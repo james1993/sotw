@@ -4,9 +4,7 @@
 #include <math.h>
 
 #define PLAYER_INDEX 0
-#define MIN_ZOOM 0.5f
-#define MAX_ZOOM 3.0f
-#define MAX_CLICK_MOVE_DISTANCE 800.0f
+#define MAX_CLICK_MOVE_DISTANCE 2000.0f
 
 void Input_Update(Camera2D *camera) {
     // Scroll wheel zoom, independent of window size - this is the direct
@@ -14,8 +12,8 @@ void Input_Update(Camera2D *camera) {
     float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) {
         camera->zoom += wheel * 0.1f;
-        if (camera->zoom < MIN_ZOOM) camera->zoom = MIN_ZOOM;
-        if (camera->zoom > MAX_ZOOM) camera->zoom = MAX_ZOOM;
+        if (camera->zoom < MIN_CAMERA_ZOOM) camera->zoom = MIN_CAMERA_ZOOM;
+        if (camera->zoom > MAX_CAMERA_ZOOM) camera->zoom = MAX_CAMERA_ZOOM;
     }
 
     Entity *player = Entity_Get(PLAYER_INDEX);

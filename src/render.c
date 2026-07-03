@@ -1,5 +1,6 @@
 #include "render.h"
 #include "entity.h"
+#include <math.h>
 
 static void DrawHealthBar(const Entity *e) {
     float w = 30.0f, h = 4.0f;
@@ -23,13 +24,27 @@ static void DrawCastBar(const Entity *e) {
 void Render_World(Camera2D camera) {
     BeginMode2D(camera);
 
+    // Grid covers whatever is actually visible, computed from the
+    // camera/screen instead of a fixed world-unit range. A hardcoded
+    // range only fills the window at the specific zoom/resolution it was
+    // tuned for - on a bigger window or when zoomed out, a fixed range
+    // left the game world as a small square surrounded by blank space.
+    int screenWidth = GetScreenWidth();
+    int screenHeight = GetScreenHeight();
+    Vector2 topLeft = GetScreenToWorld2D((Vector2){ 0, 0 }, camera);
+    Vector2 bottomRight = GetScreenToWorld2D((Vector2){ (float)screenWidth, (float)screenHeight }, camera);
+
     const int gridSpacing = 40;
-    const int range = 800;
-    for (int x = -range; x <= range; x += gridSpacing) {
-        DrawLine(x, -range, x, range, (Color){ 60, 60, 60, 255 });
+    int startX = ((int)floorf(topLeft.x / gridSpacing) - 1) * gridSpacing;
+    int endX = ((int)ceilf(bottomRight.x / gridSpacing) + 1) * gridSpacing;
+    int startY = ((int)floorf(topLeft.y / gridSpacing) - 1) * gridSpacing;
+    int endY = ((int)ceilf(bottomRight.y / gridSpacing) + 1) * gridSpacing;
+
+    for (int x = startX; x <= endX; x += gridSpacing) {
+        DrawLine(x, startY, x, endY, (Color){ 60, 60, 60, 255 });
     }
-    for (int y = -range; y <= range; y += gridSpacing) {
-        DrawLine(-range, y, range, y, (Color){ 60, 60, 60, 255 });
+    for (int y = startY; y <= endY; y += gridSpacing) {
+        DrawLine(startX, y, endX, y, (Color){ 60, 60, 60, 255 });
     }
 
     for (int i = 0; i < g_entityCount; i++) {

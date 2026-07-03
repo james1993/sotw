@@ -13,7 +13,7 @@
 // high-res window (or a fixed size that overflows a small one).
 #define UI_REFERENCE_HEIGHT 800.0f
 #define UI_MIN_SCALE 0.85f
-#define UI_MAX_SCALE 2.5f
+#define UI_MAX_SCALE 5.0f
 
 static float UIScale(int screenHeight) {
     float scale = (float)screenHeight / UI_REFERENCE_HEIGHT;

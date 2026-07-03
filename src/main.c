@@ -80,7 +80,14 @@ int main(void) {
     Camera2D camera = { 0 };
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
     camera.target = player->pos;
-    camera.zoom = 1.0f;
+    // Default zoom scales with window width instead of a flat 1.0, so the
+    // starting skirmish fills a consistent, comfortable fraction of the
+    // window on any resolution - a flat zoom looked fine on the 1280x800
+    // window it was tuned on, but left everything looking tiny and
+    // distant on a large/high-res window.
+    camera.zoom = GetScreenWidth() / 700.0f;
+    if (camera.zoom < MIN_CAMERA_ZOOM) camera.zoom = MIN_CAMERA_ZOOM;
+    if (camera.zoom > MAX_CAMERA_ZOOM) camera.zoom = MAX_CAMERA_ZOOM;
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
