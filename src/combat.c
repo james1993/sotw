@@ -1,0 +1,149 @@
+#include "combat.h"
+#include "skill.h"
+#include "effect.h"
+#include "raylib.h"
+#include <math.h>
+
+static float Dist(Vector2 a, Vector2 b) {
+    float dx = a.x - b.x, dy = a.y - b.y;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
+    Entity *caster = Entity_Get(casterIndex);
+    if (!caster || !caster->alive) return false;
+    if (slot < 0 || slot >= SKILL_BAR_SIZE) return false;
+
+    int skillIdx = caster->skillBar[slot];
+    if (skillIdx < 0 || skillIdx >= g_skillCount) return false;
+    if (Entity_IsCasting(caster)) return false;
+    if (caster->skillRecharge[slot] > 0.0f) return false;
+
+    Skill *skill = &g_skillDB[skillIdx];
+
+    if (skill->energyCost > 0 && caster->energy < skill->energyCost) return false;
+    if (skill->adrenalineCost > 0 && caster->adrenaline < skill->adrenalineCost) return false;
+
+    Entity *target = Entity_Get(targetIndex);
+    if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
+        if (!target || !target->alive || target->team == caster->team) return false;
+        if (Dist(caster->pos, target->pos) > skill->range) return false;
+    }
+    if (skill->targeting == TARGET_SINGLE_ALLY) {
+        if (!target || !target->alive || target->team != caster->team) return false;
+        if (Dist(caster->pos, target->pos) > skill->range) return false;
+    }
+
+    caster->energy -= skill->energyCost;
+    caster->adrenaline -= skill->adrenalineCost;
+    if (caster->adrenaline < 0) caster->adrenaline = 0;
+
+    if (skill->castTime > 0.0f) {
+        caster->castingSlot = slot;
+        caster->castTimeRemaining = skill->castTime;
+        caster->castTimeTotal = skill->castTime;
+        caster->targetIndex = targetIndex;
+        caster->hasMoveTarget = false; // casting roots the caster, matches GW1 spellcasting
+    } else {
+        Effect_Execute(caster, skill, target);
+        caster->skillRecharge[slot] = skill->recharge;
+    }
+    return true;
+}
+
+static void ResolveCast(Entity *caster) {
+    int slot = caster->castingSlot;
+    int skillIdx = caster->skillBar[slot];
+    Skill *skill = &g_skillDB[skillIdx];
+    Entity *target = Entity_Get(caster->targetIndex);
+
+    bool targetStillValid = true;
+    if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
+        targetStillValid = target && target->alive;
+    }
+    if (targetStillValid) {
+        Effect_Execute(caster, skill, target);
+    }
+
+    caster->skillRecharge[slot] = skill->recharge;
+    caster->castingSlot = -1;
+}
+
+void Combat_UpdateEntity(Entity *e, float dt) {
+    if (!e->alive) return;
+
+    // Energy regen: roughly one pip every 3 seconds at baseline.
+    e->energyRegenAccum += dt;
+    const float regenInterval = 3.0f;
+    if (e->energyRegenAccum >= regenInterval) {
+        e->energyRegenAccum -= regenInterval;
+        e->energy++;
+        if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+    }
+
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        if (e->skillRecharge[i] > 0.0f) {
+            e->skillRecharge[i] -= dt;
+            if (e->skillRecharge[i] < 0.0f) e->skillRecharge[i] = 0.0f;
+        }
+    }
+
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        ActiveEffect *fx = &e->effects[i];
+        if (!fx->active) continue;
+        fx->remaining -= dt;
+        if (fx->tickDamage > 0.0f) {
+            fx->tickAccum += dt;
+            if (fx->tickAccum >= 1.0f) {
+                fx->tickAccum -= 1.0f;
+                Entity_ApplyDamage(e, (int)fx->tickDamage);
+            }
+        }
+        if (fx->remaining <= 0.0f) fx->active = false;
+    }
+
+    if (Entity_IsCasting(e)) {
+        e->castTimeRemaining -= dt;
+        if (e->castTimeRemaining <= 0.0f) {
+            ResolveCast(e);
+        }
+        return; // no movement/attacks while casting
+    }
+
+    if (e->hasMoveTarget) {
+        float dx = e->moveTarget.x - e->pos.x;
+        float dy = e->moveTarget.y - e->pos.y;
+        float d = sqrtf(dx * dx + dy * dy);
+        if (d > 2.0f) {
+            e->pos.x += (dx / d) * e->moveSpeed * dt;
+            e->pos.y += (dy / d) * e->moveSpeed * dt;
+        } else {
+            e->hasMoveTarget = false;
+        }
+    }
+
+    Entity *target = Entity_Get(e->targetIndex);
+    if (target && target->alive && target->team != e->team) {
+        float d = Dist(e->pos, target->pos);
+        if (d <= e->attackRange) {
+            e->hasMoveTarget = false;
+            e->attackTimer -= dt;
+            if (e->attackTimer <= 0.0f) {
+                int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
+                Entity_ApplyDamage(target, dmg);
+                e->adrenaline += 4; // basic attacks also build adrenaline in GW1
+                if (e->adrenaline > 100) e->adrenaline = 100;
+                e->attackTimer = e->attackInterval;
+            }
+        } else {
+            e->moveTarget = target->pos;
+            e->hasMoveTarget = true;
+        }
+    }
+}
+
+void Combat_TickTimers(float dt) {
+    for (int i = 0; i < g_entityCount; i++) {
+        Combat_UpdateEntity(&g_entities[i], dt);
+    }
+}
