@@ -19,6 +19,15 @@ void Input_Update(Camera2D *camera) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player || !player->alive) return;
 
+    // Explicit manual override: always clears the current target/chase
+    // order, regardless of what a click resolves to. A guaranteed way to
+    // stop auto-chasing an out-of-range target without needing to land a
+    // click that's certain to miss every entity.
+    if (IsKeyPressed(KEY_ESCAPE)) {
+        player->targetIndex = -1;
+        player->hasMoveTarget = false;
+    }
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         Vector2 mouseScreen = GetMousePosition();
         Vector2 world = GetScreenToWorld2D(mouseScreen, *camera);

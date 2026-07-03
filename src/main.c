@@ -12,26 +12,22 @@
 
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_VSYNC_HINT);
-    InitWindow(1280, 800, "Guild Wars 1 2D Demake - Prototype");
+    InitWindow(1600, 900, "Guild Wars 1 2D Demake - Prototype");
 
-    // Two independent attempts at "start big," since neither is reliable
-    // on its own: FLAG_WINDOW_MAXIMIZED depends on a window manager being
-    // present and honoring the request (normal on Windows/macOS/desktop
-    // Linux, but a no-op under a bare X server with no WM), while
-    // GetMonitorWidth/Height can silently return 0 on some platforms.
-    // Doing both means either one succeeding is enough to avoid being
-    // stuck at the small InitWindow fallback size above.
+    // Ask the OS/window manager to maximize the window - this is the only
+    // sizing mechanism used, because computing a size ourselves from
+    // GetMonitorWidth/Height is unreliable: that call returns *physical*
+    // pixels, while SetWindowSize expects *logical* points on any display
+    // using OS-level scaling (Windows DPI scaling, macOS Retina). Mixing
+    // the two previously produced a window sized far larger than the
+    // real desktop, which is what made everything look zoomed out and
+    // pushed the skill bar off the bottom of the visible window.
+    // Maximizing delegates all of that unit conversion to the OS, so
+    // there's no manual pixel math to get wrong. If no window manager is
+    // present to honor the request (e.g. a bare X server), the window
+    // simply stays at the 1600x900 fallback above - resizable, so it can
+    // still be dragged bigger by hand.
     SetWindowState(FLAG_WINDOW_MAXIMIZED);
-
-    int monitor = GetCurrentMonitor();
-    int monitorW = GetMonitorWidth(monitor);
-    int monitorH = GetMonitorHeight(monitor);
-    if (monitorW > 0 && monitorH > 0) {
-        int windowW = (int)(monitorW * 0.85f);
-        int windowH = (int)(monitorH * 0.85f);
-        SetWindowSize(windowW, windowH);
-        SetWindowPosition((monitorW - windowW) / 2, (monitorH - windowH) / 2);
-    }
 
     SetWindowMinSize(960, 600);
     SetTargetFPS(60);
@@ -102,7 +98,7 @@ int main(void) {
 
         int uiFontSize = UI_ScaledFontSize(screenHeight, 16);
         DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
-        DrawText("Keys 1-4: your skill bar. Scroll wheel to zoom. The hero acts on its own.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
+        DrawText("Keys 1-4: your skill bar. Scroll wheel to zoom. Escape clears your target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
         DrawFPS(screenWidth - 90, 10);
 
         EndDrawing();
