@@ -11,10 +11,21 @@
 #define PLAYER_INDEX 0
 
 int main(void) {
-    const int screenWidth = 1280;
-    const int screenHeight = 800;
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_VSYNC_HINT);
+    InitWindow(1280, 800, "Guild Wars 1 2D Demake - Prototype");
 
-    InitWindow(screenWidth, screenHeight, "Guild Wars 1 2D Demake - Prototype");
+    // Default to a window sized relative to the actual monitor instead of
+    // a fixed 1280x800, so the game isn't a tiny box on a high-res display.
+    int monitor = GetCurrentMonitor();
+    int monitorW = GetMonitorWidth(monitor);
+    int monitorH = GetMonitorHeight(monitor);
+    if (monitorW > 0 && monitorH > 0) {
+        int windowW = (int)(monitorW * 0.8f);
+        int windowH = (int)(monitorH * 0.8f);
+        SetWindowSize(windowW, windowH);
+        SetWindowPosition((monitorW - windowW) / 2, (monitorH - windowH) / 2);
+    }
+    SetWindowMinSize(960, 600);
     SetTargetFPS(60);
 
     SkillDB_Init();
@@ -54,14 +65,20 @@ int main(void) {
     monster->skillBar[0] = 8; // Claw Swipe
 
     Camera2D camera = { 0 };
-    camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f };
+    camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
     camera.target = player->pos;
     camera.zoom = 1.0f;
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
+        int screenWidth = GetScreenWidth();
+        int screenHeight = GetScreenHeight();
 
-        Input_Update(camera);
+        // Re-centered every frame so resizing the window (or moving it to
+        // a different monitor) doesn't leave the camera offset stale.
+        camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f };
+
+        Input_Update(&camera);
         AI_Update(dt);
         Combat_TickTimers(dt);
 
@@ -75,8 +92,9 @@ int main(void) {
         UI_DrawSkillBar(screenWidth, screenHeight);
         UI_DrawResourceBars(screenWidth, screenHeight);
 
-        DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, 16, LIGHTGRAY);
-        DrawText("Keys 1-4: your skill bar. The hero acts on its own, exactly like a GW1 hero.", 20, 40, 16, LIGHTGRAY);
+        int uiFontSize = UI_ScaledFontSize(screenHeight, 16);
+        DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
+        DrawText("Keys 1-4: your skill bar. Scroll wheel to zoom. The hero acts on its own.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
         DrawFPS(screenWidth - 90, 10);
 
         EndDrawing();
