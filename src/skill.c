@@ -48,8 +48,8 @@ static void AddStep(Skill *s, EffectKind kind, float base, float perRank, int co
 
 // Skill DB indices, in registration order below:
 //  0 Gash            4 Fire Bolt      8 Claw Swipe (monster)
-//  1 Rush Strike      5 Cinder Storm
-//  2 Battle Cry        6 Mind Sear
+//  1 Rush Strike      5 Cinder Storm    9 Distracting Blow
+//  2 Battle Cry        6 Mind Sear      10 Feral Howl (monster)
 //  3 Deathblow (elite)  7 Meteor (elite)
 void SkillDB_Init(void) {
     g_skillCount = 0;
@@ -100,9 +100,26 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_DAMAGE, 25, 4.0f, 0, 0);
     SkillDB_Register(s);
 
-    // --- Monster skill ---
+    // --- Monster skills ---
     s = MakeSkill("Claw Swipe", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
                   0, 25, 0.0f, 3.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 10, 0, 0, 0);
+    SkillDB_Register(s);
+
+    // --- Interrupt: demonstrates cast time actually meaning something -
+    // this only has a target to punish because Fire Bolt/Cinder Storm/
+    // Feral Howl all have real cast times a player can watch and react to.
+    s = MakeSkill("Distracting Blow", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+                  0, 25, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 5, 1.0f, 0, 0);
+    AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
+    SkillDB_Register(s);
+
+    // Gives the monster a cast-time skill worth interrupting - without
+    // this its only skill (Claw Swipe) is instant and has nothing an
+    // interrupt could punish.
+    s = MakeSkill("Feral Howl", SKILLTYPE_SPELL, ATTR_STRENGTH,
+                  5, 0, 1.5f, 10.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_HEAL, 30, 0, 0, 0);
     SkillDB_Register(s);
 }

@@ -6,6 +6,7 @@
 #include "ai_hero.h"
 #include "input.h"
 #include "ui_skillbar.h"
+#include "ui_target.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -57,6 +58,7 @@ int main(void) {
     player->skillBar[1] = 1; // Rush Strike
     player->skillBar[2] = 2; // Battle Cry
     player->skillBar[3] = 3; // Deathblow (elite)
+    player->skillBar[4] = 9; // Distracting Blow (interrupt)
 
     // Hero: player-configured AI companion, Elementalist primary -
     // demonstrating the hero system from docs/research/gw1-mechanics.md #10.
@@ -75,7 +77,12 @@ int main(void) {
     Entity *monster = Entity_Get(monsterIdx);
     monster->attributeRank[ATTR_STRENGTH] = 8;
     monster->maxHp = monster->hp = 220;
-    monster->skillBar[0] = 8; // Claw Swipe
+    monster->maxEnergy = monster->energy = 20;
+    // Feral Howl first in priority so the AI actually casts it whenever
+    // it's up, rather than Claw Swipe (always available once adrenaline
+    // is full) crowding it out - see ai_hero.c's priority-order scan.
+    monster->skillBar[0] = 10; // Feral Howl (self-heal - interrupt it!)
+    monster->skillBar[1] = 8;  // Claw Swipe
 
     Camera2D camera = { 0 };
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
@@ -114,8 +121,11 @@ int main(void) {
 
         int uiFontSize = UI_ScaledFontSize(screenHeight, 16);
         DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
-        DrawText("Keys 1-4: your skill bar. Scroll wheel to zoom. Escape clears your target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
+        DrawText("Keys 1-5: your skill bar (5 = interrupt). Scroll wheel to zoom. Escape clears target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
         DrawFPS(screenWidth - 90, 10);
+
+        // Target panel starts below the help text so the two never overlap.
+        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + 2 * (uiFontSize + 4) + 16);
 
         EndDrawing();
     }

@@ -48,9 +48,14 @@ bool Entity_IsCasting(const Entity *e) {
     return e->castingSlot >= 0;
 }
 
+void Entity_MarkInCombat(Entity *e) {
+    e->timeSinceCombat = 0.0f;
+}
+
 void Entity_ApplyDamage(Entity *e, int amount) {
     if (!e->alive) return;
     e->hp -= amount;
+    Entity_MarkInCombat(e);
     if (e->hp <= 0) {
         e->hp = 0;
         e->alive = false;

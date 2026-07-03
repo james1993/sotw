@@ -29,6 +29,7 @@ add_executable(sotw_demake
     src/ai_hero.c
     src/input.c
     src/ui_skillbar.c
+    src/ui_target.c
     src/render.c
 )
 

@@ -9,6 +9,13 @@ static float Dist(Vector2 a, Vector2 b) {
     return sqrtf(dx * dx + dy * dy);
 }
 
+// GW1 splits health regen into a slow in-combat trickle and a much
+// faster regen once you haven't dealt or taken damage in a few seconds -
+// the "sit down and rest" pattern most RPGs use. See
+// docs/research/gw1-mechanics.md.
+#define OUT_OF_COMBAT_DELAY 4.0f
+#define OUT_OF_COMBAT_REGEN_PCT_PER_SEC 0.06f
+
 bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     Entity *caster = Entity_Get(casterIndex);
     if (!caster || !caster->alive) return false;
@@ -81,6 +88,24 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
     }
 
+    // Health regen: nothing while anyone's recently traded blows, then a
+    // fast percentage-of-max regen once things have been quiet a moment.
+    e->timeSinceCombat += dt;
+    if (e->timeSinceCombat >= OUT_OF_COMBAT_DELAY && e->hp > 0 && e->hp < e->maxHp) {
+        e->hpRegenAccum += (float)e->maxHp * OUT_OF_COMBAT_REGEN_PCT_PER_SEC * dt;
+        while (e->hpRegenAccum >= 1.0f && e->hp < e->maxHp) {
+            e->hpRegenAccum -= 1.0f;
+            e->hp++;
+        }
+    } else {
+        e->hpRegenAccum = 0.0f;
+    }
+
+    if (e->interruptFlashTimer > 0.0f) {
+        e->interruptFlashTimer -= dt;
+        if (e->interruptFlashTimer < 0.0f) e->interruptFlashTimer = 0.0f;
+    }
+
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
         if (e->skillRecharge[i] > 0.0f) {
             e->skillRecharge[i] -= dt;
@@ -131,6 +156,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
                 Entity_ApplyDamage(target, dmg);
+                Entity_MarkInCombat(e);
                 e->adrenaline += 4; // basic attacks also build adrenaline in GW1
                 if (e->adrenaline > 100) e->adrenaline = 100;
                 e->attackTimer = e->attackInterval;

@@ -13,6 +13,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
         case FX_DAMAGE: {
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
             Entity_ApplyDamage(target, dmg);
+            Entity_MarkInCombat(caster);
             break;
         }
         case FX_HEAL: {
@@ -55,6 +56,21 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // driven by step->duration.
             target->castingSlot = -1;
             target->hasMoveTarget = false;
+            break;
+        }
+        case FX_INTERRUPT: {
+            if (target->castingSlot >= 0) {
+                int slot = target->castingSlot;
+                int interruptedSkillIdx = target->skillBar[slot];
+                if (interruptedSkillIdx >= 0 && interruptedSkillIdx < g_skillCount) {
+                    // GW1's interrupt penalty: the interrupted skill gets a
+                    // longer recharge than if it had simply been used.
+                    target->skillRecharge[slot] = g_skillDB[interruptedSkillIdx].recharge * 2.0f;
+                }
+                target->castingSlot = -1;
+                target->castTimeRemaining = 0.0f;
+                target->interruptFlashTimer = 1.0f;
+            }
             break;
         }
         default:

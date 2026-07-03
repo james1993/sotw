@@ -46,6 +46,8 @@ typedef struct Entity {
     int hp, maxHp;
     int energy, maxEnergy;
     float energyRegenAccum;
+    float hpRegenAccum;
+    float timeSinceCombat; // seconds since this entity last dealt or took damage
     int adrenaline; // simplified 0-100 shared pool (GW1 tracks this per adrenaline skill)
 
     int primaryProfession;
@@ -64,6 +66,8 @@ typedef struct Entity {
     int attackDamageMin, attackDamageMax;
     float attackRange;
 
+    float interruptFlashTimer; // > 0 briefly after being interrupted, for UI feedback
+
     ActiveEffect effects[MAX_ACTIVE_EFFECTS];
 } Entity;
 
@@ -74,5 +78,12 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
 Entity *Entity_Get(int index);
 bool Entity_IsCasting(const Entity *e);
 void Entity_ApplyDamage(Entity *e, int amount);
+
+// Resets the out-of-combat regen timer. Called whenever an entity deals
+// or takes damage, matching GW1's "recent combat activity blocks fast
+// regen" rule (see docs/research/gw1-mechanics.md - health here isn't a
+// GW1 resource with its own pips, but the in/out-of-combat regen split
+// is a faithful simplification of the same idea).
+void Entity_MarkInCombat(Entity *e);
 
 #endif

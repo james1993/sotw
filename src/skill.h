@@ -34,7 +34,12 @@ typedef enum {
     FX_APPLY_CONDITION,
     FX_ENERGY_DELTA,
     FX_ADRENALINE_DELTA,
-    FX_KNOCKDOWN
+    FX_KNOCKDOWN,
+    // Cancels the target's current cast (if any) and applies an extra
+    // recharge penalty to the interrupted skill, same as GW1's interrupt
+    // skills - the whole reason cast time exists as a distinct mechanic
+    // from instant skills is so interrupts have something to punish.
+    FX_INTERRUPT
 } EffectKind;
 
 typedef struct {
