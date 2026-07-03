@@ -14,17 +14,25 @@ int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_VSYNC_HINT);
     InitWindow(1280, 800, "Guild Wars 1 2D Demake - Prototype");
 
-    // Default to a window sized relative to the actual monitor instead of
-    // a fixed 1280x800, so the game isn't a tiny box on a high-res display.
+    // Two independent attempts at "start big," since neither is reliable
+    // on its own: FLAG_WINDOW_MAXIMIZED depends on a window manager being
+    // present and honoring the request (normal on Windows/macOS/desktop
+    // Linux, but a no-op under a bare X server with no WM), while
+    // GetMonitorWidth/Height can silently return 0 on some platforms.
+    // Doing both means either one succeeding is enough to avoid being
+    // stuck at the small InitWindow fallback size above.
+    SetWindowState(FLAG_WINDOW_MAXIMIZED);
+
     int monitor = GetCurrentMonitor();
     int monitorW = GetMonitorWidth(monitor);
     int monitorH = GetMonitorHeight(monitor);
     if (monitorW > 0 && monitorH > 0) {
-        int windowW = (int)(monitorW * 0.8f);
-        int windowH = (int)(monitorH * 0.8f);
+        int windowW = (int)(monitorW * 0.85f);
+        int windowH = (int)(monitorH * 0.85f);
         SetWindowSize(windowW, windowH);
         SetWindowPosition((monitorW - windowW) / 2, (monitorH - windowH) / 2);
     }
+
     SetWindowMinSize(960, 600);
     SetTargetFPS(60);
 
