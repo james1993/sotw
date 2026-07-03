@@ -11,7 +11,16 @@
 #define PLAYER_INDEX 0
 
 int main(void) {
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_VSYNC_HINT);
+    // Deliberately NOT using FLAG_WINDOW_HIGHDPI: on displays with OS-level
+    // scaling it can make GetScreenWidth()/GetScreenHeight() disagree in
+    // scale with what GetMousePosition() actually reports, which is a
+    // very likely explanation for click-to-move sending the player to a
+    // wildly wrong, consistently-offset world position - every click
+    // landing "way off in one direction" rather than where the cursor
+    // actually was. Rendering may be a little softer on Retina/4K
+    // displays without it, but coordinates staying consistent matters
+    // far more than crispness right now.
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
     InitWindow(1600, 900, "Guild Wars 1 2D Demake - Prototype");
 
     // Ask the OS/window manager to maximize the window - this is the only
