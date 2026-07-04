@@ -28,11 +28,15 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
 
     e->castingSlot = -1;
     e->targetIndex = -1;
+    e->lastCastSkillSlot = -1;
 
     e->attackInterval = 1.33f; // matches a common GW1 weapon attack speed
     e->attackDamageMin = 6;
     e->attackDamageMax = 12;
     e->attackRange = 28.0f;
+
+    e->spawnPos = pos;
+    e->aggroed = false;
 
     for (int i = 0; i < SKILL_BAR_SIZE; i++) e->skillBar[i] = -1;
 

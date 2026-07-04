@@ -21,8 +21,6 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
 
     float scale = PanelScale(screenHeight);
     int panelW = (int)(340 * scale);
-    int slotSize = (int)(36 * scale);
-    int gap = (int)(4 * scale);
     int barH = (int)(20 * scale);
     int font = (int)(14 * scale);
     int smallFont = (int)(10 * scale);
@@ -44,52 +42,58 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     DrawText(hpLabel, x + pad, y + 2, smallFont, RAYWHITE);
     y += barH + pad;
 
+    // Only ever show the skill the target is *currently* using, or the
+    // one they *just* used (for a few seconds after) - never their whole
+    // kit. This matches GW1's own target bar: you have to actually watch
+    // for a cast to react to it, not read it off a static skill list.
+    int displaySlot = -1;
+    bool isLive = false;
     if (Entity_IsCasting(target)) {
-        float castPct = (target->castTimeTotal > 0.0f)
-            ? 1.0f - (target->castTimeRemaining / target->castTimeTotal) : 0.0f;
-        int castBarH = (int)(12 * scale);
-        DrawRectangle(x, y, panelW, castBarH, (Color){ 30, 30, 30, 255 });
-        DrawRectangle(x, y, (int)(panelW * castPct), castBarH, SKYBLUE);
-        DrawRectangleLines(x, y, panelW, castBarH, BLACK);
-        int castingSkillIdx = target->skillBar[target->castingSlot];
-        if (castingSkillIdx >= 0 && castingSkillIdx < g_skillCount) {
-            DrawText(g_skillDB[castingSkillIdx].name, x + pad, y, smallFont, RAYWHITE);
+        displaySlot = target->castingSlot;
+        isLive = true;
+    } else if (target->postCastDisplayTimer > 0.0f && target->lastCastSkillSlot >= 0) {
+        displaySlot = target->lastCastSkillSlot;
+        isLive = false;
+    }
+
+    if (displaySlot >= 0) {
+        int skillIdx = target->skillBar[displaySlot];
+        if (skillIdx >= 0 && skillIdx < g_skillCount) {
+            Skill *s = &g_skillDB[skillIdx];
+            int castBarH = (int)(18 * scale);
+
+            float pct;
+            Color fillColor;
+            if (isLive) {
+                pct = (target->castTimeTotal > 0.0f)
+                    ? 1.0f - (target->castTimeRemaining / target->castTimeTotal) : 1.0f;
+                fillColor = SKYBLUE;
+            } else if (target->lastCastInterrupted) {
+                pct = 1.0f;
+                fillColor = (Color){ 180, 70, 70, 255 };
+            } else {
+                pct = 1.0f;
+                fillColor = (Color){ 80, 170, 90, 255 };
+            }
+
+            DrawRectangle(x, y, panelW, castBarH, (Color){ 30, 30, 30, 255 });
+            DrawRectangle(x, y, (int)(panelW * pct), castBarH, fillColor);
+            DrawRectangleLines(x, y, panelW, castBarH, BLACK);
+
+            char label[48];
+            if (!isLive && target->lastCastInterrupted) {
+                snprintf(label, sizeof(label), "%s (interrupted)", s->name);
+            } else {
+                snprintf(label, sizeof(label), "%s", s->name);
+            }
+            DrawText(label, x + pad, y + 2, smallFont, s->isElite ? GOLD : RAYWHITE);
+            y += castBarH + pad;
         }
-        y += castBarH + pad;
     }
 
     if (target->interruptFlashTimer > 0.0f) {
         const char *label = "INTERRUPTED!";
         int tw = MeasureText(label, font);
         DrawText(label, x + (panelW - tw) / 2, y, font, GOLD);
-        y += font + pad;
-    }
-
-    // Read-only display of the target's equipped skills, so you can see
-    // what they might use (and, combined with the cast bar above, when
-    // it's worth trying to interrupt).
-    int totalSkillWidth = SKILL_BAR_SIZE * slotSize + (SKILL_BAR_SIZE - 1) * gap;
-    int skillX = x + (panelW - totalSkillWidth) / 2;
-    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
-        int sx = skillX + i * (slotSize + gap);
-        Rectangle rect = { (float)sx, (float)y, (float)slotSize, (float)slotSize };
-
-        int skillIdx = target->skillBar[i];
-        bool isCastingThis = Entity_IsCasting(target) && target->castingSlot == i;
-        Color base = (skillIdx < 0) ? (Color){ 20, 20, 20, 255 }
-            : (isCastingThis ? (Color){ 70, 110, 160, 255 } : (Color){ 45, 45, 60, 255 });
-        DrawRectangleRec(rect, base);
-        DrawRectangleLinesEx(rect, isCastingThis ? 2 : 1, isCastingThis ? SKYBLUE : (Color){ 140, 140, 140, 255 });
-
-        if (skillIdx >= 0 && skillIdx < g_skillCount) {
-            Skill *s = &g_skillDB[skillIdx];
-            DrawText(s->name, sx + 2, y + 2, smallFont, s->isElite ? GOLD : RAYWHITE);
-            if (target->skillRecharge[i] > 0.0f) {
-                float pct = target->skillRecharge[i] / s->recharge;
-                if (pct > 1.0f) pct = 1.0f;
-                int overlayH = (int)(slotSize * pct);
-                DrawRectangle(sx, y + (slotSize - overlayH), slotSize, overlayH, (Color){ 0, 0, 0, 160 });
-            }
-        }
     }
 }

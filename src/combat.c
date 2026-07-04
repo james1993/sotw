@@ -45,6 +45,10 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     caster->adrenaline -= skill->adrenalineCost;
     if (caster->adrenaline < 0) caster->adrenaline = 0;
 
+    // Which skill the target panel shows as "current/recent" - set here so
+    // it covers both branches below, not just cast-time skills.
+    caster->lastCastSkillSlot = slot;
+
     if (skill->castTime > 0.0f) {
         caster->castingSlot = slot;
         caster->castTimeRemaining = skill->castTime;
@@ -54,6 +58,8 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     } else {
         Effect_Execute(caster, skill, target);
         caster->skillRecharge[slot] = skill->recharge;
+        caster->lastCastInterrupted = false;
+        caster->postCastDisplayTimer = 3.0f;
     }
     return true;
 }
@@ -74,6 +80,8 @@ static void ResolveCast(Entity *caster) {
 
     caster->skillRecharge[slot] = skill->recharge;
     caster->castingSlot = -1;
+    caster->lastCastInterrupted = false;
+    caster->postCastDisplayTimer = 3.0f;
 }
 
 void Combat_UpdateEntity(Entity *e, float dt) {
@@ -104,6 +112,11 @@ void Combat_UpdateEntity(Entity *e, float dt) {
     if (e->interruptFlashTimer > 0.0f) {
         e->interruptFlashTimer -= dt;
         if (e->interruptFlashTimer < 0.0f) e->interruptFlashTimer = 0.0f;
+    }
+
+    if (e->postCastDisplayTimer > 0.0f) {
+        e->postCastDisplayTimer -= dt;
+        if (e->postCastDisplayTimer < 0.0f) e->postCastDisplayTimer = 0.0f;
     }
 
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
@@ -157,6 +170,13 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
                 Entity_ApplyDamage(target, dmg);
                 Entity_MarkInCombat(e);
+                if (target->kind == ENT_MONSTER && !target->aggroed) {
+                    // Landing a hit wakes a sleeping monster up regardless
+                    // of its aggro range - pulling with melee still works,
+                    // it just means getting close enough to swing first.
+                    target->aggroed = true;
+                    target->targetIndex = (int)(e - g_entities);
+                }
                 e->adrenaline += 4; // basic attacks also build adrenaline in GW1
                 if (e->adrenaline > 100) e->adrenaline = 100;
                 e->attackTimer = e->attackInterval;

@@ -73,16 +73,39 @@ int main(void) {
     hero->skillBar[1] = 5; // Cinder Storm
     hero->skillBar[2] = 6; // Mind Sear (energy management)
 
+    // A loose group of three, spaced further apart than any one monster's
+    // aggro range - approaching one doesn't automatically wake the others,
+    // so pulling them one at a time (rather than fighting all three at
+    // once) is a real, spatially-legible option. See
+    // docs/research/gw1-mechanics.md #7 and ai_hero.c.
     int monsterIdx = Entity_Spawn(ENT_MONSTER, "Charr Brute", 1, (Vector2){ 260, 20 }, (Color){ 90, 90, 90, 255 });
     Entity *monster = Entity_Get(monsterIdx);
     monster->attributeRank[ATTR_STRENGTH] = 8;
     monster->maxHp = monster->hp = 220;
     monster->maxEnergy = monster->energy = 20;
+    monster->aggroRange = 130.0f;
+    monster->leashRange = 320.0f;
     // Feral Howl first in priority so the AI actually casts it whenever
     // it's up, rather than Claw Swipe (always available once adrenaline
     // is full) crowding it out - see ai_hero.c's priority-order scan.
     monster->skillBar[0] = 10; // Feral Howl (self-heal - interrupt it!)
     monster->skillBar[1] = 8;  // Claw Swipe
+
+    int gruntAIdx = Entity_Spawn(ENT_MONSTER, "Charr Grunt", 1, (Vector2){ 440, 110 }, (Color){ 100, 90, 80, 255 });
+    Entity *gruntA = Entity_Get(gruntAIdx);
+    gruntA->attributeRank[ATTR_STRENGTH] = 6;
+    gruntA->maxHp = gruntA->hp = 140;
+    gruntA->aggroRange = 120.0f;
+    gruntA->leashRange = 300.0f;
+    gruntA->skillBar[0] = 8; // Claw Swipe
+
+    int gruntBIdx = Entity_Spawn(ENT_MONSTER, "Charr Grunt", 1, (Vector2){ 400, -130 }, (Color){ 100, 90, 80, 255 });
+    Entity *gruntB = Entity_Get(gruntBIdx);
+    gruntB->attributeRank[ATTR_STRENGTH] = 6;
+    gruntB->maxHp = gruntB->hp = 140;
+    gruntB->aggroRange = 120.0f;
+    gruntB->leashRange = 300.0f;
+    gruntB->skillBar[0] = 8; // Claw Swipe
 
     Camera2D camera = { 0 };
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
@@ -122,10 +145,11 @@ int main(void) {
         int uiFontSize = UI_ScaledFontSize(screenHeight, 16);
         DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
         DrawText("Keys 1-5: your skill bar (5 = interrupt). Scroll wheel to zoom. Escape clears target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
+        DrawText("Faint circles mark sleeping monsters' aggro range - pull one at a time instead of the whole group.", 20, 20 + 2 * (uiFontSize + 4), uiFontSize, LIGHTGRAY);
         DrawFPS(screenWidth - 90, 10);
 
         // Target panel starts below the help text so the two never overlap.
-        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + 2 * (uiFontSize + 4) + 16);
+        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + 3 * (uiFontSize + 4) + 16);
 
         EndDrawing();
     }

@@ -14,6 +14,13 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
             Entity_ApplyDamage(target, dmg);
             Entity_MarkInCombat(caster);
+            if (target->kind == ENT_MONSTER && !target->aggroed) {
+                // A ranged pull: damaging a sleeping monster wakes it up
+                // even from outside its passive aggro range, same as
+                // GW1 - this is what lets a bow/spell pull work at all.
+                target->aggroed = true;
+                target->targetIndex = (int)(caster - g_entities);
+            }
             break;
         }
         case FX_HEAL: {
@@ -70,6 +77,8 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 target->castingSlot = -1;
                 target->castTimeRemaining = 0.0f;
                 target->interruptFlashTimer = 1.0f;
+                target->lastCastInterrupted = true;
+                target->postCastDisplayTimer = 3.0f;
             }
             break;
         }

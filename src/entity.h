@@ -68,6 +68,24 @@ typedef struct Entity {
 
     float interruptFlashTimer; // > 0 briefly after being interrupted, for UI feedback
 
+    // Target-panel display: which skill to show as "currently/recently
+    // used" (see ui_target.c). Set whenever a skill is activated; the
+    // post-cast window keeps it visible for a few seconds after a cast
+    // resolves or gets interrupted, matching how a GW1 target bar shows
+    // what your target just did, not their whole skill bar.
+    int lastCastSkillSlot;
+    float postCastDisplayTimer;
+    bool lastCastInterrupted;
+
+    // Aggro/leash (monsters only - see docs/research/gw1-mechanics.md #7
+    // and ai_hero.c). A monster is passive until something enters
+    // aggroRange or hits it; if it or its target strays more than
+    // leashRange from spawnPos, it gives up, walks home, and resets.
+    Vector2 spawnPos;
+    float aggroRange;
+    float leashRange;
+    bool aggroed;
+
     ActiveEffect effects[MAX_ACTIVE_EFFECTS];
 } Entity;
 

@@ -119,6 +119,17 @@ void Render_World(Camera2D camera) {
 
     DrawEnvironment();
 
+    // Faint aggro-range circle around idle monsters, so the new pull
+    // mechanic is legible while learning it (real GW1 famously doesn't
+    // show this, which is exactly why pulling is a "feel" skill there -
+    // but for a demake introducing the mechanic, showing the boundary is
+    // worth the trade-off).
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (!e->alive || e->kind != ENT_MONSTER || e->aggroed) continue;
+        DrawCircleLines((int)e->spawnPos.x, (int)e->spawnPos.y, e->aggroRange, (Color){ 220, 170, 60, 70 });
+    }
+
     // Ring under the player's current target, so it's obvious at a glance
     // which entity the target panel/skill-bar actions apply to.
     Entity *player = Entity_Get(PLAYER_INDEX);
