@@ -9,9 +9,12 @@
 #define MAX_CAMERA_ZOOM 6.0f
 
 // Click-to-move + click-to-target + 1-8 skill bar hotkeys for the
-// player entity (index 0), plus scroll-wheel camera zoom. Takes the
-// camera by pointer since zoom needs to persist back to the caller.
+// player entity (index 0), plus scroll-wheel camera zoom and gamepad
+// support (left stick moves, nearest foe in attack range is
+// auto-targeted for auto-attack, L2 + A/B/X/Y = skills 1-4 and
+// R2 + A/B/X/Y = skills 5-8). Takes the camera by pointer since zoom
+// needs to persist back to the caller; dt drives stick movement.
 // See docs/design/demake-design.md #1.
-void Input_Update(Camera2D *camera);
+void Input_Update(Camera2D *camera, float dt);
 
 #endif

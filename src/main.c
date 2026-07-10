@@ -128,7 +128,7 @@ int main(void) {
         // a different monitor) doesn't leave the camera offset stale.
         camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f };
 
-        Input_Update(&camera);
+        Input_Update(&camera, dt);
         AI_Update(dt);
         Combat_TickTimers(dt);
 
@@ -146,10 +146,15 @@ int main(void) {
         DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
         DrawText("Keys 1-5: your skill bar (5 = interrupt). Scroll wheel to zoom. Escape clears target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
         DrawText("Faint circles mark sleeping monsters' aggro range - pull one at a time instead of the whole group.", 20, 20 + 2 * (uiFontSize + 4), uiFontSize, LIGHTGRAY);
+        if (IsGamepadAvailable(0)) {
+            DrawText("Controller: left stick moves (auto-attacks in range), L2+A/B/X/Y = skills 1-4, R2+A/B/X/Y = skills 5-8.", 20, 20 + 3 * (uiFontSize + 4), uiFontSize, (Color){ 150, 200, 150, 255 });
+        }
         DrawFPS(screenWidth - 90, 10);
 
-        // Target panel starts below the help text so the two never overlap.
-        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + 3 * (uiFontSize + 4) + 16);
+        // Target panel starts below the help text so the two never overlap
+        // (one extra line of help text when a controller is connected).
+        int helpLines = IsGamepadAvailable(0) ? 4 : 3;
+        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + helpLines * (uiFontSize + 4) + 16);
 
         EndDrawing();
     }
