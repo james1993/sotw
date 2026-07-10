@@ -26,21 +26,48 @@ int UI_ScaledFontSize(int screenHeight, int baseSize) {
     return (int)(baseSize * UIScale(screenHeight));
 }
 
+// One shared layout so the skill bar and the health/energy bars flanking
+// it (GW1-style: HP to the left of the bar, energy to the right, all
+// bottom-center) always agree on geometry.
+typedef struct {
+    float scale;
+    int slotSize, gap, font;
+    int startX, y;        // skill bar origin
+    int totalWidth;
+} HudLayout;
+
+static HudLayout ComputeHudLayout(int screenWidth, int screenHeight) {
+    HudLayout L;
+    L.scale = UIScale(screenHeight);
+    L.slotSize = (int)(56 * L.scale);
+    L.gap = (int)(6 * L.scale);
+    L.font = (int)(10 * L.scale);
+    L.totalWidth = SKILL_BAR_SIZE * L.slotSize + (SKILL_BAR_SIZE - 1) * L.gap;
+    L.startX = (screenWidth - L.totalWidth) / 2;
+    L.y = screenHeight - L.slotSize - (int)(20 * L.scale);
+    return L;
+}
+
+// Controller glyph for a skill slot ("L2+A" ... "R2+Y"), shown only
+// while a gamepad is connected. Order matches input.c's mapping.
+static const char *SlotGamepadGlyph(int slot) {
+    static const char *glyphs[SKILL_BAR_SIZE] = {
+        "L2+A", "L2+B", "L2+X", "L2+Y",
+        "R2+A", "R2+B", "R2+X", "R2+Y",
+    };
+    return (slot >= 0 && slot < SKILL_BAR_SIZE) ? glyphs[slot] : "";
+}
+
 void UI_DrawSkillBar(int screenWidth, int screenHeight) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player) return;
 
-    float scale = UIScale(screenHeight);
-    int slotSize = (int)(56 * scale);
-    int gap = (int)(6 * scale);
-    int font = (int)(10 * scale);
-    int totalWidth = SKILL_BAR_SIZE * slotSize + (SKILL_BAR_SIZE - 1) * gap;
-    int startX = (screenWidth - totalWidth) / 2;
-    int y = screenHeight - slotSize - (int)(20 * scale);
+    HudLayout L = ComputeHudLayout(screenWidth, screenHeight);
+    bool pad = IsGamepadAvailable(0);
 
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
-        int x = startX + i * (slotSize + gap);
-        Rectangle slotRect = { (float)x, (float)y, (float)slotSize, (float)slotSize };
+        int x = L.startX + i * (L.slotSize + L.gap);
+        Rectangle slotRect = { (float)x, (float)L.y, (float)L.slotSize, (float)L.slotSize };
 
         int skillIdx = player->skillBar[i];
         Color base = (skillIdx >= 0) ? (Color){ 45, 45, 60, 255 } : (Color){ 25, 25, 25, 255 };
@@ -49,27 +76,35 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
 
         if (skillIdx >= 0) {
             Skill *s = &g_skillDB[skillIdx];
-            DrawText(s->name, x + 4, y + 4, font, s->isElite ? GOLD : RAYWHITE);
+            DrawText(s->name, x + 4, L.y + 4, L.font, s->isElite ? GOLD : RAYWHITE);
 
             if (player->skillRecharge[i] > 0.0f) {
                 float pct = player->skillRecharge[i] / s->recharge;
                 if (pct > 1.0f) pct = 1.0f;
-                int overlayH = (int)(slotSize * pct);
-                DrawRectangle(x, y + (slotSize - overlayH), slotSize, overlayH, (Color){ 0, 0, 0, 160 });
+                int overlayH = (int)(L.slotSize * pct);
+                DrawRectangle(x, L.y + (L.slotSize - overlayH), L.slotSize, overlayH, (Color){ 0, 0, 0, 160 });
                 char buf[8];
                 snprintf(buf, sizeof(buf), "%.1f", player->skillRecharge[i]);
-                DrawText(buf, x + 4, y + slotSize - (int)(16 * scale), font, GOLD);
+                DrawText(buf, x + 4, L.y + L.slotSize - (int)(16 * L.scale), L.font, GOLD);
             }
 
             char costBuf[16] = { 0 };
             if (s->energyCost > 0) snprintf(costBuf, sizeof(costBuf), "%dE", s->energyCost);
             else if (s->adrenalineCost > 0) snprintf(costBuf, sizeof(costBuf), "%dAd", s->adrenalineCost);
-            DrawText(costBuf, x + 4, y + slotSize - (int)(30 * scale), font, SKYBLUE);
+            DrawText(costBuf, x + 4, L.y + L.slotSize - (int)(30 * L.scale), L.font, SKYBLUE);
         }
 
-        char keyLabel[4];
-        snprintf(keyLabel, sizeof(keyLabel), "%d", i + 1);
-        DrawText(keyLabel, x + slotSize - (int)(12 * scale), y + slotSize - (int)(14 * scale), font, LIGHTGRAY);
+        // Bottom-right activation label: controller glyph while a pad is
+        // connected, keyboard number otherwise.
+        if (pad) {
+            const char *glyph = SlotGamepadGlyph(i);
+            int gw = MeasureText(glyph, L.font);
+            DrawText(glyph, x + L.slotSize - gw - 3, L.y + L.slotSize - (int)(14 * L.scale), L.font, (Color){ 150, 200, 150, 255 });
+        } else {
+            char keyLabel[4];
+            snprintf(keyLabel, sizeof(keyLabel), "%d", i + 1);
+            DrawText(keyLabel, x + L.slotSize - (int)(12 * L.scale), L.y + L.slotSize - (int)(14 * L.scale), L.font, LIGHTGRAY);
+        }
     }
 }
 
@@ -83,22 +118,33 @@ static void DrawResourceBar(int x, int y, int w, int h, int font, float pct, Col
 }
 
 void UI_DrawResourceBars(int screenWidth, int screenHeight) {
-    (void)screenWidth;
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player) return;
 
-    float scale = UIScale(screenHeight);
-    int barW = (int)(220 * scale), barH = (int)(18 * scale);
-    int font = (int)(10 * scale);
-    int gap = (int)(6 * scale);
-    int x = (int)(20 * scale), y = screenHeight - (int)(120 * scale);
+    HudLayout L = ComputeHudLayout(screenWidth, screenHeight);
+    // GW1 HUD placement: health bar immediately left of the skill bar,
+    // energy bar immediately right, on the same row - not stacked in a
+    // corner. Adrenaline (not a bar GW1 shows globally, but ours is a
+    // shared pool) sits as a thin strip under the health bar.
+    int barW = (int)(200 * L.scale);
+    int barH = (int)(20 * L.scale);
+    int gap = (int)(10 * L.scale);
+    int barY = L.y + (L.slotSize - barH) / 2;
 
     char hpLabel[32], enLabel[32], adLabel[32];
-    snprintf(hpLabel, sizeof(hpLabel), "HP %d/%d", player->hp, player->maxHp);
-    snprintf(enLabel, sizeof(enLabel), "Energy %d/%d", player->energy, player->maxEnergy);
-    snprintf(adLabel, sizeof(adLabel), "Adrenaline %d%%", player->adrenaline);
+    snprintf(hpLabel, sizeof(hpLabel), "%d/%d", player->hp, player->maxHp);
+    snprintf(enLabel, sizeof(enLabel), "%d/%d", player->energy, player->maxEnergy);
+    snprintf(adLabel, sizeof(adLabel), "Adr %d%%", player->adrenaline);
 
-    DrawResourceBar(x, y, barW, barH, font, (float)player->hp / (float)player->maxHp, RED, hpLabel);
-    DrawResourceBar(x, y + barH + gap, barW, barH, font, (float)player->energy / (float)player->maxEnergy, SKYBLUE, enLabel);
-    DrawResourceBar(x, y + 2 * (barH + gap), barW, barH, font, player->adrenaline / 100.0f, GOLD, adLabel);
+    int hpX = L.startX - gap - barW;
+    DrawResourceBar(hpX, barY, barW, barH, L.font,
+                    (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, hpLabel);
+
+    int adrH = (int)(8 * L.scale);
+    DrawResourceBar(hpX, barY + barH + 4, barW, adrH, L.font - 2 > 6 ? L.font - 2 : 6,
+                    player->adrenaline / 100.0f, GOLD, adLabel);
+
+    int enX = L.startX + L.totalWidth + gap;
+    DrawResourceBar(enX, barY, barW, barH, L.font,
+                    (float)player->energy / (float)player->maxEnergy, (Color){ 60, 130, 220, 255 }, enLabel);
 }

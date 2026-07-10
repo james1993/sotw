@@ -19,6 +19,18 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(raylib)
 
+# raylib vendors third-party code (miniaudio, jar_mod, ...) that emits
+# warnings we can't fix; silence the dependency builds so the only
+# warnings in our output come from our own sources - which are compiled
+# with warnings turned up, below.
+foreach(dep raylib glfw)
+    if(TARGET ${dep})
+        target_compile_options(${dep} PRIVATE
+            $<$<C_COMPILER_ID:MSVC>:/w>
+            $<$<NOT:$<C_COMPILER_ID:MSVC>>:-w>)
+    endif()
+endforeach()
+
 add_executable(sotw_demake
     src/main.c
     src/entity.c
@@ -30,11 +42,15 @@ add_executable(sotw_demake
     src/input.c
     src/ui_skillbar.c
     src/ui_target.c
+    src/ui_party.c
     src/render.c
 )
 
 target_link_libraries(sotw_demake PRIVATE raylib)
 target_include_directories(sotw_demake PRIVATE src)
+target_compile_options(sotw_demake PRIVATE
+    $<$<C_COMPILER_ID:MSVC>:/W4>
+    $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall -Wextra>)
 
 if(APPLE)
     target_link_libraries(sotw_demake PRIVATE "-framework IOKit" "-framework Cocoa" "-framework OpenGL")

@@ -24,6 +24,9 @@ typedef enum {
 
 typedef struct {
     bool active;
+    bool isHex;        // hex vs condition - separate categories with separate
+                       // removal counters in GW1, and shown differently in the
+                       // party window (purple vs brown arrow)
     ConditionKind kind;
     float remaining;
     float tickDamage; // > 0 for DoT-style conditions (bleeding/burning)

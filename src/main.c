@@ -7,6 +7,7 @@
 #include "input.h"
 #include "ui_skillbar.h"
 #include "ui_target.h"
+#include "ui_party.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -141,20 +142,16 @@ int main(void) {
         Render_World(camera);
         UI_DrawSkillBar(screenWidth, screenHeight);
         UI_DrawResourceBars(screenWidth, screenHeight);
+        UI_DrawPartyPanel(screenWidth, screenHeight);
 
         int uiFontSize = UI_ScaledFontSize(screenHeight, 16);
         DrawText("Left-click ground to move, left-click an enemy to target/auto-attack.", 20, 20, uiFontSize, LIGHTGRAY);
         DrawText("Keys 1-5: your skill bar (5 = interrupt). Scroll wheel to zoom. Escape clears target.", 20, 20 + uiFontSize + 4, uiFontSize, LIGHTGRAY);
-        DrawText("Faint circles mark sleeping monsters' aggro range - pull one at a time instead of the whole group.", 20, 20 + 2 * (uiFontSize + 4), uiFontSize, LIGHTGRAY);
-        if (IsGamepadAvailable(0)) {
-            DrawText("Controller: left stick moves (auto-attacks in range), L2+A/B/X/Y = skills 1-4, R2+A/B/X/Y = skills 5-8.", 20, 20 + 3 * (uiFontSize + 4), uiFontSize, (Color){ 150, 200, 150, 255 });
-        }
+        DrawText("The circle around you is your aggro bubble - sleeping monsters inside it wake up. Pull one at a time.", 20, 20 + 2 * (uiFontSize + 4), uiFontSize, LIGHTGRAY);
         DrawFPS(screenWidth - 90, 10);
 
-        // Target panel starts below the help text so the two never overlap
-        // (one extra line of help text when a controller is connected).
-        int helpLines = IsGamepadAvailable(0) ? 4 : 3;
-        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + helpLines * (uiFontSize + 4) + 16);
+        // Target panel starts below the help text so the two never overlap.
+        UI_DrawTargetPanel(screenWidth, screenHeight, 20 + 3 * (uiFontSize + 4) + 16);
 
         EndDrawing();
     }
