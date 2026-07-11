@@ -29,12 +29,14 @@ static void DrawStatusArrow(int x, int y, int size, Color color) {
 }
 
 void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
+    (void)screenWidth;
     float scale = UIScale(screenHeight);
     int panelW = (int)(200 * scale);
-    int rowH = (int)(38 * scale);
+    int rowH = (int)(46 * scale); // room for a thin energy bar per member
     int pad = (int)(8 * scale);
     int font = (int)(11 * scale);
     int barH = (int)(12 * scale);
+    int energyH = (int)(5 * scale);
     int arrow = (int)(10 * scale);
 
     // Count party members first so the panel hugs its contents.
@@ -48,7 +50,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     }
 
     int panelH = pad * 2 + members * rowH;
-    int x = screenWidth - panelW - (int)(14 * scale);
+    // Top-left, where GW1 anchors its party window.
+    int x = (int)(14 * scale);
     int y = (int)(80 * scale);
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
 
@@ -97,6 +100,16 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
             DrawRectangle(x + pad, barY, (int)(barW * pct), barH, (Color){ 190, 40, 40, 255 });
         }
         DrawRectangleLines(x + pad, barY, barW, barH, BLACK);
+
+        // Thin energy strip under each member's health, like GW1's party
+        // window gives heroes.
+        int enY = barY + barH + 2;
+        float enPct = (e->maxEnergy > 0) ? (float)e->energy / (float)e->maxEnergy : 0.0f;
+        DrawRectangle(x + pad, enY, barW, energyH, (Color){ 40, 40, 40, 255 });
+        if (e->alive) {
+            DrawRectangle(x + pad, enY, (int)(barW * enPct), energyH, (Color){ 60, 130, 220, 255 });
+        }
+        DrawRectangleLines(x + pad, enY, barW, energyH, BLACK);
 
         bool hasCondition = false, hasHex = false;
         for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) {

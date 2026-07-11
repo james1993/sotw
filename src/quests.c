@@ -101,8 +101,10 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
     int font = (int)(11 * scale);
     int pad = (int)(8 * scale);
     int w = (int)(220 * scale);
+    // Top-right: with the party window moved to its GW1 home on the
+    // left, quest goals take GW1's upper-right position.
     int x = screenWidth - w - (int)(14 * scale);
-    int y = (int)(280 * scale);
+    int y = (int)(80 * scale);
 
     for (int i = 0; i < QUEST_COUNT; i++) {
         Quest *q = &g_quests[i];

@@ -58,7 +58,8 @@ static void DrawInventory(Entity *player, int screenHeight) {
     int w = (int)(300 * scale);
     int h = pad * 3 + font + (g_inventoryCount + 1) * rowH;
 
-    g_invRect = (Rectangle){ (float)(20 * scale), (float)(120 * scale), (float)w, (float)h };
+    // Below the party window, which now owns the upper-left.
+    g_invRect = (Rectangle){ (float)(20 * scale), (float)(310 * scale), (float)w, (float)h };
     DrawRectangleRec(g_invRect, (Color){ 20, 22, 30, 235 });
     DrawRectangleLinesEx(g_invRect, 2, (Color){ 120, 120, 140, 255 });
 

@@ -109,32 +109,41 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
         }
     }
 
-    // Level + XP progress, GW1-style thin strip tucked under the bar.
+    // Level + XP progress: a thin strip along the bottom edge of the
+    // screen (GW1's spot for it) with the level label centered inside.
+    // Our own flat styling and gold accent - position is the borrowed
+    // convention, not the look.
     {
-        int xpH = (int)(6 * L.scale);
-        int xpY = L.y + L.slotSize + 4;
+        int xpH = (int)(10 * L.scale);
+        int xpY = screenHeight - xpH - 3;
         float xpPct = 1.0f;
         if (player->level < MAX_LEVEL) {
             int need = Progression_XPToNext(player->level);
             xpPct = (need > 0) ? (float)player->xp / (float)need : 0.0f;
         }
         DrawRectangle(L.startX, xpY, L.totalWidth, xpH, (Color){ 30, 30, 30, 255 });
-        DrawRectangle(L.startX, xpY, (int)(L.totalWidth * xpPct), xpH, (Color){ 200, 180, 80, 255 });
+        DrawRectangle(L.startX, xpY, (int)(L.totalWidth * xpPct), xpH, (Color){ 160, 140, 60, 255 });
         DrawRectangleLines(L.startX, xpY, L.totalWidth, xpH, BLACK);
 
         char lvl[32];
-        snprintf(lvl, sizeof(lvl), "Lv %d", player->level);
-        UIText(lvl, L.startX - UITextWidth(lvl, L.font) - 8, xpY - 2, L.font, (Color){ 200, 180, 80, 255 });
+        snprintf(lvl, sizeof(lvl), "Level: %d", player->level);
+        int lw = UITextWidth(lvl, L.font);
+        UIText(lvl, L.startX + (L.totalWidth - lw) / 2, xpY - 1, L.font, RAYWHITE);
     }
 }
 
-static void DrawResourceBar(int x, int y, int w, int h, int font, float pct, Color fillColor, const char *label) {
+// Flat bar with the current value centered inside - our styling; only
+// the placement convention (current value, centered) follows GW1.
+static void DrawResourceBar(int x, int y, int w, int h, int font, float pct, Color fillColor, int value) {
     if (pct < 0.0f) pct = 0.0f;
     if (pct > 1.0f) pct = 1.0f;
     DrawRectangle(x, y, w, h, (Color){ 30, 30, 30, 255 });
     DrawRectangle(x, y, (int)(w * pct), h, fillColor);
     DrawRectangleLines(x, y, w, h, BLACK);
-    UIText(label, x + 4, y + 2, font, RAYWHITE);
+    char label[16];
+    snprintf(label, sizeof(label), "%d", value);
+    int lw = UITextWidth(label, font);
+    UIText(label, x + (w - lw) / 2, y + (h - font) / 2, font, RAYWHITE);
 }
 
 void UI_DrawResourceBars(int screenWidth, int screenHeight) {
@@ -142,21 +151,40 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
     if (!player) return;
 
     HudLayout L = ComputeHudLayout(screenWidth, screenHeight);
-    // GW1 HUD placement: health bar immediately left of the skill bar,
-    // energy bar immediately right, on the same row - not stacked in a
-    // corner.
+    // GW1 placement: health left-of-center and energy right-of-center,
+    // sitting directly ABOVE the skill bar rather than flanking it.
     int barW = (int)(200 * L.scale);
-    int barH = (int)(20 * L.scale);
-    int gap = (int)(10 * L.scale);
-    int barY = L.y + (L.slotSize - barH) / 2;
+    int barH = (int)(18 * L.scale);
+    int centerGap = (int)(14 * L.scale);
+    int barY = L.y - barH - (int)(8 * L.scale);
+    int centerX = L.startX + L.totalWidth / 2;
 
-    char hpLabel[32], enLabel[32];
-    snprintf(hpLabel, sizeof(hpLabel), "%d/%d", player->hp, player->maxHp);
-    snprintf(enLabel, sizeof(enLabel), "%d/%d", player->energy, player->maxEnergy);
-
-    int hpX = L.startX - gap - barW;
+    int hpX = centerX - centerGap / 2 - barW;
     DrawResourceBar(hpX, barY, barW, barH, L.font,
-                    (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, hpLabel);
+                    (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, player->hp);
+
+    int enX = centerX + centerGap / 2;
+    DrawResourceBar(enX, barY, barW, barH, L.font,
+                    (float)player->energy / (float)player->maxEnergy, (Color){ 60, 130, 220, 255 }, player->energy);
+
+    // Energy regen pips: small arrows in the energy bar, GW1's language
+    // for "how fast this refills". Regen isn't per-profession yet, so
+    // the count is fixed at the caster-standard four.
+    {
+        int pips = 4;
+        int pipW = (int)(6 * L.scale);
+        int pipH = barH - (int)(8 * L.scale);
+        if (pipH < 4) pipH = 4;
+        int px = enX + barW - (int)(10 * L.scale) - pips * (pipW + 2);
+        int py = barY + (barH - pipH) / 2;
+        for (int i = 0; i < pips; i++) {
+            DrawTriangle((Vector2){ (float)px, (float)py },
+                         (Vector2){ (float)px, (float)(py + pipH) },
+                         (Vector2){ (float)(px + pipW), (float)(py + pipH / 2) },
+                         (Color){ 180, 210, 240, 220 });
+            px += pipW + 2;
+        }
+    }
 
     // Adrenaline is a Warrior mechanic; a Monk bar has no adrenaline
     // skills, so only show the strip when something equipped uses it.
@@ -169,14 +197,11 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
         }
     }
     if (anyAdrenalineSkill) {
-        char adLabel[32];
-        snprintf(adLabel, sizeof(adLabel), "Adr %d%%", player->adrenaline);
         int adrH = (int)(8 * L.scale);
-        DrawResourceBar(hpX, barY + barH + 4, barW, adrH, L.font - 2 > 6 ? L.font - 2 : 6,
-                        player->adrenaline / 100.0f, GOLD, adLabel);
+        int adrY = barY - adrH - 4;
+        float pct = player->adrenaline / 100.0f;
+        DrawRectangle(hpX, adrY, barW, adrH, (Color){ 30, 30, 30, 255 });
+        DrawRectangle(hpX, adrY, (int)(barW * pct), adrH, GOLD);
+        DrawRectangleLines(hpX, adrY, barW, adrH, BLACK);
     }
-
-    int enX = L.startX + L.totalWidth + gap;
-    DrawResourceBar(enX, barY, barW, barH, L.font,
-                    (float)player->energy / (float)player->maxEnergy, (Color){ 60, 130, 220, 255 }, enLabel);
 }
