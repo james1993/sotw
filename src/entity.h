@@ -89,6 +89,9 @@ typedef struct Entity {
     int castingSlot;        // -1 if not casting
     float castTimeRemaining;
     float castTimeTotal;
+    int castTargetIndex;    // resolved target of the cast in progress -
+                            // separate from targetIndex so a self-fallback
+                            // heal doesn't stomp your selected target
 
     int targetIndex;        // index into g_entities, -1 if none
     float attackTimer;

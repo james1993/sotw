@@ -43,7 +43,12 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         if (Dist(caster->pos, target->pos) > skill->range) return false;
     }
     if (skill->targeting == TARGET_SINGLE_ALLY) {
-        if (!target || !target->alive || target->team != caster->team) return false;
+        // GW1: ally-targeted spells fall back to casting on yourself when
+        // the current target isn't a valid ally (a foe, dead, or nothing).
+        if (!target || !target->alive || target->team != caster->team) {
+            targetIndex = casterIndex;
+            target = caster;
+        }
         if (Dist(caster->pos, target->pos) > skill->range) return false;
     }
 
@@ -59,7 +64,12 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         caster->castingSlot = slot;
         caster->castTimeRemaining = skill->castTime;
         caster->castTimeTotal = skill->castTime;
-        caster->targetIndex = targetIndex;
+        caster->castTargetIndex = targetIndex;
+        // Chasing/attacking only follows foe targets, so only offensive
+        // casts update the caster's current target.
+        if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
+            caster->targetIndex = targetIndex;
+        }
         caster->hasMoveTarget = false; // casting roots the caster, matches GW1 spellcasting
     } else {
         Effect_Execute(caster, skill, target);
@@ -74,11 +84,14 @@ static void ResolveCast(Entity *caster) {
     int slot = caster->castingSlot;
     int skillIdx = caster->skillBar[slot];
     Skill *skill = &g_skillDB[skillIdx];
-    Entity *target = Entity_Get(caster->targetIndex);
+    Entity *target = Entity_Get(caster->castTargetIndex);
 
     bool targetStillValid = true;
     if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
         targetStillValid = target && target->alive;
+    }
+    if (skill->targeting == TARGET_SINGLE_ALLY) {
+        targetStillValid = target && target->alive && target->team == caster->team;
     }
     if (targetStillValid) {
         Effect_Execute(caster, skill, target);

@@ -20,11 +20,64 @@
 // while the pad, not the mouse, was touched last.
 static bool g_gamepadMode = false;
 
+// Set when a target was explicitly chosen on the D-pad (GW1's official
+// gamepad scheme: up/down walks the party list, left/right cycles
+// enemies). While a manual selection is live, the proximity auto-target
+// leaves it alone.
+static bool g_manualGamepadTarget = false;
+
 static bool TriggerDown(int axisId, int buttonId) {
     if (IsGamepadButtonDown(GAMEPAD_ID, buttonId)) return true;
     // Analog triggers rest at -1 and reach +1 fully pressed on most
     // backends; anything meaningfully past the midpoint counts as held.
     return GetGamepadAxisMovement(GAMEPAD_ID, axisId) > TRIGGER_AXIS_THRESHOLD;
+}
+
+// D-pad up/down: walk the party list (player + heroes, entity order).
+static void CyclePartyTarget(Entity *player, int direction) {
+    int members[MAX_ENTITIES];
+    int count = 0, currentPos = -1;
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (e->team != 0 || !e->alive) continue;
+        if (e->kind != ENT_PLAYER && e->kind != ENT_HERO) continue;
+        if (i == player->targetIndex) currentPos = count;
+        members[count++] = i;
+    }
+    if (count == 0) return;
+    int pos = (currentPos < 0) ? (direction > 0 ? 0 : count - 1)
+                               : (currentPos + direction + count) % count;
+    player->targetIndex = members[pos];
+    g_manualGamepadTarget = true;
+}
+
+// D-pad left/right: cycle living foes, nearest first.
+static void CycleFoeTarget(Entity *player, int direction) {
+    int foes[MAX_ENTITIES];
+    float dists[MAX_ENTITIES];
+    int count = 0;
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (!e->alive || e->team == player->team) continue;
+        float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
+        foes[count] = i;
+        dists[count] = dx * dx + dy * dy;
+        count++;
+    }
+    if (count == 0) return;
+    // insertion sort by distance - the foe list is tiny
+    for (int i = 1; i < count; i++) {
+        int fi = foes[i]; float di = dists[i]; int j = i - 1;
+        while (j >= 0 && dists[j] > di) { foes[j + 1] = foes[j]; dists[j + 1] = dists[j]; j--; }
+        foes[j + 1] = fi; dists[j + 1] = di;
+    }
+    int currentPos = -1;
+    for (int i = 0; i < count; i++) {
+        if (foes[i] == player->targetIndex) currentPos = i;
+    }
+    int pos = (currentPos < 0) ? 0 : (currentPos + direction + count) % count;
+    player->targetIndex = foes[pos];
+    g_manualGamepadTarget = true;
 }
 
 static void UpdateGamepad(Entity *player, float dt) {
@@ -63,6 +116,40 @@ static void UpdateGamepad(Entity *player, float dt) {
         } else if (r2) {
             Combat_ActivateSkill(PLAYER_INDEX, 4 + face, player->targetIndex);
             g_gamepadMode = true;
+        } else if (face == 1) {
+            // Bare B (no trigger): drop the current target, GW1-gamepad's
+            // escape hatch.
+            player->targetIndex = -1;
+            g_manualGamepadTarget = false;
+            g_gamepadMode = true;
+        }
+    }
+
+    // --- D-pad targeting, matching GW1's official gamepad scheme:
+    // up/down selects party members, left/right cycles enemies. ---
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_UP)) {
+        CyclePartyTarget(player, -1);
+        g_gamepadMode = true;
+    }
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_DOWN)) {
+        CyclePartyTarget(player, +1);
+        g_gamepadMode = true;
+    }
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
+        CycleFoeTarget(player, -1);
+        g_gamepadMode = true;
+    }
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
+        CycleFoeTarget(player, +1);
+        g_gamepadMode = true;
+    }
+
+    // A manual selection expires when the target dies.
+    if (g_manualGamepadTarget) {
+        Entity *t = Entity_Get(player->targetIndex);
+        if (!t || !t->alive) {
+            g_manualGamepadTarget = false;
+            player->targetIndex = -1;
         }
     }
 
@@ -72,8 +159,9 @@ static void UpdateGamepad(Entity *player, float dt) {
     // NOT sticky beyond attack range: the chase-your-target logic in
     // combat.c would otherwise wrestle the stick for control of the
     // player's position, and stick-driven kiting only works if walking
-    // away actually disengages.
-    if (g_gamepadMode) {
+    // away actually disengages. Suspended while a D-pad selection is
+    // live so cycling to a specific target isn't instantly overwritten.
+    if (g_gamepadMode && !g_manualGamepadTarget) {
         int best = -1;
         float bestDist = 1e9f;
         for (int i = 0; i < g_entityCount; i++) {
@@ -131,6 +219,10 @@ void Input_Update(Camera2D *camera, float dt) {
 
         if (clickedEntity >= 0 && g_entities[clickedEntity].team != player->team) {
             player->targetIndex = clickedEntity;
+        } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_HERO) {
+            // Clicking a party member selects them, so ally-targeted
+            // spells (Orison) land on them instead of self-falling back.
+            player->targetIndex = clickedEntity;
         } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_NPC) {
             // Outpost NPC: talk if close enough, otherwise walk over to
             // them (click again on arrival to open the conversation).
@@ -161,6 +253,20 @@ void Input_Update(Camera2D *camera, float dt) {
             player->moveTarget = world;
             player->hasMoveTarget = true;
         }
+    }
+
+    // GW1's classic keyboard targeting: C = nearest foe, Tab = cycle foes.
+    if (IsKeyPressed(KEY_C)) {
+        g_manualGamepadTarget = false;
+        int save = player->targetIndex;
+        player->targetIndex = -1; // force "nearest" rather than "next"
+        CycleFoeTarget(player, +1);
+        if (player->targetIndex < 0) player->targetIndex = save;
+        g_manualGamepadTarget = false;
+    }
+    if (IsKeyPressed(KEY_TAB)) {
+        CycleFoeTarget(player, +1);
+        g_manualGamepadTarget = false;
     }
 
     int keys[8] = { KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN, KEY_EIGHT };

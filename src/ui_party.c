@@ -70,10 +70,28 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     Vector2 mouse = GetMousePosition();
 
+    Entity *player = Entity_Get(0);
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (e->team != 0 || e->kind == ENT_NPC) continue;
+
+        // Clicking a member's row selects them - how GW1 targets allies
+        // for heals from the party window. (The dismiss button, drawn
+        // later over this row, wins when hovered because its click
+        // handler converts the entity before targeting matters.)
+        Rectangle rowRect = { (float)x + 2, (float)rowY - 2, (float)panelW - 4, (float)rowH - 4 };
+        bool rowHovered = CheckCollisionPointRec(mouse, rowRect);
+        if (rowHovered && click && e->alive && player) {
+            player->targetIndex = i;
+        }
+        if (rowHovered) {
+            DrawRectangleRec(rowRect, (Color){ 50, 55, 75, 120 });
+        }
+        // Selected-member highlight
+        if (player && player->targetIndex == i) {
+            DrawRectangleLinesEx(rowRect, 1, GOLD);
+        }
 
         Color nameColor = e->alive ? RAYWHITE : (Color){ 130, 130, 130, 255 };
         UIText(e->name, x + pad, rowY, font, nameColor);
@@ -97,6 +115,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
             UIText("x", (int)dismiss.x + btn / 3, (int)dismiss.y - 1, font, RAYWHITE);
             if (hovered && click) {
                 World_DismissHenchman(e);
+                // The row-click handler above may have just targeted him.
+                if (player && player->targetIndex == i) player->targetIndex = -1;
             }
         }
 

@@ -58,7 +58,12 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 
 - **Left-click** empty ground to move there.
 - **Left-click** an enemy to target it (auto-walks into range and
-  auto-attacks). **Escape** clears your target.
+  auto-attacks). **C** targets the nearest foe, **Tab** cycles foes —
+  GW1's classic keys. **Escape** clears your target.
+- **Left-click a party member** (in the world or their bar in the party
+  window) to select them, so ally spells like Orison of Healing land on
+  them; with no ally selected, ally spells fall back to casting on
+  yourself, like GW1.
 - **Left-click an NPC** in the outpost to talk: accept Captain Osric's
   quest, hire Little Thom, or trade with the Merchant.
 - **1–5** activate your equipped skills (Monk bar: Orison of Healing,
@@ -71,6 +76,9 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Scroll wheel** zooms.
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
+  **D-pad up/down** selects party members and **left/right** cycles
+  enemies, matching GW1's official gamepad scheme; bare **B** clears
+  the target.
 
 ### Zones
 

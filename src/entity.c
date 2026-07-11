@@ -37,6 +37,7 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
 
     e->castingSlot = -1;
     e->targetIndex = -1;
+    e->castTargetIndex = -1;
     e->lastCastSkillSlot = -1;
 
     e->attackInterval = 1.33f; // matches a common GW1 weapon attack speed

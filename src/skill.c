@@ -125,8 +125,11 @@ void SkillDB_Init(void) {
 
     // --- Monk skills: energy spells, Divine Favor bonus healing applies
     // to FX_HEAL (see effect.c), no adrenaline anywhere on this bar ---
+    // Ally-targeted like the real Orison: heals your selected party
+    // member, or yourself when no valid ally is targeted (see
+    // Combat_ActivateSkill's self-fallback).
     s = MakeSkill("Orison of Healing", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
-                  5, 0, 1.0f, 2.0f, 0.0f, false, TARGET_SELF);
+                  5, 0, 1.0f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
     AddStep(&s, FX_HEAL, 20, 3.0f, 0, 0);
     SkillDB_Register(s);
 
