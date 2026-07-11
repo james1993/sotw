@@ -1,6 +1,7 @@
 #include "render.h"
 #include "entity.h"
 #include "items.h"
+#include "projectile.h"
 #include "world.h"
 #include "quests.h"
 #include "ui_font.h"
@@ -261,6 +262,12 @@ void Render_World(Camera2D camera) {
             UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, GOLD);
         }
 
+        if (e->dodgeFlashTimer > 0.0f) {
+            const char *label = "DODGED";
+            int tw = UITextWidth(label, 10);
+            UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, (Color){ 200, 200, 210, 255 });
+        }
+
         // GW1's green exclamation point over quest givers with something
         // to offer (or a reward to hand out).
         if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER && Quests_GiverHasAttention()) {
@@ -272,6 +279,8 @@ void Render_World(Camera2D camera) {
         int textWidth = UITextWidth(e->name, 10);
         UIText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, nameColor);
     }
+
+    Projectile_Draw();
 
     EndMode2D();
 }

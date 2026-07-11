@@ -100,6 +100,7 @@ typedef struct Entity {
     float attackRange;
 
     float interruptFlashTimer; // > 0 briefly after being interrupted, for UI feedback
+    float dodgeFlashTimer;     // > 0 briefly after dodging a projectile
 
     // Target-panel display: which skill to show as "currently/recently
     // used" (see ui_target.c). Set whenever a skill is activated; the

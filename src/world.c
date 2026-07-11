@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
+#include "projectile.h"
 #include <math.h>
 #include <string.h>
 
@@ -147,6 +148,7 @@ static void LoadZone(GameMode mode, Vector2 playerEntry) {
     Entity saved = g_entities[PLAYER_INDEX];
     g_entityCount = 0;
     memset(g_drops, 0, sizeof(g_drops)); // ground loot doesn't survive rezoning, like GW1
+    Projectile_ClearAll();               // and neither do shots in flight
 
     g_entities[g_entityCount++] = saved;
     Entity *player = Entity_Get(PLAYER_INDEX);

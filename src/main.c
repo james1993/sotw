@@ -5,6 +5,7 @@
 #include "ai_hero.h"
 #include "input.h"
 #include "items.h"
+#include "projectile.h"
 #include "world.h"
 #include "quests.h"
 #include "ui_skillbar.h"
@@ -61,6 +62,7 @@ int main(void) {
         Input_Update(&camera, dt);
         AI_Update(dt);
         Combat_TickTimers(dt);
+        Projectile_Update(dt);
 
         Entity *playerNow = Entity_Get(PLAYER_INDEX);
         World_Update(playerNow, dt);

@@ -2,9 +2,14 @@
 #include "skill.h"
 #include "effect.h"
 #include "world.h"
+#include "projectile.h"
 #include "raylib.h"
 #include <math.h>
 #include <stddef.h>
+
+// Auto-attacks from beyond this range are projectiles with travel time
+// (dodgeable); anything closer is a melee swing and hits instantly.
+#define RANGED_ATTACK_THRESHOLD 60.0f
 
 static float Dist(Vector2 a, Vector2 b) {
     float dx = a.x - b.x, dy = a.y - b.y;
@@ -133,6 +138,11 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         if (e->interruptFlashTimer < 0.0f) e->interruptFlashTimer = 0.0f;
     }
 
+    if (e->dodgeFlashTimer > 0.0f) {
+        e->dodgeFlashTimer -= dt;
+        if (e->dodgeFlashTimer < 0.0f) e->dodgeFlashTimer = 0.0f;
+    }
+
     if (e->postCastDisplayTimer > 0.0f) {
         e->postCastDisplayTimer -= dt;
         if (e->postCastDisplayTimer < 0.0f) e->postCastDisplayTimer = 0.0f;
@@ -187,17 +197,24 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             e->attackTimer -= dt;
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
-                Entity_ApplyDamage(target, dmg, e);
                 Entity_MarkInCombat(e);
-                if (target->kind == ENT_MONSTER && !target->aggroed) {
-                    // Landing a hit wakes a sleeping monster up regardless
-                    // of its aggro range - pulling with melee still works,
-                    // it just means getting close enough to swing first.
-                    target->aggroed = true;
-                    target->targetIndex = (int)(e - g_entities);
+                if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
+                    // Ranged: a visible bolt flies to where the target is
+                    // standing NOW; adrenaline/aggro/damage resolve on
+                    // impact - or not at all, if they dodge (projectile.c).
+                    Projectile_Spawn((int)(e - g_entities), e->targetIndex, dmg);
+                } else {
+                    Entity_ApplyDamage(target, dmg, e);
+                    if (target->kind == ENT_MONSTER && !target->aggroed) {
+                        // Landing a hit wakes a sleeping monster up regardless
+                        // of its aggro range - pulling with melee still works,
+                        // it just means getting close enough to swing first.
+                        target->aggroed = true;
+                        target->targetIndex = (int)(e - g_entities);
+                    }
+                    e->adrenaline += 4; // basic attacks also build adrenaline in GW1
+                    if (e->adrenaline > 100) e->adrenaline = 100;
                 }
-                e->adrenaline += 4; // basic attacks also build adrenaline in GW1
-                if (e->adrenaline > 100) e->adrenaline = 100;
                 e->attackTimer = e->attackInterval;
             }
         } else {
