@@ -42,6 +42,8 @@ add_executable(sotw_demake
     src/input.c
     src/items.c
     src/progression.c
+    src/world.c
+    src/quests.c
     src/ui_skillbar.c
     src/ui_target.c
     src/ui_party.c

@@ -1,6 +1,8 @@
 #include "render.h"
 #include "entity.h"
 #include "items.h"
+#include "world.h"
+#include "quests.h"
 #include "ui_font.h"
 #include <math.h>
 #include <stddef.h>
@@ -30,8 +32,25 @@ static void DrawDrops(void) {
 // Basic environmental art: a fixed, hand-placed scatter of trees/rocks/
 // grass tufts built from primitive shapes, since the prototype has no
 // sprite assets yet. Purely decorative - no collision or LoS blocking.
-typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS } PropType;
+typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE } PropType;
 typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
+
+// Ashford Camp: a small circle of tents around a fire, palisade-ish
+// rocks, a couple of trees for shade.
+static const EnvProp g_outpostProps[] = {
+    { { 0, -140 }, PROP_FIRE, 1.0f },
+    { { -150, -140 }, PROP_TENT, 1.0f },
+    { { -190, -40 }, PROP_TENT, 0.9f },
+    { { 150, -150 }, PROP_TENT, 1.1f },
+    { { 190, -50 }, PROP_TENT, 0.9f },
+    { { -120, 150 }, PROP_TENT, 1.0f },
+    { { 140, 160 }, PROP_TENT, 0.95f },
+    { { -260, -180 }, PROP_TREE, 1.0f },
+    { { 280, -200 }, PROP_TREE, 1.1f },
+    { { -280, 120 }, PROP_ROCK, 1.0f },
+    { { 240, 140 }, PROP_ROCK, 0.9f },
+};
+#define OUTPOST_PROP_COUNT (int)(sizeof(g_outpostProps) / sizeof(g_outpostProps[0]))
 
 static const EnvProp g_envProps[] = {
     { { -320, -160 }, PROP_TREE, 1.1f },
@@ -83,15 +102,55 @@ static void DrawGrassTuft(Vector2 pos, float scale) {
     }
 }
 
-static void DrawEnvironment(void) {
-    for (int i = 0; i < ENV_PROP_COUNT; i++) {
-        const EnvProp *p = &g_envProps[i];
+static void DrawTent(Vector2 pos, float scale) {
+    Vector2 top = { pos.x, pos.y - 26 * scale };
+    Vector2 left = { pos.x - 22 * scale, pos.y + 8 * scale };
+    Vector2 right = { pos.x + 22 * scale, pos.y + 8 * scale };
+    DrawTriangle(top, left, right, (Color){ 150, 120, 80, 255 });
+    DrawTriangleLines(top, left, right, (Color){ 90, 70, 45, 255 });
+    // Entrance flap
+    DrawTriangle((Vector2){ pos.x, pos.y - 8 * scale },
+                 (Vector2){ pos.x - 7 * scale, pos.y + 8 * scale },
+                 (Vector2){ pos.x + 7 * scale, pos.y + 8 * scale },
+                 (Color){ 60, 48, 32, 255 });
+}
+
+static void DrawCampfire(Vector2 pos, float scale) {
+    DrawCircleV(pos, 10 * scale, (Color){ 60, 50, 45, 255 });
+    DrawCircleV(pos, 6 * scale, (Color){ 230, 130, 40, 255 });
+    DrawCircleV((Vector2){ pos.x, pos.y - 3 * scale }, 3 * scale, (Color){ 255, 210, 90, 255 });
+}
+
+static void DrawProps(const EnvProp *props, int count) {
+    for (int i = 0; i < count; i++) {
+        const EnvProp *p = &props[i];
         switch (p->type) {
             case PROP_TREE: DrawTree(p->pos, p->scale); break;
             case PROP_ROCK: DrawRock(p->pos, p->scale); break;
             case PROP_GRASS: DrawGrassTuft(p->pos, p->scale); break;
+            case PROP_TENT: DrawTent(p->pos, p->scale); break;
+            case PROP_FIRE: DrawCampfire(p->pos, p->scale); break;
         }
     }
+}
+
+static void DrawEnvironment(void) {
+    if (World_GetMode() == MODE_OUTPOST) {
+        DrawProps(g_outpostProps, OUTPOST_PROP_COUNT);
+    } else {
+        DrawProps(g_envProps, ENV_PROP_COUNT);
+    }
+
+    // The zone portal: a swirl of blue, labeled with where it goes -
+    // GW1's map-travel gates reduced to their essence.
+    Vector2 portalPos;
+    const char *portalLabel;
+    World_GetPortal(&portalPos, &portalLabel);
+    DrawCircleGradient((int)portalPos.x, (int)portalPos.y, 34.0f,
+                       (Color){ 90, 150, 255, 200 }, (Color){ 30, 40, 90, 40 });
+    DrawCircleLines((int)portalPos.x, (int)portalPos.y, 34.0f, (Color){ 120, 170, 255, 180 });
+    int tw = UITextWidth(portalLabel, 11);
+    UIText(portalLabel, (int)(portalPos.x - tw / 2), (int)(portalPos.y + 40), 11, (Color){ 150, 190, 255, 255 });
 }
 
 static void DrawHealthBar(const Entity *e) {
@@ -132,23 +191,25 @@ void Render_World(Camera2D camera) {
     int startY = ((int)floorf(topLeft.y / gridSpacing) - 1) * gridSpacing;
     int endY = ((int)ceilf(bottomRight.y / gridSpacing) + 1) * gridSpacing;
 
+    // Ground tint sells the zone: packed dirt in the camp, green grass
+    // out in the plains.
+    Color gridColor = (World_GetMode() == MODE_OUTPOST)
+        ? (Color){ 80, 68, 52, 255 } : (Color){ 52, 76, 48, 255 };
     for (int x = startX; x <= endX; x += gridSpacing) {
-        DrawLine(x, startY, x, endY, (Color){ 60, 60, 60, 255 });
+        DrawLine(x, startY, x, endY, gridColor);
     }
     for (int y = startY; y <= endY; y += gridSpacing) {
-        DrawLine(startX, y, endX, y, (Color){ 60, 60, 60, 255 });
+        DrawLine(startX, y, endX, y, gridColor);
     }
 
     DrawEnvironment();
     DrawDrops();
 
     // Faint "danger bubble" around the player, like the aggro circle on
-    // GW1's compass: step inside a sleeping monster's radius and it wakes
-    // up, so this circle is the distance to keep your distance by. Drawn
-    // around the player rather than each monster - matching where GW1
-    // itself puts this information.
+    // GW1's compass. Only meaningful (and only drawn) in combat zones -
+    // outposts are safe.
     Entity *player = Entity_Get(PLAYER_INDEX);
-    if (player && player->alive) {
+    if (player && player->alive && World_GetMode() == MODE_EXPLORABLE) {
         DrawCircleLines((int)player->pos.x, (int)player->pos.y, 130.0f, (Color){ 220, 170, 60, 60 });
     }
 
@@ -175,8 +236,17 @@ void Render_World(Camera2D camera) {
             UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, GOLD);
         }
 
+        // GW1's green exclamation point over quest givers with something
+        // to offer (or a reward to hand out).
+        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER &&
+            (g_quest.state == QUEST_AVAILABLE || g_quest.state == QUEST_READY_TO_TURN_IN)) {
+            int mw = UITextWidth("!", 16);
+            UIText("!", (int)(e->pos.x - mw / 2), (int)(e->pos.y - e->radius - 32.0f), 16, (Color){ 90, 230, 90, 255 });
+        }
+
+        Color nameColor = (e->kind == ENT_NPC) ? (Color){ 150, 230, 150, 255 } : RAYWHITE;
         int textWidth = UITextWidth(e->name, 10);
-        UIText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, RAYWHITE);
+        UIText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, nameColor);
     }
 
     EndMode2D();

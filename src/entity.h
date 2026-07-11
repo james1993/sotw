@@ -12,8 +12,16 @@
 typedef enum {
     ENT_PLAYER,
     ENT_HERO,
-    ENT_MONSTER
+    ENT_MONSTER,
+    ENT_NPC      // outpost service NPCs: quest giver, merchant, henchman
 } EntityKind;
+
+typedef enum {
+    NPC_NONE = 0,
+    NPC_QUEST_GIVER,
+    NPC_MERCHANT,
+    NPC_HENCHMAN
+} NpcRole;
 
 typedef enum {
     COND_NONE = 0,
@@ -37,6 +45,7 @@ typedef struct {
 typedef struct Entity {
     bool alive;
     EntityKind kind;
+    NpcRole npcRole; // only meaningful for ENT_NPC
     char name[32];
     int team; // 0 = player party, 1 = hostile
 

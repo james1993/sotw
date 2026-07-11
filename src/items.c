@@ -35,6 +35,25 @@ bool Items_AddToInventory(Item item) {
     return true;
 }
 
+bool Items_RemoveFromInventory(int inventoryIndex) {
+    if (inventoryIndex < 0 || inventoryIndex >= g_inventoryCount) return false;
+    if (inventoryIndex == g_equippedWeapon || inventoryIndex == g_equippedArmor) return false;
+
+    for (int i = inventoryIndex; i < g_inventoryCount - 1; i++) {
+        g_inventory[i] = g_inventory[i + 1];
+    }
+    g_inventoryCount--;
+    if (g_equippedWeapon > inventoryIndex) g_equippedWeapon--;
+    if (g_equippedArmor > inventoryIndex) g_equippedArmor--;
+    return true;
+}
+
+int Items_SellValue(const Item *item) {
+    if (item->kind == ITEM_ARMOR) return 10 + item->armor / 2;
+    if (item->kind == ITEM_WEAPON) return 15 + item->dmgMax / 2;
+    return 0;
+}
+
 void Items_EquipWeapon(Entity *player, int inventoryIndex) {
     if (inventoryIndex < 0 || inventoryIndex >= g_inventoryCount) return;
     Item *it = &g_inventory[inventoryIndex];

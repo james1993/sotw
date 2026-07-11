@@ -16,6 +16,9 @@ int Progression_XPToNext(int level);
 // points on GW1's schedule (+5/level up to 10, +10 to 15, +15 to 20).
 void Progression_AwardKillXP(struct Entity *player, int monsterLevel);
 
+// Direct XP grant (quest rewards etc.); runs the same level-up logic.
+void Progression_AwardXP(struct Entity *player, int amount);
+
 #define MAX_LEVEL 20
 
 #endif

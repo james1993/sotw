@@ -33,7 +33,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     // Count party members first so the panel hugs its contents.
     int members = 0;
     for (int i = 0; i < g_entityCount; i++) {
-        if (g_entities[i].team == 0) members++;
+        if (g_entities[i].team == 0 && g_entities[i].kind != ENT_NPC) members++;
     }
     if (members == 0) return;
 
@@ -48,7 +48,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
-        if (e->team != 0) continue;
+        if (e->team != 0 || e->kind == ENT_NPC) continue;
 
         Color nameColor = e->alive ? RAYWHITE : (Color){ 130, 130, 130, 255 };
         UIText(e->name, x + pad, rowY, font, nameColor);

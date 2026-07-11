@@ -46,6 +46,14 @@ extern GroundDrop g_drops[MAX_DROPS];
 // Adds to inventory; returns false if full.
 bool Items_AddToInventory(Item item);
 
+// Removes an item, keeping the equipped-item indices consistent.
+// Refuses to remove something currently equipped (returns false).
+bool Items_RemoveFromInventory(int inventoryIndex);
+
+// What the merchant pays for an item - deliberately a fraction of buy
+// prices, like GW1 merchants.
+int Items_SellValue(const Item *item);
+
 // Applies an inventory weapon/armor to the player's combat stats.
 void Items_EquipWeapon(struct Entity *player, int inventoryIndex);
 void Items_EquipArmor(struct Entity *player, int inventoryIndex);

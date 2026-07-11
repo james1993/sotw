@@ -59,6 +59,8 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Left-click** empty ground to move there.
 - **Left-click** an enemy to target it (auto-walks into range and
   auto-attacks). **Escape** clears your target.
+- **Left-click an NPC** in the outpost to talk: accept Captain Osric's
+  quest, hire Little Thom, or trade with the Merchant.
 - **1–5** activate your equipped skills (Monk bar: Orison of Healing,
   Banish, Smite, Bane Signet, plus Fire Bolt from the Elementalist
   secondary). Vekk, the hero companion, fights automatically the same
@@ -69,6 +71,14 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Scroll wheel** zooms.
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
+
+### Zones
+
+The game starts in **Ashford Camp**, a GW1-style outpost: no combat,
+service NPCs (quest giver, merchant, hireable henchman), and a portal to
+**Ashford Plains** — a combat instance that reloads fresh on every
+entry, exactly like GW1's per-party explorable areas. Returning to the
+outpost fully restores the party.
 
 ### What's deliberately not built yet
 

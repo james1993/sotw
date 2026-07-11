@@ -1,6 +1,7 @@
 #include "entity.h"
 #include "items.h"
 #include "progression.h"
+#include "quests.h"
 #include <math.h>
 #include <string.h>
 
@@ -86,6 +87,7 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
             // they or the hero landed the killing blow.
             Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
             Items_SpawnMonsterDrops(e->pos, e->level);
+            Quests_NotifyMonsterKill();
         }
     }
 }

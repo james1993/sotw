@@ -129,6 +129,17 @@ void Input_Update(Camera2D *camera, float dt) {
 
         if (clickedEntity >= 0 && g_entities[clickedEntity].team != player->team) {
             player->targetIndex = clickedEntity;
+        } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_NPC) {
+            // Outpost NPC: talk if close enough, otherwise walk over to
+            // them (click again on arrival to open the conversation).
+            Entity *npc = &g_entities[clickedEntity];
+            float dx = npc->pos.x - player->pos.x, dy = npc->pos.y - player->pos.y;
+            if (sqrtf(dx * dx + dy * dy) <= 90.0f) {
+                UI_OpenNpcDialog(clickedEntity);
+            } else {
+                player->moveTarget = npc->pos;
+                player->hasMoveTarget = true;
+            }
         } else {
             // Defensive cap: bound how far a single click can send the
             // player. If screen-to-world coordinates are ever wrong (e.g.
