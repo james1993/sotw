@@ -32,4 +32,13 @@ void World_GetPortal(Vector2 *pos, const char **label);
 bool World_IsThomHired(void);
 void World_SetThomHired(bool hired);
 
+// Dismiss a hired henchman entity: outposts only, GW1's rule for party
+// editing. Converts the party member back into the standing NPC.
+void World_DismissHenchman(struct Entity *henchman);
+
+// Resurrection shrine (explorable zones only). On a full party wipe the
+// party respawns here, each member carrying their stacked death penalty
+// - straight from GW1.
+bool World_GetShrine(Vector2 *pos);
+
 #endif

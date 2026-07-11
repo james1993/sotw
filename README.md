@@ -80,6 +80,20 @@ service NPCs (quest giver, merchant, hireable henchman), and a portal to
 entry, exactly like GW1's per-party explorable areas. Returning to the
 outpost fully restores the party.
 
+Captain Osric's quests chain GW1-style: finish *Charr at the Gate*
+(kill quest) and he offers *Scout the Eastern Ridge* (reach the green
+flag marker deep in the plains).
+
+### Death
+
+Dying costs a party member 15% of max health and energy (GW1's death
+penalty), stacking to -60% and shown in the party window; it clears
+when you rezone. If part of the party falls but the fight is won, the
+survivors revive them shortly after combat ends. If the whole party
+wipes, everyone respawns at the zone's resurrection shrine, penalty
+intact. Hired henchmen can be dismissed from the party window — in the
+outpost only, GW1's rule for party changes.
+
 ### What's deliberately not built yet
 
 Only two professions' worth of sample skills (see `src/skill.c`), one

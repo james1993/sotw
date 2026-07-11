@@ -28,8 +28,9 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->radius = 12.0f;
     e->color = color;
 
-    e->hp = e->maxHp = 100;
-    e->energy = e->maxEnergy = 40;
+    e->hp = e->maxHp = e->baseMaxHp = 100;
+    e->energy = e->maxEnergy = e->baseMaxEnergy = 40;
+    e->deathPenalty = 0;
     e->adrenaline = 0;
     e->armor = 60; // neutral AL - no bonus, no penalty
     e->level = 1;
@@ -64,6 +65,13 @@ void Entity_MarkInCombat(Entity *e) {
     e->timeSinceCombat = 0.0f;
 }
 
+void Entity_RecomputePenalizedStats(Entity *e) {
+    e->maxHp = e->baseMaxHp * (100 - e->deathPenalty) / 100;
+    e->maxEnergy = e->baseMaxEnergy * (100 - e->deathPenalty) / 100;
+    if (e->hp > e->maxHp) e->hp = e->maxHp;
+    if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+}
+
 void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
     (void)attacker; // kills award party-wide XP regardless of who landed the blow
     if (!e->alive) return;
@@ -81,6 +89,14 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
         e->alive = false;
         e->hasMoveTarget = false;
         e->castingSlot = -1;
+
+        // GW1's death penalty: dying costs party members 15% of max
+        // health and energy, stacking to -60%, until they rezone.
+        if (e->kind == ENT_PLAYER || e->kind == ENT_HERO) {
+            e->deathPenalty += 15;
+            if (e->deathPenalty > 60) e->deathPenalty = 60;
+            Entity_RecomputePenalizedStats(e);
+        }
 
         if (e->kind == ENT_MONSTER) {
             // GW1 XP is party-wide: the player levels no matter whether

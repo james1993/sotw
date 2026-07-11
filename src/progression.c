@@ -18,8 +18,10 @@ void Progression_AwardXP(Entity *player, int amount) {
     while (player->level < MAX_LEVEL && player->xp >= Progression_XPToNext(player->level)) {
         player->xp -= Progression_XPToNext(player->level);
         player->level++;
-        player->maxHp += 20; // GW1's real per-level health gain
+        player->baseMaxHp += 20; // GW1's real per-level health gain
+        Entity_RecomputePenalizedStats(player);
         player->hp += 20;
+        if (player->hp > player->maxHp) player->hp = player->maxHp;
         player->attributePoints += AttrPointsForLevel(player->level);
     }
     if (player->level >= MAX_LEVEL) player->xp = 0;

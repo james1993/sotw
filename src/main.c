@@ -66,6 +66,7 @@ int main(void) {
         World_Update(playerNow, dt);
         playerNow = Entity_Get(PLAYER_INDEX); // zone loads rebuild the array
         Items_UpdatePickup(playerNow);
+        Quests_Update(playerNow);
         if (playerNow) camera.target = playerNow->pos;
 
         BeginDrawing();
@@ -89,6 +90,26 @@ int main(void) {
         UI_DrawTargetPanel(screenWidth, screenHeight, 50);
         Quests_DrawTracker(screenWidth, screenHeight);
         UI_PanelsUpdateAndDraw(screenWidth, screenHeight);
+
+        // Death overlay: GW1 dims the world and tells you plainly.
+        if (playerNow && !playerNow->alive) {
+            DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 110 });
+            int bigFont = UI_ScaledFontSize(screenHeight, 34);
+            const char *msg = "You have died.";
+            int tw = UITextWidth(msg, bigFont);
+            UIText(msg, (screenWidth - tw) / 2, screenHeight / 2 - bigFont, bigFont, (Color){ 220, 80, 80, 255 });
+
+            bool anyAlive = false;
+            for (int i = 0; i < g_entityCount; i++) {
+                Entity *e = &g_entities[i];
+                if (e->team == 0 && e->alive && (e->kind == ENT_PLAYER || e->kind == ENT_HERO)) anyAlive = true;
+            }
+            int smallFont = UI_ScaledFontSize(screenHeight, 15);
+            const char *sub = anyAlive ? "Your party fights on..."
+                                       : "Your party has fallen. Returning to the shrine...";
+            int sw = UITextWidth(sub, smallFont);
+            UIText(sub, (screenWidth - sw) / 2, screenHeight / 2 + 8, smallFont, LIGHTGRAY);
+        }
 
         EndDrawing();
     }

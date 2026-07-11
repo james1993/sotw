@@ -58,10 +58,17 @@ typedef struct Entity {
 
     int hp, maxHp;
     int energy, maxEnergy;
+    // Death penalty (GW1's DP): each death costs 15% of max health and
+    // energy, stacking to -60%, cleared by rezoning. maxHp/maxEnergy are
+    // the *penalized* values; base* hold the real stats.
+    int baseMaxHp, baseMaxEnergy;
+    int deathPenalty; // percent, 0-60
     float energyRegenAccum;
     float hpRegenAccum;
     float timeSinceCombat; // seconds since this entity last dealt or took damage
     int adrenaline; // simplified 0-100 shared pool (GW1 tracks this per adrenaline skill)
+
+    bool isHenchman; // hired help - dismissible in outposts, unlike heroes
 
     // GW1-style armor level (AL): incoming damage is scaled by
     // 2^((60 - AL) / 40), GW1's actual armor formula against the AL 60
@@ -130,5 +137,9 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker);
 // GW1 resource with its own pips, but the in/out-of-combat regen split
 // is a faithful simplification of the same idea).
 void Entity_MarkInCombat(Entity *e);
+
+// Recomputes penalized maxHp/maxEnergy from base stats and the current
+// death penalty. Call after changing baseMax*, deathPenalty, or both.
+void Entity_RecomputePenalizedStats(Entity *e);
 
 #endif

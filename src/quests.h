@@ -1,11 +1,21 @@
 #ifndef QUESTS_H
 #define QUESTS_H
 
+#include "raylib.h"
+#include <stdbool.h>
+
 struct Entity;
 
-// Minimal GW1-style quest loop: accept from an NPC, objective tracked
-// on the right side of the screen (where GW1 puts its quest log), then
-// return to the giver to turn in for an XP + gold reward.
+// GW1-style quest loop: accept from an NPC, objective tracked on the
+// right side of the screen (where GW1 puts its quest log), then return
+// to the giver to turn in for an XP + gold reward. Quests can chain -
+// a quest with a prerequisite only becomes available once it's done,
+// like GW1's quest lines.
+typedef enum {
+    QTYPE_KILL,  // slay N monsters
+    QTYPE_REACH  // scout/reach a marked location in the explorable
+} QuestType;
+
 typedef enum {
     QUEST_AVAILABLE,
     QUEST_ACTIVE,
@@ -16,20 +26,36 @@ typedef enum {
 typedef struct {
     const char *name;
     const char *objective;
+    QuestType type;
     int killsRequired;
     int kills;
+    Vector2 targetPos;  // QTYPE_REACH: where to go (explorable coords)
+    float reachRadius;
     int rewardXP;
     int rewardGold;
     QuestState state;
+    int prereq; // index of a quest that must be DONE first, -1 = none
 } Quest;
 
-// The one authored quest, "Charr at the Gate" (a real pre-Searing GW1
-// quest name), given by Captain Osric.
-extern Quest g_quest;
+#define QUEST_COUNT 2
+extern Quest g_quests[QUEST_COUNT];
 
-void Quests_Accept(void);
+// The first offerable (available + prerequisite met) / turn-in-ready
+// quest index, or -1.
+int Quests_OfferableIndex(void);
+int Quests_ReadyToTurnInIndex(void);
+
+// True when the quest giver has anything for the player - drives the
+// green "!" marker.
+bool Quests_GiverHasAttention(void);
+
+void Quests_Accept(int index);
+void Quests_TurnIn(struct Entity *player, int index);
 void Quests_NotifyMonsterKill(void);
-void Quests_TurnIn(struct Entity *player); // grants rewards
+
+// Per-frame objective checks (reach quests). Only meaningful in the
+// explorable zone.
+void Quests_Update(struct Entity *player);
 
 // Right-side objective tracker, drawn under the party panel.
 void Quests_DrawTracker(int screenWidth, int screenHeight);

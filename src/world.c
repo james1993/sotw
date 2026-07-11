@@ -17,6 +17,11 @@ static Vector2 g_portalPos;
 static const char *g_portalLabel = "";
 static const char *g_zoneName = "";
 
+static Vector2 g_shrinePos;
+static bool g_hasShrine = false;
+static float g_wipeTimer = 0.0f;
+static float g_autoResTimer = 0.0f;
+
 GameMode World_GetMode(void) { return g_mode; }
 const char *World_GetZoneName(void) { return g_zoneName; }
 bool World_IsThomHired(void) { return g_thomHired; }
@@ -27,9 +32,29 @@ void World_GetPortal(Vector2 *pos, const char **label) {
     if (label) *label = g_portalLabel;
 }
 
+bool World_GetShrine(Vector2 *pos) {
+    if (pos) *pos = g_shrinePos;
+    return g_hasShrine;
+}
+
+void World_DismissHenchman(Entity *henchman) {
+    if (!henchman || !henchman->isHenchman) return;
+    if (g_mode != MODE_OUTPOST) return; // GW1: party changes only in outposts
+
+    g_thomHired = false;
+    henchman->kind = ENT_NPC;
+    henchman->npcRole = NPC_HENCHMAN;
+    henchman->isHenchman = false;
+    henchman->alive = true;
+    henchman->hp = henchman->maxHp;
+    henchman->targetIndex = -1;
+    henchman->hasMoveTarget = false;
+}
+
 // Strips combat/zone-transient state off the persistent player entity
 // when crossing a portal; progression (level/xp/attributes) and the
-// global inventory survive untouched.
+// global inventory survive untouched. Death penalty clears on rezoning,
+// exactly like GW1.
 static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     p->pos = entryPos;
     p->moveTarget = entryPos;
@@ -40,6 +65,9 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     p->postCastDisplayTimer = 0.0f;
     p->interruptFlashTimer = 0.0f;
     p->adrenaline = 0;
+    p->alive = true;
+    p->deathPenalty = 0;
+    Entity_RecomputePenalizedStats(p);
     for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) p->effects[i].active = false;
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->skillRecharge[i] = 0.0f;
 }
@@ -50,8 +78,11 @@ static void SpawnVekk(Vector2 pos) {
     hero->primaryProfession = PROF_ELEMENTALIST;
     hero->secondaryProfession = PROF_MONK;
     hero->level = 5;
-    hero->maxHp = hero->hp = 100 + 20 * (hero->level - 1);
-    hero->maxEnergy = hero->energy = 50;
+    hero->baseMaxHp = 100 + 20 * (hero->level - 1);
+    hero->baseMaxEnergy = 50;
+    Entity_RecomputePenalizedStats(hero);
+    hero->hp = hero->maxHp;
+    hero->energy = hero->maxEnergy;
     hero->attackRange = 220.0f; // caster keeps distance
     hero->attributeRank[ATTR_FIRE_MAGIC] = 4;
     hero->attributeRank[ATTR_ENERGY_STORAGE] = 3;
@@ -67,10 +98,15 @@ static void SpawnVekk(Vector2 pos) {
 static void SpawnThomCompanion(Vector2 pos) {
     int idx = Entity_Spawn(ENT_HERO, "Little Thom", 0, pos, (Color){ 170, 80, 60, 255 });
     Entity *thom = Entity_Get(idx);
+    thom->isHenchman = true;
     thom->primaryProfession = PROF_WARRIOR;
     thom->secondaryProfession = PROF_MONK;
     thom->level = 5;
-    thom->maxHp = thom->hp = 100 + 20 * (thom->level - 1);
+    thom->baseMaxHp = 100 + 20 * (thom->level - 1);
+    thom->baseMaxEnergy = 20;
+    Entity_RecomputePenalizedStats(thom);
+    thom->hp = thom->maxHp;
+    thom->energy = thom->maxEnergy;
     thom->armor = 80; // warriors wear heavy armor
     thom->attributeRank[ATTR_STRENGTH] = 4;
     thom->attributeRank[ATTR_TACTICS] = 3;
@@ -119,10 +155,14 @@ static void LoadZone(GameMode mode, Vector2 playerEntry) {
     g_mode = mode;
     g_portalCooldown = PORTAL_COOLDOWN;
 
+    g_wipeTimer = 0.0f;
+    g_autoResTimer = 0.0f;
+
     if (mode == MODE_OUTPOST) {
         g_zoneName = "Ashford Camp";
         g_portalPos = (Vector2){ 260, 0 };
         g_portalLabel = "To Ashford Plains";
+        g_hasShrine = false;
 
         // Outposts restore the party completely, GW1-style.
         player->hp = player->maxHp;
@@ -140,6 +180,8 @@ static void LoadZone(GameMode mode, Vector2 playerEntry) {
         g_zoneName = "Ashford Plains";
         g_portalPos = (Vector2){ -420, 0 };
         g_portalLabel = "To Ashford Camp";
+        g_shrinePos = (Vector2){ -320, 140 };
+        g_hasShrine = true;
 
         SpawnVekk((Vector2){ playerEntry.x - 40, playerEntry.y + 50 });
         if (g_thomHired) SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
@@ -163,8 +205,11 @@ void World_Init(void) {
     player->primaryProfession = PROF_MONK;
     player->secondaryProfession = PROF_ELEMENTALIST;
     player->level = 5;
-    player->maxHp = player->hp = 100 + 20 * (player->level - 1); // GW1: +20 HP per level
-    player->maxEnergy = player->energy = 30;
+    player->baseMaxHp = 100 + 20 * (player->level - 1); // GW1: +20 HP per level
+    player->baseMaxEnergy = 30;
+    Entity_RecomputePenalizedStats(player);
+    player->hp = player->maxHp;
+    player->energy = player->maxEnergy;
     // Level 5 grants 20 attribute points; these ranks spend 17 per the
     // GW1 cost table, leaving 3 free for the attributes panel (K).
     player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
@@ -193,7 +238,82 @@ void World_Update(Entity *player, float dt) {
         g_portalCooldown -= dt;
         return;
     }
-    if (!player || !player->alive) return;
+    if (!player) return;
+
+    // --- Death & resurrection bookkeeping (explorable only) ---
+    if (g_mode == MODE_EXPLORABLE) {
+        int aliveCount = 0, deadCount = 0;
+        for (int i = 0; i < g_entityCount; i++) {
+            Entity *e = &g_entities[i];
+            if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
+            if (e->alive) aliveCount++; else deadCount++;
+        }
+
+        if (aliveCount == 0 && deadCount > 0) {
+            // Full party wipe: after a beat, everyone respawns at the
+            // resurrection shrine, carrying the death penalty their
+            // deaths already stacked - straight GW1.
+            g_wipeTimer += dt;
+            if (g_wipeTimer >= 2.5f) {
+                g_wipeTimer = 0.0f;
+                int slot = 0;
+                for (int i = 0; i < g_entityCount; i++) {
+                    Entity *e = &g_entities[i];
+                    if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
+                    e->alive = true;
+                    e->hp = e->maxHp; // already penalized by DP
+                    e->energy = e->maxEnergy;
+                    e->pos = (Vector2){ g_shrinePos.x + (slot % 2) * 34.0f,
+                                        g_shrinePos.y + (slot / 2) * 34.0f };
+                    e->moveTarget = e->pos;
+                    e->hasMoveTarget = false;
+                    e->targetIndex = -1;
+                    e->castingSlot = -1;
+                    for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) e->effects[j].active = false;
+                    slot++;
+                }
+            }
+            return; // no portal use while wiped
+        }
+
+        if (deadCount > 0) {
+            // Some of the party is down but the fight was survived: once
+            // no monster is aggroed, the survivors revive the fallen after
+            // a few seconds. This stands in for GW1's res signets and
+            // hero res skills until dead-ally targeting exists.
+            bool anyAggro = false;
+            Entity *anchor = NULL; // a living member the fallen revive beside
+            for (int i = 0; i < g_entityCount; i++) {
+                Entity *e = &g_entities[i];
+                if (e->kind == ENT_MONSTER && e->alive && e->aggroed) anyAggro = true;
+                if (e->team == 0 && e->alive && !anchor &&
+                    (e->kind == ENT_PLAYER || e->kind == ENT_HERO)) anchor = e;
+            }
+            if (anyAggro || !anchor) {
+                g_autoResTimer = 0.0f;
+            } else {
+                g_autoResTimer += dt;
+                if (g_autoResTimer >= 5.0f) {
+                    g_autoResTimer = 0.0f;
+                    for (int i = 0; i < g_entityCount; i++) {
+                        Entity *e = &g_entities[i];
+                        if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO) || e->alive) continue;
+                        e->alive = true;
+                        e->hp = e->maxHp / 2; // revived weakened, like a res signet
+                        e->energy = e->maxEnergy / 2;
+                        e->pos = (Vector2){ anchor->pos.x + 30.0f, anchor->pos.y + 30.0f };
+                        e->targetIndex = -1;
+                        e->castingSlot = -1;
+                        for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) e->effects[j].active = false;
+                    }
+                }
+            }
+        } else {
+            g_autoResTimer = 0.0f;
+        }
+    }
+
+    if (!player->alive) return;
 
     float dx = player->pos.x - g_portalPos.x;
     float dy = player->pos.y - g_portalPos.y;

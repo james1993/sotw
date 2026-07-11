@@ -291,20 +291,33 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
 
     switch (npc->npcRole) {
         case NPC_QUEST_GIVER: {
-            if (g_quest.state == QUEST_AVAILABLE) {
-                UIText("The Charr prowl our plains. Will you thin them out?", x, y, font, LIGHTGRAY);
-                if (DialogButton(btn, "Accept: Charr at the Gate (250 XP, 100g)", font, true)) {
-                    Quests_Accept();
-                }
-            } else if (g_quest.state == QUEST_ACTIVE) {
-                UIText("The Charr still prowl. Come back when it's done.", x, y, font, LIGHTGRAY);
-            } else if (g_quest.state == QUEST_READY_TO_TURN_IN) {
+            int ready = Quests_ReadyToTurnInIndex();
+            int offer = Quests_OfferableIndex();
+            if (ready >= 0) {
                 UIText("You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
-                if (DialogButton(btn, "Claim reward (250 XP, 100g)", font, true)) {
-                    Quests_TurnIn(player);
+                char label[96];
+                snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg)",
+                         g_quests[ready].name, g_quests[ready].rewardXP, g_quests[ready].rewardGold);
+                if (DialogButton(btn, label, font, true)) {
+                    Quests_TurnIn(player, ready);
+                }
+            } else if (offer >= 0) {
+                UIText(offer == 0 ? "The Charr prowl our plains. Will you thin them out?"
+                                  : "With the Charr culled, we need eyes on the eastern ridge.",
+                       x, y, font, LIGHTGRAY);
+                char label[96];
+                snprintf(label, sizeof(label), "Accept: %s (%d XP, %dg)",
+                         g_quests[offer].name, g_quests[offer].rewardXP, g_quests[offer].rewardGold);
+                if (DialogButton(btn, label, font, true)) {
+                    Quests_Accept(offer);
                 }
             } else {
-                UIText("Ashford is safer for your work, friend.", x, y, font, LIGHTGRAY);
+                bool anyActive = false;
+                for (int i = 0; i < QUEST_COUNT; i++) {
+                    if (g_quests[i].state == QUEST_ACTIVE) anyActive = true;
+                }
+                UIText(anyActive ? "Your task awaits in the plains. Good hunting."
+                                 : "Ashford is safer for your work, friend.", x, y, font, LIGHTGRAY);
             }
             break;
         }
@@ -323,10 +336,15 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 // the spot; zone loads keep him from then on.
                 npc->kind = ENT_HERO;
                 npc->npcRole = NPC_NONE;
+                npc->isHenchman = true;
                 npc->primaryProfession = PROF_WARRIOR;
                 npc->secondaryProfession = PROF_MONK;
                 npc->level = 5;
-                npc->maxHp = npc->hp = 100 + 20 * (npc->level - 1);
+                npc->baseMaxHp = 100 + 20 * (npc->level - 1);
+                npc->baseMaxEnergy = 20;
+                Entity_RecomputePenalizedStats(npc);
+                npc->hp = npc->maxHp;
+                npc->energy = npc->maxEnergy;
                 npc->armor = 80;
                 npc->attributeRank[ATTR_STRENGTH] = 4;
                 npc->attributeRank[ATTR_TACTICS] = 3;

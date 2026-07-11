@@ -151,6 +151,31 @@ static void DrawEnvironment(void) {
     DrawCircleLines((int)portalPos.x, (int)portalPos.y, 34.0f, (Color){ 120, 170, 255, 180 });
     int tw = UITextWidth(portalLabel, 11);
     UIText(portalLabel, (int)(portalPos.x - tw / 2), (int)(portalPos.y + 40), 11, (Color){ 150, 190, 255, 255 });
+
+    // Resurrection shrine: a stone marker with a soft glow. On a party
+    // wipe everyone respawns here with their death penalty, like GW1.
+    Vector2 shrinePos;
+    if (World_GetShrine(&shrinePos)) {
+        DrawCircleGradient((int)shrinePos.x, (int)shrinePos.y, 26.0f,
+                           (Color){ 200, 220, 255, 90 }, (Color){ 60, 70, 100, 0 });
+        DrawRectangle((int)shrinePos.x - 6, (int)shrinePos.y - 22, 12, 26, (Color){ 130, 130, 140, 255 });
+        DrawRectangle((int)shrinePos.x - 12, (int)shrinePos.y + 2, 24, 6, (Color){ 110, 110, 120, 255 });
+        int sw = UITextWidth("Resurrection Shrine", 10);
+        UIText("Resurrection Shrine", (int)(shrinePos.x - sw / 2), (int)(shrinePos.y + 14), 10, (Color){ 180, 200, 230, 255 });
+    }
+
+    // Reach-quest marker: a green flag planted at the objective while
+    // the quest is active.
+    for (int i = 0; i < QUEST_COUNT; i++) {
+        const Quest *q = &g_quests[i];
+        if (q->type != QTYPE_REACH || q->state != QUEST_ACTIVE) continue;
+        if (World_GetMode() != MODE_EXPLORABLE) continue;
+        Vector2 p = q->targetPos;
+        DrawCircleLines((int)p.x, (int)p.y, q->reachRadius, (Color){ 90, 220, 90, 90 });
+        DrawLineEx((Vector2){ p.x, p.y + 6 }, (Vector2){ p.x, p.y - 26 }, 3.0f, (Color){ 200, 200, 200, 255 });
+        DrawTriangle((Vector2){ p.x, p.y - 26 }, (Vector2){ p.x, p.y - 12 },
+                     (Vector2){ p.x + 18, p.y - 19 }, (Color){ 90, 220, 90, 255 });
+    }
 }
 
 static void DrawHealthBar(const Entity *e) {
@@ -238,8 +263,7 @@ void Render_World(Camera2D camera) {
 
         // GW1's green exclamation point over quest givers with something
         // to offer (or a reward to hand out).
-        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER &&
-            (g_quest.state == QUEST_AVAILABLE || g_quest.state == QUEST_READY_TO_TURN_IN)) {
+        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER && Quests_GiverHasAttention()) {
             int mw = UITextWidth("!", 16);
             UIText("!", (int)(e->pos.x - mw / 2), (int)(e->pos.y - e->radius - 32.0f), 16, (Color){ 90, 230, 90, 255 });
         }

@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "combat.h"
 #include "ui_panels.h"
+#include "ui_party.h"
 #include <math.h>
 #include <stdbool.h>
 
@@ -111,7 +112,8 @@ void Input_Update(Camera2D *camera, float dt) {
         player->hasMoveTarget = false;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !UI_PointerOverPanels(GetMousePosition())) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !UI_PointerOverPanels(GetMousePosition())
+        && !UI_PartyPanelContains(GetMousePosition())) {
         g_gamepadMode = false; // mouse takes back targeting control
 
         Vector2 mouseScreen = GetMousePosition();

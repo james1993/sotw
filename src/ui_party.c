@@ -1,14 +1,21 @@
 #include "ui_party.h"
 #include "entity.h"
+#include "world.h"
 #include "raylib.h"
 #include "ui_font.h"
 #include <stdio.h>
+
+static Rectangle g_panelRect;
 
 static float UIScale(int screenHeight) {
     float scale = (float)screenHeight / 800.0f;
     if (scale < 0.85f) scale = 0.85f;
     if (scale > 5.0f) scale = 5.0f;
     return scale;
+}
+
+bool UI_PartyPanelContains(Vector2 point) {
+    return CheckCollisionPointRec(point, g_panelRect);
 }
 
 // Small downward-pointing triangle, the GW1 party-window shorthand for
@@ -35,15 +42,22 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     for (int i = 0; i < g_entityCount; i++) {
         if (g_entities[i].team == 0 && g_entities[i].kind != ENT_NPC) members++;
     }
-    if (members == 0) return;
+    if (members == 0) {
+        g_panelRect = (Rectangle){ 0 };
+        return;
+    }
 
     int panelH = pad * 2 + members * rowH;
     int x = screenWidth - panelW - (int)(14 * scale);
     int y = (int)(80 * scale);
+    g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
 
     DrawRectangle(x, y, panelW, panelH, (Color){ 20, 22, 30, 210 });
     DrawRectangleLines(x, y, panelW, panelH, (Color){ 120, 120, 140, 255 });
     UIText("Party", x + pad, y - font - 4, font, LIGHTGRAY);
+
+    bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    Vector2 mouse = GetMousePosition();
 
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
@@ -52,6 +66,28 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
 
         Color nameColor = e->alive ? RAYWHITE : (Color){ 130, 130, 130, 255 };
         UIText(e->name, x + pad, rowY, font, nameColor);
+
+        // GW1 shows each member's stacked death penalty in the party list.
+        if (e->deathPenalty > 0) {
+            char dp[16];
+            snprintf(dp, sizeof(dp), "-%d%%", e->deathPenalty);
+            int nameW = UITextWidth(e->name, font);
+            UIText(dp, x + pad + nameW + 8, rowY, font, (Color){ 220, 120, 120, 255 });
+        }
+
+        // Dismiss button for hired henchmen - outposts only, GW1's rule
+        // for changing party composition.
+        if (e->isHenchman && World_GetMode() == MODE_OUTPOST) {
+            int btn = (int)(14 * scale);
+            Rectangle dismiss = { (float)(x + panelW - pad - btn), (float)rowY, (float)btn, (float)btn };
+            bool hovered = CheckCollisionPointRec(mouse, dismiss);
+            DrawRectangleRec(dismiss, hovered ? (Color){ 140, 60, 60, 255 } : (Color){ 70, 45, 45, 255 });
+            DrawRectangleLinesEx(dismiss, 1, LIGHTGRAY);
+            UIText("x", (int)dismiss.x + btn / 3, (int)dismiss.y - 1, font, RAYWHITE);
+            if (hovered && click) {
+                World_DismissHenchman(e);
+            }
+        }
 
         int barY = rowY + font + 2;
         int barW = panelW - 2 * pad - arrow - 6; // leave room for status arrows
