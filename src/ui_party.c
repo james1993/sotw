@@ -18,6 +18,10 @@ bool UI_PartyPanelContains(Vector2 point) {
     return CheckCollisionPointRec(point, g_panelRect);
 }
 
+float UI_PartyPanelBottom(void) {
+    return g_panelRect.y + g_panelRect.height;
+}
+
 // Small downward-pointing triangle, the GW1 party-window shorthand for
 // "something is on this player": brown = condition, purple = hex.
 static void DrawStatusArrow(int x, int y, int size, Color color) {
@@ -29,7 +33,6 @@ static void DrawStatusArrow(int x, int y, int size, Color color) {
 }
 
 void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
-    (void)screenWidth;
     float scale = UIScale(screenHeight);
     int panelW = (int)(200 * scale);
     int rowH = (int)(46 * scale); // room for a thin energy bar per member
@@ -50,8 +53,13 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     }
 
     int panelH = pad * 2 + members * rowH;
-    // Top-left, where GW1 anchors its party window.
-    int x = (int)(14 * scale);
+    // GW1 uses both positions: the in-mission party health list sits
+    // top-LEFT, while the outpost party-formation window (the one you
+    // hire and dismiss from) opens on the RIGHT. Our panel plays both
+    // roles, so it follows the mode.
+    int x = (World_GetMode() == MODE_OUTPOST)
+        ? screenWidth - panelW - (int)(14 * scale)
+        : (int)(14 * scale);
     int y = (int)(80 * scale);
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
 

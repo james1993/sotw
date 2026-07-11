@@ -3,6 +3,7 @@
 #include "progression.h"
 #include "items.h"
 #include "world.h"
+#include "ui_party.h"
 #include "ui_font.h"
 #include <math.h>
 #include <stdio.h>
@@ -101,10 +102,14 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
     int font = (int)(11 * scale);
     int pad = (int)(8 * scale);
     int w = (int)(220 * scale);
-    // Top-right: with the party window moved to its GW1 home on the
-    // left, quest goals take GW1's upper-right position.
+    // Upper-right, GW1's spot for mission goals. In outposts the party
+    // window also lives on the right, so stack below it there.
     int x = screenWidth - w - (int)(14 * scale);
     int y = (int)(80 * scale);
+    if (World_GetMode() == MODE_OUTPOST) {
+        int below = (int)UI_PartyPanelBottom() + (int)(12 * scale);
+        if (below > y) y = below;
+    }
 
     for (int i = 0; i < QUEST_COUNT; i++) {
         Quest *q = &g_quests[i];

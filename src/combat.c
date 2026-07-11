@@ -1,6 +1,7 @@
 #include "combat.h"
 #include "skill.h"
 #include "effect.h"
+#include "world.h"
 #include "raylib.h"
 #include <math.h>
 #include <stddef.h>
@@ -18,6 +19,10 @@ static float Dist(Vector2 a, Vector2 b) {
 #define OUT_OF_COMBAT_REGEN_PCT_PER_SEC 0.06f
 
 bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
+    // GW1 disables the skill bar in towns and outposts entirely - even
+    // self-targeted skills can't be cast in a safe zone.
+    if (World_GetMode() == MODE_OUTPOST) return false;
+
     Entity *caster = Entity_Get(casterIndex);
     if (!caster || !caster->alive) return false;
     if (slot < 0 || slot >= SKILL_BAR_SIZE) return false;

@@ -16,4 +16,9 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight);
 // click-to-move.
 bool UI_PartyPanelContains(Vector2 point);
 
+// Bottom edge (screen y) of the last-drawn party panel, so other
+// right-side UI (the quest tracker) can stack below it in outposts.
+// 0 when no panel was drawn.
+float UI_PartyPanelBottom(void);
+
 #endif

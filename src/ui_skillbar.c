@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "skill.h"
 #include "progression.h"
+#include "world.h"
 #include "ui_font.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -106,6 +107,12 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
             char keyLabel[4];
             snprintf(keyLabel, sizeof(keyLabel), "%d", i + 1);
             UIText(keyLabel, x + L.slotSize - (int)(12 * L.scale), L.y + L.slotSize - (int)(14 * L.scale), L.font, LIGHTGRAY);
+        }
+
+        // Skill use is disabled in outposts (see Combat_ActivateSkill);
+        // dim the bar so it reads as inactive, like GW1's grayed town bar.
+        if (World_GetMode() == MODE_OUTPOST) {
+            DrawRectangleRec(slotRect, (Color){ 10, 10, 12, 150 });
         }
     }
 
