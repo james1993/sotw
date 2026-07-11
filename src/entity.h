@@ -2,6 +2,7 @@
 #define ENTITY_H
 
 #include "raylib.h"
+#include "attributes.h"
 #include <stdbool.h>
 
 #define MAX_ENTITIES 16
@@ -53,8 +54,18 @@ typedef struct Entity {
     float timeSinceCombat; // seconds since this entity last dealt or took damage
     int adrenaline; // simplified 0-100 shared pool (GW1 tracks this per adrenaline skill)
 
-    int primaryProfession;
-    int attributeRank[4]; // indexed by AttributeKind, see attributes.h
+    // GW1-style armor level (AL): incoming damage is scaled by
+    // 2^((60 - AL) / 40), GW1's actual armor formula against the AL 60
+    // caster baseline. 60 = neutral.
+    int armor;
+
+    int level;
+    int xp;              // toward the next level
+    int attributePoints; // earned but unspent
+
+    Profession primaryProfession;
+    Profession secondaryProfession;
+    int attributeRank[ATTR_COUNT];
 
     int skillBar[SKILL_BAR_SIZE];      // index into g_skillDB, -1 = empty
     float skillRecharge[SKILL_BAR_SIZE];
@@ -98,7 +109,11 @@ extern int g_entityCount;
 int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color color);
 Entity *Entity_Get(int index);
 bool Entity_IsCasting(const Entity *e);
-void Entity_ApplyDamage(Entity *e, int amount);
+
+// Applies armor-scaled damage. `attacker` may be NULL (e.g. condition
+// ticks). Monster deaths award party XP and roll loot drops here, so
+// every damage source shares one death path.
+void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker);
 
 // Resets the out-of-combat regen timer. Called whenever an entity deals
 // or takes damage, matching GW1's "recent combat activity blocks fast

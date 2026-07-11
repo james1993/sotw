@@ -40,9 +40,13 @@ add_executable(sotw_demake
     src/combat.c
     src/ai_hero.c
     src/input.c
+    src/items.c
+    src/progression.c
     src/ui_skillbar.c
     src/ui_target.c
     src/ui_party.c
+    src/ui_panels.c
+    src/ui_font.c
     src/render.c
 )
 

@@ -1,5 +1,10 @@
 #include "entity.h"
+#include "items.h"
+#include "progression.h"
+#include <math.h>
 #include <string.h>
+
+#define PLAYER_INDEX 0
 
 Entity g_entities[MAX_ENTITIES];
 int g_entityCount = 0;
@@ -25,6 +30,8 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->hp = e->maxHp = 100;
     e->energy = e->maxEnergy = 40;
     e->adrenaline = 0;
+    e->armor = 60; // neutral AL - no bonus, no penalty
+    e->level = 1;
 
     e->castingSlot = -1;
     e->targetIndex = -1;
@@ -56,14 +63,29 @@ void Entity_MarkInCombat(Entity *e) {
     e->timeSinceCombat = 0.0f;
 }
 
-void Entity_ApplyDamage(Entity *e, int amount) {
+void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
+    (void)attacker; // kills award party-wide XP regardless of who landed the blow
     if (!e->alive) return;
-    e->hp -= amount;
+
+    // GW1's armor formula: every 40 AL above/below the 60 baseline
+    // halves/doubles incoming damage.
+    float scaled = (float)amount * powf(2.0f, (60.0f - (float)e->armor) / 40.0f);
+    int finalDamage = (int)scaled;
+    if (finalDamage < 1 && amount > 0) finalDamage = 1;
+
+    e->hp -= finalDamage;
     Entity_MarkInCombat(e);
     if (e->hp <= 0) {
         e->hp = 0;
         e->alive = false;
         e->hasMoveTarget = false;
         e->castingSlot = -1;
+
+        if (e->kind == ENT_MONSTER) {
+            // GW1 XP is party-wide: the player levels no matter whether
+            // they or the hero landed the killing blow.
+            Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
+            Items_SpawnMonsterDrops(e->pos, e->level);
+        }
     }
 }

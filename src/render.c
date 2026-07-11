@@ -1,9 +1,31 @@
 #include "render.h"
 #include "entity.h"
+#include "items.h"
+#include "ui_font.h"
 #include <math.h>
 #include <stddef.h>
 
 #define PLAYER_INDEX 0
+
+// Ground loot: gold piles as coins, weapon/armor drops as diamonds with
+// a small name label so you can tell whether walking over is worth it.
+static void DrawDrops(void) {
+    for (int i = 0; i < MAX_DROPS; i++) {
+        const GroundDrop *d = &g_drops[i];
+        if (!d->active) continue;
+
+        if (d->gold > 0) {
+            DrawCircleV(d->pos, 5.0f, GOLD);
+            DrawCircleLines((int)d->pos.x, (int)d->pos.y, 5.0f, (Color){ 120, 90, 20, 255 });
+        } else {
+            Color c = (d->item.kind == ITEM_WEAPON) ? SKYBLUE : (Color){ 120, 220, 130, 255 };
+            DrawPoly(d->pos, 4, 7.0f, 45.0f, c);
+            DrawPolyLines(d->pos, 4, 7.0f, 45.0f, BLACK);
+            int tw = UITextWidth(d->item.name, 10);
+            UIText(d->item.name, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 10), 10, c);
+        }
+    }
+}
 
 // Basic environmental art: a fixed, hand-placed scatter of trees/rocks/
 // grass tufts built from primitive shapes, since the prototype has no
@@ -118,6 +140,7 @@ void Render_World(Camera2D camera) {
     }
 
     DrawEnvironment();
+    DrawDrops();
 
     // Faint "danger bubble" around the player, like the aggro circle on
     // GW1's compass: step inside a sleeping monster's radius and it wakes
@@ -148,12 +171,12 @@ void Render_World(Camera2D camera) {
 
         if (e->interruptFlashTimer > 0.0f) {
             const char *label = "INTERRUPTED";
-            int tw = MeasureText(label, 10);
-            DrawText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, GOLD);
+            int tw = UITextWidth(label, 10);
+            UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, GOLD);
         }
 
-        int textWidth = MeasureText(e->name, 10);
-        DrawText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, RAYWHITE);
+        int textWidth = UITextWidth(e->name, 10);
+        UIText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, RAYWHITE);
     }
 
     EndMode2D();

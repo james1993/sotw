@@ -67,11 +67,20 @@ static void UpdateHero(int index) {
         return;
     }
 
-    // No one worth fighting - regroup near the player instead of
-    // standing wherever the last fight happened.
-    if (player && player->alive && Dist(self->pos, player->pos) > 50.0f) {
-        self->moveTarget = player->pos;
-        self->hasMoveTarget = true;
+    // No one worth fighting - drift back toward the player, but keep a
+    // respectful follow distance instead of standing on top of them:
+    // start regrouping only when well behind, and stop approaching at
+    // ~arm's length like a GW1 henchman trailing the party leader.
+    if (player && player->alive) {
+        float d = Dist(self->pos, player->pos);
+        if (d > 200.0f) {
+            float t = (d - 110.0f) / d; // stop ~110 units short of the player
+            self->moveTarget = (Vector2){
+                self->pos.x + (player->pos.x - self->pos.x) * t,
+                self->pos.y + (player->pos.y - self->pos.y) * t
+            };
+            self->hasMoveTarget = true;
+        }
     }
 }
 

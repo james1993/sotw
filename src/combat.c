@@ -3,6 +3,7 @@
 #include "effect.h"
 #include "raylib.h"
 #include <math.h>
+#include <stddef.h>
 
 static float Dist(Vector2 a, Vector2 b) {
     float dx = a.x - b.x, dy = a.y - b.y;
@@ -134,7 +135,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             fx->tickAccum += dt;
             if (fx->tickAccum >= 1.0f) {
                 fx->tickAccum -= 1.0f;
-                Entity_ApplyDamage(e, (int)fx->tickDamage);
+                Entity_ApplyDamage(e, (int)fx->tickDamage, NULL);
             }
         }
         if (fx->remaining <= 0.0f) fx->active = false;
@@ -168,7 +169,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             e->attackTimer -= dt;
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
-                Entity_ApplyDamage(target, dmg);
+                Entity_ApplyDamage(target, dmg, e);
                 Entity_MarkInCombat(e);
                 if (target->kind == ENT_MONSTER && !target->aggroed) {
                     // Landing a hit wakes a sleeping monster up regardless

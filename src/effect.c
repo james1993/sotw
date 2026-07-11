@@ -12,7 +12,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
     switch (step->kind) {
         case FX_DAMAGE: {
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
-            Entity_ApplyDamage(target, dmg);
+            Entity_ApplyDamage(target, dmg, caster);
             Entity_MarkInCombat(caster);
             if (target->kind == ENT_MONSTER && !target->aggroed) {
                 // A ranged pull: damaging a sleeping monster wakes it up
@@ -25,6 +25,11 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
         }
         case FX_HEAL: {
             int amount = (int)RankScaledValue(step, caster, skill->attribute);
+            // Divine Favor: GW1's Monk primary attribute adds bonus
+            // healing (~3.2/rank there, 3/rank here) to every monk spell
+            // that heals - the whole reason a primary Monk out-heals a
+            // secondary one with identical Healing Prayers.
+            amount += 3 * caster->attributeRank[ATTR_DIVINE_FAVOR];
             target->hp += amount;
             if (target->hp > target->maxHp) target->hp = target->maxHp;
             break;

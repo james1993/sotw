@@ -1,6 +1,7 @@
 #include "ui_party.h"
 #include "entity.h"
 #include "raylib.h"
+#include "ui_font.h"
 #include <stdio.h>
 
 static float UIScale(int screenHeight) {
@@ -42,7 +43,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
 
     DrawRectangle(x, y, panelW, panelH, (Color){ 20, 22, 30, 210 });
     DrawRectangleLines(x, y, panelW, panelH, (Color){ 120, 120, 140, 255 });
-    DrawText("Party", x + pad, y - font - 4, font, LIGHTGRAY);
+    UIText("Party", x + pad, y - font - 4, font, LIGHTGRAY);
 
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
@@ -50,7 +51,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         if (e->team != 0) continue;
 
         Color nameColor = e->alive ? RAYWHITE : (Color){ 130, 130, 130, 255 };
-        DrawText(e->name, x + pad, rowY, font, nameColor);
+        UIText(e->name, x + pad, rowY, font, nameColor);
 
         int barY = rowY + font + 2;
         int barW = panelW - 2 * pad - arrow - 6; // leave room for status arrows

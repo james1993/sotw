@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "skill.h"
 #include "raylib.h"
+#include "ui_font.h"
 #include <stdio.h>
 
 #define PLAYER_INDEX 0
@@ -30,7 +31,7 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     int y = startY;
 
     Color teamColor = (target->team == 0) ? SKYBLUE : (Color){ 255, 140, 140, 255 };
-    DrawText(target->name, x, y, font, teamColor);
+    UIText(target->name, x, y, font, teamColor);
     y += font + pad;
 
     float hpPct = (target->maxHp > 0) ? (float)target->hp / (float)target->maxHp : 0.0f;
@@ -39,7 +40,7 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     DrawRectangleLines(x, y, panelW, barH, BLACK);
     char hpLabel[32];
     snprintf(hpLabel, sizeof(hpLabel), "%d / %d", target->hp, target->maxHp);
-    DrawText(hpLabel, x + pad, y + 2, smallFont, RAYWHITE);
+    UIText(hpLabel, x + pad, y + 2, smallFont, RAYWHITE);
     y += barH + pad;
 
     // Only ever show the skill the target is *currently* using, or the
@@ -86,14 +87,14 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
             } else {
                 snprintf(label, sizeof(label), "%s", s->name);
             }
-            DrawText(label, x + pad, y + 2, smallFont, s->isElite ? GOLD : RAYWHITE);
+            UIText(label, x + pad, y + 2, smallFont, s->isElite ? GOLD : RAYWHITE);
             y += castBarH + pad;
         }
     }
 
     if (target->interruptFlashTimer > 0.0f) {
         const char *label = "INTERRUPTED!";
-        int tw = MeasureText(label, font);
-        DrawText(label, x + (panelW - tw) / 2, y, font, GOLD);
+        int tw = UITextWidth(label, font);
+        UIText(label, x + (panelW - tw) / 2, y, font, GOLD);
     }
 }

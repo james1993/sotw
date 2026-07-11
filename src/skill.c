@@ -47,10 +47,10 @@ static void AddStep(Skill *s, EffectKind kind, float base, float perRank, int co
 }
 
 // Skill DB indices, in registration order below:
-//  0 Gash            4 Fire Bolt      8 Claw Swipe (monster)
-//  1 Rush Strike      5 Cinder Storm    9 Distracting Blow
-//  2 Battle Cry        6 Mind Sear      10 Feral Howl (monster)
-//  3 Deathblow (elite)  7 Meteor (elite)
+//  0 Gash            4 Fire Bolt      8 Claw Swipe (monster)    12 Banish
+//  1 Rush Strike      5 Cinder Storm    9 Distracting Blow       13 Smite
+//  2 Battle Cry        6 Mind Sear      10 Feral Howl (monster)   14 Bane Signet
+//  3 Deathblow (elite)  7 Meteor (elite) 11 Orison of Healing
 void SkillDB_Init(void) {
     g_skillCount = 0;
     Skill s;
@@ -121,5 +121,30 @@ void SkillDB_Init(void) {
     s = MakeSkill("Feral Howl", SKILLTYPE_SPELL, ATTR_STRENGTH,
                   5, 0, 1.5f, 10.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_HEAL, 30, 0, 0, 0);
+    SkillDB_Register(s);
+
+    // --- Monk skills: energy spells, Divine Favor bonus healing applies
+    // to FX_HEAL (see effect.c), no adrenaline anywhere on this bar ---
+    s = MakeSkill("Orison of Healing", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
+                  5, 0, 1.0f, 2.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_HEAL, 20, 3.0f, 0, 0);
+    SkillDB_Register(s);
+
+    s = MakeSkill("Banish", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
+                  5, 0, 1.0f, 4.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 15, 2.5f, 0, 0);
+    SkillDB_Register(s);
+
+    s = MakeSkill("Smite", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
+                  10, 0, 1.0f, 6.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 25, 3.0f, 0, 0);
+    SkillDB_Register(s);
+
+    // Signet: free, but pays for it in cast time and a long recharge -
+    // the type's whole identity in GW1.
+    s = MakeSkill("Bane Signet", SKILLTYPE_SIGNET, ATTR_SMITING_PRAYERS,
+                  0, 0, 2.0f, 15.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 20, 2.0f, 0, 0);
+    AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
     SkillDB_Register(s);
 }

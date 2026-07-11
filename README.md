@@ -58,10 +58,17 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 
 - **Left-click** empty ground to move there.
 - **Left-click** an enemy to target it (auto-walks into range and
-  auto-attacks).
-- **1–4** activate your equipped skills (Gash, Rush Strike, Battle Cry,
-  Deathblow). The Hero companion fights automatically, choosing skills
-  from its own bar the same way a GW1 hero does.
+  auto-attacks). **Escape** clears your target.
+- **1–5** activate your equipped skills (Monk bar: Orison of Healing,
+  Banish, Smite, Bane Signet, plus Fire Bolt from the Elementalist
+  secondary). Vekk, the hero companion, fights automatically the same
+  way a GW1 hero does.
+- **I** toggles the inventory (walk over drops to pick them up; click an
+  item to equip it). **K** toggles the attributes panel for spending
+  earned attribute points at GW1's real rank costs.
+- **Scroll wheel** zooms.
+- **Controller**: left stick moves (auto-attacks the nearest enemy in
+  range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
 
 ### What's deliberately not built yet
 
