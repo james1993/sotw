@@ -11,11 +11,6 @@
 // hired henchmen.
 void UI_DrawPartyPanel(int screenWidth, int screenHeight);
 
-// True if the point is inside the party panel - input.c uses this so
-// clicks on the panel (e.g. the dismiss button) don't fall through to
-// click-to-move.
-bool UI_PartyPanelContains(Vector2 point);
-
 // Bottom edge (screen y) of the last-drawn party panel, so other
 // right-side UI (the quest tracker) can stack below it in outposts.
 // 0 when no panel was drawn.

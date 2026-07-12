@@ -2,9 +2,8 @@
 #define PROJECTILE_H
 
 #include "raylib.h"
+#include "entity.h"
 #include <stdbool.h>
-
-struct Entity;
 
 #define MAX_PROJECTILES 64
 
@@ -16,9 +15,9 @@ struct Entity;
 typedef struct {
     bool active;
     Vector2 pos;
-    Vector2 landingPoint; // target's position when the shot left
-    int targetIndex;
-    int shooterIndex;
+    Vector2 landingPoint;  // target's position when the shot left
+    EntityRef targetRef;   // generational: a stale target means the shot
+    EntityRef shooterRef;  // fizzles instead of hitting a slot-reuse victim
     int damage;
     float speed;
     Color color;

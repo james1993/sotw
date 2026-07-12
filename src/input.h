@@ -17,4 +17,10 @@
 // See docs/design/demake-design.md #1.
 void Input_Update(Camera2D *camera, float dt);
 
+// True once the player has touched the scroll wheel. Until then main.c
+// keeps re-deriving the default zoom from the window size, so a window
+// manager that maximizes the window a few frames after startup still
+// ends up with the right default view.
+bool Input_UserAdjustedZoom(void);
+
 #endif

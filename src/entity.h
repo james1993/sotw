@@ -5,7 +5,15 @@
 #include "attributes.h"
 #include <stdbool.h>
 
-#define MAX_ENTITIES 16
+// Sized for a GW1-scale party (8) plus a zone's worth of camps and
+// patrols, with headroom for spawned reinforcements.
+#define MAX_ENTITIES 32
+
+// Radius of the player's drawn "danger bubble" (the world-space ring in
+// render.c and the compass ring in ui_compass.c - one constant so the
+// two can't drift). Monster aggroRange values in zone data stay at or
+// below this, so the bubble never under-promises who can notice you.
+#define AGGRO_RING_RADIUS 130.0f
 #define SKILL_BAR_SIZE 8
 #define MAX_ACTIVE_EFFECTS 8
 
@@ -41,6 +49,17 @@ typedef struct {
     float tickDamage; // > 0 for DoT-style conditions (bleeding/burning)
     float tickAccum;
 } ActiveEffect;
+
+// Generational entity handle. A bare slot index stays "valid" after the
+// entity in that slot dies AND after the slot is reused by a different
+// entity - the second case silently retargets whoever moved in. The
+// generation counter (bumped every time a slot is respawned) catches
+// exactly that: a stale ref resolves to NULL instead of the wrong
+// entity. Take refs with Entity_RefOf, read them with Entity_Resolve.
+typedef struct {
+    int idx;      // slot in g_entities, -1 = no entity
+    unsigned gen; // g_entityGen[idx] at the time the ref was taken
+} EntityRef;
 
 typedef struct Entity {
     bool alive;
@@ -89,11 +108,11 @@ typedef struct Entity {
     int castingSlot;        // -1 if not casting
     float castTimeRemaining;
     float castTimeTotal;
-    int castTargetIndex;    // resolved target of the cast in progress -
-                            // separate from targetIndex so a self-fallback
-                            // heal doesn't stomp your selected target
+    EntityRef castTargetRef; // resolved target of the cast in progress -
+                             // separate from targetRef so a self-fallback
+                             // heal doesn't stomp your selected target
 
-    int targetIndex;        // index into g_entities, -1 if none
+    EntityRef targetRef;    // current target, Entity_Resolve to read
     float attackTimer;
     float attackInterval;
     int attackDamageMin, attackDamageMax;
@@ -132,10 +151,17 @@ typedef struct Entity {
 
 extern Entity g_entities[MAX_ENTITIES];
 extern int g_entityCount;
+extern unsigned g_entityGen[MAX_ENTITIES]; // per-slot generation counters
 
 int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color color);
 Entity *Entity_Get(int index);
 bool Entity_IsCasting(const Entity *e);
+
+// Generational handles (see EntityRef above).
+EntityRef Entity_NoRef(void);
+EntityRef Entity_RefOf(int index);        // ref to a current slot, or NoRef
+Entity *Entity_Resolve(EntityRef ref);    // NULL when none or stale
+int Entity_RefIndex(EntityRef ref);       // slot index while valid, else -1
 
 // Applies armor-scaled damage. `attacker` may be NULL (e.g. condition
 // ticks). Monster deaths award party XP and roll loot drops here, so

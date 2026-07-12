@@ -9,11 +9,13 @@
 
 Entity g_entities[MAX_ENTITIES];
 int g_entityCount = 0;
+unsigned g_entityGen[MAX_ENTITIES];
 
 int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color color) {
     if (g_entityCount >= MAX_ENTITIES) return -1;
 
     int idx = g_entityCount++;
+    g_entityGen[idx]++; // this slot now holds a different entity; stale refs die here
     Entity *e = &g_entities[idx];
     memset(e, 0, sizeof(Entity));
 
@@ -36,8 +38,8 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->level = 1;
 
     e->castingSlot = -1;
-    e->targetIndex = -1;
-    e->castTargetIndex = -1;
+    e->targetRef = Entity_NoRef();
+    e->castTargetRef = Entity_NoRef();
     e->lastCastSkillSlot = -1;
 
     e->attackInterval = 1.33f; // matches a common GW1 weapon attack speed
@@ -56,6 +58,27 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
 Entity *Entity_Get(int index) {
     if (index < 0 || index >= g_entityCount) return NULL;
     return &g_entities[index];
+}
+
+EntityRef Entity_NoRef(void) {
+    EntityRef r = { -1, 0 };
+    return r;
+}
+
+EntityRef Entity_RefOf(int index) {
+    if (index < 0 || index >= g_entityCount) return Entity_NoRef();
+    EntityRef r = { index, g_entityGen[index] };
+    return r;
+}
+
+Entity *Entity_Resolve(EntityRef ref) {
+    if (ref.idx < 0 || ref.idx >= g_entityCount) return NULL;
+    if (g_entityGen[ref.idx] != ref.gen) return NULL; // slot reused since
+    return &g_entities[ref.idx];
+}
+
+int Entity_RefIndex(EntityRef ref) {
+    return Entity_Resolve(ref) ? ref.idx : -1;
 }
 
 bool Entity_IsCasting(const Entity *e) {
@@ -104,7 +127,7 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
             // they or the hero landed the killing blow.
             Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
             Items_SpawnMonsterDrops(e->pos, e->level);
-            Quests_NotifyMonsterKill();
+            Quests_NotifyMonsterKill(e);
         }
     }
 }

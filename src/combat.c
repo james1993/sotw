@@ -56,6 +56,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         }
         if (Dist(caster->pos, target->pos) > skill->range) return false;
     }
+    EntityRef targetRef = Entity_RefOf(targetIndex);
 
     caster->energy -= skill->energyCost;
     caster->adrenaline -= skill->adrenalineCost;
@@ -69,11 +70,11 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         caster->castingSlot = slot;
         caster->castTimeRemaining = skill->castTime;
         caster->castTimeTotal = skill->castTime;
-        caster->castTargetIndex = targetIndex;
+        caster->castTargetRef = targetRef;
         // Chasing/attacking only follows foe targets, so only offensive
         // casts update the caster's current target.
         if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
-            caster->targetIndex = targetIndex;
+            caster->targetRef = targetRef;
         }
         caster->hasMoveTarget = false; // casting roots the caster, matches GW1 spellcasting
     } else {
@@ -89,7 +90,7 @@ static void ResolveCast(Entity *caster) {
     int slot = caster->castingSlot;
     int skillIdx = caster->skillBar[slot];
     Skill *skill = &g_skillDB[skillIdx];
-    Entity *target = Entity_Get(caster->castTargetIndex);
+    Entity *target = Entity_Resolve(caster->castTargetRef);
 
     bool targetStillValid = true;
     if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
@@ -182,14 +183,18 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         float dy = e->moveTarget.y - e->pos.y;
         float d = sqrtf(dx * dx + dy * dy);
         if (d > 2.0f) {
-            e->pos.x += (dx / d) * e->moveSpeed * dt;
-            e->pos.y += (dy / d) * e->moveSpeed * dt;
+            // Clamp to the remaining distance so a long frame (window
+            // drag, zone hiccup) can't overshoot the target and oscillate.
+            float step = e->moveSpeed * dt;
+            if (step > d) step = d;
+            e->pos.x += (dx / d) * step;
+            e->pos.y += (dy / d) * step;
         } else {
             e->hasMoveTarget = false;
         }
     }
 
-    Entity *target = Entity_Get(e->targetIndex);
+    Entity *target = Entity_Resolve(e->targetRef);
     if (target && target->alive && target->team != e->team) {
         float d = Dist(e->pos, target->pos);
         if (d <= e->attackRange) {
@@ -202,7 +207,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     // Ranged: a visible bolt flies to where the target is
                     // standing NOW; adrenaline/aggro/damage resolve on
                     // impact - or not at all, if they dodge (projectile.c).
-                    Projectile_Spawn((int)(e - g_entities), e->targetIndex, dmg);
+                    Projectile_Spawn((int)(e - g_entities), Entity_RefIndex(e->targetRef), dmg);
                 } else {
                     Entity_ApplyDamage(target, dmg, e);
                     if (target->kind == ENT_MONSTER && !target->aggroed) {
@@ -210,7 +215,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         // of its aggro range - pulling with melee still works,
                         // it just means getting close enough to swing first.
                         target->aggroed = true;
-                        target->targetIndex = (int)(e - g_entities);
+                        target->targetRef = Entity_RefOf((int)(e - g_entities));
                     }
                     e->adrenaline += 4; // basic attacks also build adrenaline in GW1
                     if (e->adrenaline > 100) e->adrenaline = 100;

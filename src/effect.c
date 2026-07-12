@@ -1,5 +1,6 @@
 #include "effect.h"
 #include <math.h>
+#include <stddef.h>
 
 static float RankScaledValue(const EffectStep *step, const Entity *caster, AttributeKind attr) {
     int rank = (attr >= 0 && attr < ATTR_COUNT) ? caster->attributeRank[attr] : 0;
@@ -19,7 +20,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 // even from outside its passive aggro range, same as
                 // GW1 - this is what lets a bow/spell pull work at all.
                 target->aggroed = true;
-                target->targetIndex = (int)(caster - g_entities);
+                target->targetRef = Entity_RefOf((int)(caster - g_entities));
             }
             break;
         }
@@ -35,17 +36,26 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             break;
         }
         case FX_APPLY_CONDITION: {
+            // GW1 semantics: reapplying a condition refreshes its
+            // duration; the same condition never stacks in two slots.
+            ActiveEffect *slot = NULL;
             for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
-                if (!target->effects[i].active) {
-                    target->effects[i].active = true;
-                    target->effects[i].kind = (ConditionKind)step->conditionKind;
-                    target->effects[i].remaining = step->duration;
-                    target->effects[i].tickAccum = 0.0f;
-                    target->effects[i].tickDamage =
-                        (step->conditionKind == COND_BLEEDING) ? 2.0f :
-                        (step->conditionKind == COND_BURNING) ? 5.0f : 0.0f;
+                ActiveEffect *fx = &target->effects[i];
+                if (fx->active && fx->kind == (ConditionKind)step->conditionKind) {
+                    if (step->duration > fx->remaining) fx->remaining = step->duration;
+                    slot = fx;
                     break;
                 }
+                if (!slot && !fx->active) slot = fx;
+            }
+            if (slot && !slot->active) {
+                slot->active = true;
+                slot->kind = (ConditionKind)step->conditionKind;
+                slot->remaining = step->duration;
+                slot->tickAccum = 0.0f;
+                slot->tickDamage =
+                    (step->conditionKind == COND_BLEEDING) ? 2.0f :
+                    (step->conditionKind == COND_BURNING) ? 5.0f : 0.0f;
             }
             break;
         }
@@ -108,7 +118,7 @@ void Effect_Execute(Entity *caster, const Skill *skill, Entity *target) {
                 if (!other->alive || other->team == caster->team) continue;
                 float dx = other->pos.x - origin.x;
                 float dy = other->pos.y - origin.y;
-                if (sqrtf(dx * dx + dy * dy) <= 64.0f) { // fixed AoE footprint radius
+                if (sqrtf(dx * dx + dy * dy) <= skill->aoeRadius) {
                     ApplyStepToEntity(caster, skill, step, other);
                 }
             }

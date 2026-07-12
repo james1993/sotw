@@ -2,7 +2,7 @@
 #include "entity.h"
 #include "combat.h"
 #include "ui_panels.h"
-#include "ui_party.h"
+#include "ui_hit.h"
 #include <math.h>
 #include <stdbool.h>
 
@@ -26,6 +26,10 @@ static bool g_gamepadMode = false;
 // leaves it alone.
 static bool g_manualGamepadTarget = false;
 
+static bool g_userAdjustedZoom = false;
+
+bool Input_UserAdjustedZoom(void) { return g_userAdjustedZoom; }
+
 static bool TriggerDown(int axisId, int buttonId) {
     if (IsGamepadButtonDown(GAMEPAD_ID, buttonId)) return true;
     // Analog triggers rest at -1 and reach +1 fully pressed on most
@@ -37,17 +41,18 @@ static bool TriggerDown(int axisId, int buttonId) {
 static void CyclePartyTarget(Entity *player, int direction) {
     int members[MAX_ENTITIES];
     int count = 0, currentPos = -1;
+    int currentTarget = Entity_RefIndex(player->targetRef);
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (e->team != 0 || !e->alive) continue;
         if (e->kind != ENT_PLAYER && e->kind != ENT_HERO) continue;
-        if (i == player->targetIndex) currentPos = count;
+        if (i == currentTarget) currentPos = count;
         members[count++] = i;
     }
     if (count == 0) return;
     int pos = (currentPos < 0) ? (direction > 0 ? 0 : count - 1)
                                : (currentPos + direction + count) % count;
-    player->targetIndex = members[pos];
+    player->targetRef = Entity_RefOf(members[pos]);
     g_manualGamepadTarget = true;
 }
 
@@ -72,11 +77,12 @@ static void CycleFoeTarget(Entity *player, int direction) {
         foes[j + 1] = fi; dists[j + 1] = di;
     }
     int currentPos = -1;
+    int currentTarget = Entity_RefIndex(player->targetRef);
     for (int i = 0; i < count; i++) {
-        if (foes[i] == player->targetIndex) currentPos = i;
+        if (foes[i] == currentTarget) currentPos = i;
     }
     int pos = (currentPos < 0) ? 0 : (currentPos + direction + count) % count;
-    player->targetIndex = foes[pos];
+    player->targetRef = Entity_RefOf(foes[pos]);
     g_manualGamepadTarget = true;
 }
 
@@ -111,15 +117,15 @@ static void UpdateGamepad(Entity *player, float dt) {
         bool l2 = TriggerDown(GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_BUTTON_LEFT_TRIGGER_2);
         bool r2 = TriggerDown(GAMEPAD_AXIS_RIGHT_TRIGGER, GAMEPAD_BUTTON_RIGHT_TRIGGER_2);
         if (l2) {
-            Combat_ActivateSkill(PLAYER_INDEX, face, player->targetIndex);
+            Combat_ActivateSkill(PLAYER_INDEX, face, Entity_RefIndex(player->targetRef));
             g_gamepadMode = true;
         } else if (r2) {
-            Combat_ActivateSkill(PLAYER_INDEX, 4 + face, player->targetIndex);
+            Combat_ActivateSkill(PLAYER_INDEX, 4 + face, Entity_RefIndex(player->targetRef));
             g_gamepadMode = true;
         } else if (face == 1) {
             // Bare B (no trigger): drop the current target, GW1-gamepad's
             // escape hatch.
-            player->targetIndex = -1;
+            player->targetRef = Entity_NoRef();
             g_manualGamepadTarget = false;
             g_gamepadMode = true;
         }
@@ -146,10 +152,10 @@ static void UpdateGamepad(Entity *player, float dt) {
 
     // A manual selection expires when the target dies.
     if (g_manualGamepadTarget) {
-        Entity *t = Entity_Get(player->targetIndex);
+        Entity *t = Entity_Resolve(player->targetRef);
         if (!t || !t->alive) {
             g_manualGamepadTarget = false;
-            player->targetIndex = -1;
+            player->targetRef = Entity_NoRef();
         }
     }
 
@@ -174,7 +180,7 @@ static void UpdateGamepad(Entity *player, float dt) {
                 best = i;
             }
         }
-        player->targetIndex = best;
+        player->targetRef = Entity_RefOf(best);
     }
 }
 
@@ -183,6 +189,7 @@ void Input_Update(Camera2D *camera, float dt) {
     // fix for "things are too small to see" on a high-res display.
     float wheel = GetMouseWheelMove();
     if (wheel != 0.0f) {
+        g_userAdjustedZoom = true;
         camera->zoom += wheel * 0.1f;
         if (camera->zoom < MIN_CAMERA_ZOOM) camera->zoom = MIN_CAMERA_ZOOM;
         if (camera->zoom > MAX_CAMERA_ZOOM) camera->zoom = MAX_CAMERA_ZOOM;
@@ -196,12 +203,11 @@ void Input_Update(Camera2D *camera, float dt) {
     // stop auto-chasing an out-of-range target without needing to land a
     // click that's certain to miss every entity.
     if (IsKeyPressed(KEY_ESCAPE)) {
-        player->targetIndex = -1;
+        player->targetRef = Entity_NoRef();
         player->hasMoveTarget = false;
     }
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !UI_PointerOverPanels(GetMousePosition())
-        && !UI_PartyPanelContains(GetMousePosition())) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !UIHit_Contains(GetMousePosition())) {
         g_gamepadMode = false; // mouse takes back targeting control
 
         Vector2 mouseScreen = GetMousePosition();
@@ -218,11 +224,11 @@ void Input_Update(Camera2D *camera, float dt) {
         }
 
         if (clickedEntity >= 0 && g_entities[clickedEntity].team != player->team) {
-            player->targetIndex = clickedEntity;
+            player->targetRef = Entity_RefOf(clickedEntity);
         } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_HERO) {
             // Clicking a party member selects them, so ally-targeted
             // spells (Orison) land on them instead of self-falling back.
-            player->targetIndex = clickedEntity;
+            player->targetRef = Entity_RefOf(clickedEntity);
         } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_NPC) {
             // Outpost NPC: talk if close enough, otherwise walk over to
             // them (click again on arrival to open the conversation).
@@ -249,7 +255,7 @@ void Input_Update(Camera2D *camera, float dt) {
                 world.y = player->pos.y + delta.y * scale;
             }
 
-            player->targetIndex = -1;
+            player->targetRef = Entity_NoRef();
             player->moveTarget = world;
             player->hasMoveTarget = true;
         }
@@ -258,10 +264,10 @@ void Input_Update(Camera2D *camera, float dt) {
     // GW1's classic keyboard targeting: C = nearest foe, Tab = cycle foes.
     if (IsKeyPressed(KEY_C)) {
         g_manualGamepadTarget = false;
-        int save = player->targetIndex;
-        player->targetIndex = -1; // force "nearest" rather than "next"
+        EntityRef save = player->targetRef;
+        player->targetRef = Entity_NoRef(); // force "nearest" rather than "next"
         CycleFoeTarget(player, +1);
-        if (player->targetIndex < 0) player->targetIndex = save;
+        if (Entity_RefIndex(player->targetRef) < 0) player->targetRef = save;
         g_manualGamepadTarget = false;
     }
     if (IsKeyPressed(KEY_TAB)) {
@@ -272,7 +278,7 @@ void Input_Update(Camera2D *camera, float dt) {
     int keys[8] = { KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_FIVE, KEY_SIX, KEY_SEVEN, KEY_EIGHT };
     for (int i = 0; i < 8; i++) {
         if (IsKeyPressed(keys[i])) {
-            Combat_ActivateSkill(PLAYER_INDEX, i, player->targetIndex);
+            Combat_ActivateSkill(PLAYER_INDEX, i, Entity_RefIndex(player->targetRef));
         }
     }
 

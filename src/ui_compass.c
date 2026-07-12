@@ -2,6 +2,8 @@
 #include "entity.h"
 #include "world.h"
 #include "quests.h"
+#include "ui_font.h"
+#include "ui_hit.h"
 #include <math.h>
 
 #define PLAYER_INDEX 0
@@ -9,22 +11,15 @@
 // of the player maps onto the disc.
 #define COMPASS_WORLD_RANGE 560.0f
 
-static float UIScale(int screenHeight) {
-    float scale = (float)screenHeight / 800.0f;
-    if (scale < 0.85f) scale = 0.85f;
-    if (scale > 5.0f) scale = 5.0f;
-    return scale;
-}
-
 static void Geometry(int screenWidth, int screenHeight, Vector2 *center, float *radius) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     *radius = 92.0f * scale;
     center->x = (float)screenWidth - *radius - 16.0f * scale;
     center->y = *radius + 38.0f * scale;
 }
 
 float UI_CompassBottom(int screenHeight) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     float radius = 92.0f * scale;
     return radius * 2.0f + 38.0f * scale;
 }
@@ -50,23 +45,26 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
     Geometry(screenWidth, screenHeight, &center, &radius);
     float k = radius / COMPASS_WORLD_RANGE;
 
+    // Clicks on the compass are UI, not click-to-move.
+    UIHit_Claim((Rectangle){ center.x - radius, center.y - radius, radius * 2.0f, radius * 2.0f });
+
     DrawCircleV(center, radius, (Color){ 14, 17, 23, 215 });
     DrawCircleLines((int)center.x, (int)center.y, radius, (Color){ 130, 130, 150, 255 });
     DrawCircleLines((int)center.x, (int)center.y, radius - 1.0f, (Color){ 80, 80, 95, 255 });
 
     // The aggro bubble, on the compass where GW1 keeps it.
     if (World_GetMode() == MODE_EXPLORABLE) {
-        DrawCircleLines((int)center.x, (int)center.y, 130.0f * k, (Color){ 220, 170, 60, 150 });
+        DrawCircleLines((int)center.x, (int)center.y, AGGRO_RING_RADIUS * k, (Color){ 220, 170, 60, 150 });
     }
 
     Vector2 p;
 
     // Portal and shrine landmarks.
-    Vector2 portalPos;
-    const char *portalLabel;
-    World_GetPortal(&portalPos, &portalLabel);
-    if (WorldToCompass(portalPos, player->pos, center, radius, 5.0f, &p)) {
-        DrawRectangle((int)p.x - 3, (int)p.y - 3, 6, 6, (Color){ 110, 160, 255, 255 });
+    for (int i = 0; i < World_GetPortalCount(); i++) {
+        const ZonePortal *portal = World_GetPortal(i);
+        if (WorldToCompass(portal->pos, player->pos, center, radius, 5.0f, &p)) {
+            DrawRectangle((int)p.x - 3, (int)p.y - 3, 6, 6, (Color){ 110, 160, 255, 255 });
+        }
     }
     Vector2 shrinePos;
     if (World_GetShrine(&shrinePos) &&

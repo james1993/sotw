@@ -8,8 +8,4 @@
 void UI_DrawSkillBar(int screenWidth, int screenHeight);
 void UI_DrawResourceBars(int screenWidth, int screenHeight);
 
-// Scales a font size the same way the skill bar/resource bars scale,
-// for use by any other screen-space text (e.g. main.c's help text).
-int UI_ScaledFontSize(int screenHeight, int baseSize);
-
 #endif

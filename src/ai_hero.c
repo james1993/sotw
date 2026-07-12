@@ -37,9 +37,10 @@ static void UseSkillBarOn(int index, int targetIndex) {
 // pulling with a hero in the party work: hang back and the hero does
 // too, instead of charging in and aggroing everything nearby.
 static int FindHeroEngageTarget(const Entity *self, const Entity *player) {
-    if (player && player->alive && player->targetIndex >= 0) {
-        Entity *t = Entity_Get(player->targetIndex);
-        if (t && t->alive && t->team != self->team) return player->targetIndex;
+    if (player && player->alive) {
+        int playerTarget = Entity_RefIndex(player->targetRef);
+        Entity *t = Entity_Get(playerTarget);
+        if (t && t->alive && t->team != self->team) return playerTarget;
     }
 
     int best = -1;
@@ -61,7 +62,7 @@ static void UpdateHero(int index) {
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     int foe = FindHeroEngageTarget(self, player);
-    self->targetIndex = foe;
+    self->targetRef = Entity_RefOf(foe);
     if (foe >= 0) {
         UseSkillBarOn(index, foe);
         return;
@@ -116,7 +117,7 @@ static void UpdateMonster(int index) {
             int foe = FindFoeInAggroRange(self);
             if (foe >= 0) {
                 self->aggroed = true;
-                self->targetIndex = foe;
+                self->targetRef = Entity_RefOf(foe);
                 return;
             }
             Vector2 wp = (self->patrolDir >= 0) ? self->patrolB : self->patrolA;
@@ -144,16 +145,16 @@ static void UpdateMonster(int index) {
         int foe = FindFoeInAggroRange(self);
         if (foe >= 0) {
             self->aggroed = true;
-            self->targetIndex = foe;
+            self->targetRef = Entity_RefOf(foe);
         }
         return;
     }
 
-    Entity *target = Entity_Get(self->targetIndex);
+    Entity *target = Entity_Resolve(self->targetRef);
     bool giveUp = !target || !target->alive || Dist(self->pos, self->spawnPos) > self->leashRange;
     if (giveUp) {
         self->aggroed = false;
-        self->targetIndex = -1;
+        self->targetRef = Entity_NoRef();
         if (self->hasPatrol) {
             // Patrollers reset on the spot and resume the route from the
             // nearest waypoint (GW1 leash-regen, condensed).
@@ -170,7 +171,7 @@ static void UpdateMonster(int index) {
         return;
     }
 
-    UseSkillBarOn(index, self->targetIndex);
+    UseSkillBarOn(index, Entity_RefIndex(self->targetRef));
 }
 
 void AI_Update(float dt) {

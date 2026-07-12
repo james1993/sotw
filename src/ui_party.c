@@ -2,22 +2,12 @@
 #include "entity.h"
 #include "world.h"
 #include "ui_compass.h"
+#include "ui_hit.h"
 #include "raylib.h"
 #include "ui_font.h"
 #include <stdio.h>
 
 static Rectangle g_panelRect;
-
-static float UIScale(int screenHeight) {
-    float scale = (float)screenHeight / 800.0f;
-    if (scale < 0.85f) scale = 0.85f;
-    if (scale > 5.0f) scale = 5.0f;
-    return scale;
-}
-
-bool UI_PartyPanelContains(Vector2 point) {
-    return CheckCollisionPointRec(point, g_panelRect);
-}
 
 float UI_PartyPanelBottom(void) {
     return g_panelRect.y + g_panelRect.height;
@@ -34,7 +24,7 @@ static void DrawStatusArrow(int x, int y, int size, Color color) {
 }
 
 void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int panelW = (int)(200 * scale);
     int rowH = (int)(46 * scale); // room for a thin energy bar per member
     int pad = (int)(8 * scale);
@@ -62,6 +52,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     int x = outpost ? screenWidth - panelW - (int)(14 * scale) : (int)(14 * scale);
     int y = outpost ? (int)UI_CompassBottom(screenHeight) + (int)(24 * scale) : (int)(80 * scale);
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
+    UIHit_Claim(g_panelRect);
 
     DrawRectangle(x, y, panelW, panelH, (Color){ 20, 22, 30, 210 });
     DrawRectangleLines(x, y, panelW, panelH, (Color){ 120, 120, 140, 255 });
@@ -71,6 +62,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     Vector2 mouse = GetMousePosition();
 
     Entity *player = Entity_Get(0);
+    int playerTarget = player ? Entity_RefIndex(player->targetRef) : -1;
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
@@ -83,13 +75,14 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         Rectangle rowRect = { (float)x + 2, (float)rowY - 2, (float)panelW - 4, (float)rowH - 4 };
         bool rowHovered = CheckCollisionPointRec(mouse, rowRect);
         if (rowHovered && click && e->alive && player) {
-            player->targetIndex = i;
+            player->targetRef = Entity_RefOf(i);
+            playerTarget = i;
         }
         if (rowHovered) {
             DrawRectangleRec(rowRect, (Color){ 50, 55, 75, 120 });
         }
         // Selected-member highlight
-        if (player && player->targetIndex == i) {
+        if (playerTarget == i) {
             DrawRectangleLinesEx(rowRect, 1, GOLD);
         }
 
@@ -116,7 +109,9 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
             if (hovered && click) {
                 World_DismissHenchman(e);
                 // The row-click handler above may have just targeted him.
-                if (player && player->targetIndex == i) player->targetIndex = -1;
+                if (player && Entity_RefIndex(player->targetRef) == i) {
+                    player->targetRef = Entity_NoRef();
+                }
             }
         }
 

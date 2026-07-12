@@ -4,30 +4,11 @@
 #include "progression.h"
 #include "world.h"
 #include "ui_font.h"
+#include "ui_hit.h"
 #include "raylib.h"
 #include <stdio.h>
 
 #define PLAYER_INDEX 0
-
-// Every UI dimension below is defined at this reference window height,
-// then multiplied by UIScale() at draw time. This keeps the skill bar,
-// resource bars, and text a consistent proportion of the window instead
-// of staying a fixed pixel size that shrinks to nothing on a large,
-// high-res window (or a fixed size that overflows a small one).
-#define UI_REFERENCE_HEIGHT 800.0f
-#define UI_MIN_SCALE 0.85f
-#define UI_MAX_SCALE 5.0f
-
-static float UIScale(int screenHeight) {
-    float scale = (float)screenHeight / UI_REFERENCE_HEIGHT;
-    if (scale < UI_MIN_SCALE) scale = UI_MIN_SCALE;
-    if (scale > UI_MAX_SCALE) scale = UI_MAX_SCALE;
-    return scale;
-}
-
-int UI_ScaledFontSize(int screenHeight, int baseSize) {
-    return (int)(baseSize * UIScale(screenHeight));
-}
 
 // One shared layout so the skill bar and the health/energy bars flanking
 // it (GW1-style: HP to the left of the bar, energy to the right, all
@@ -41,7 +22,7 @@ typedef struct {
 
 static HudLayout ComputeHudLayout(int screenWidth, int screenHeight) {
     HudLayout L;
-    L.scale = UIScale(screenHeight);
+    L.scale = UI_Scale(screenHeight);
     L.slotSize = (int)(56 * L.scale);
     L.gap = (int)(6 * L.scale);
     L.font = (int)(10 * L.scale);
@@ -67,6 +48,10 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
 
     HudLayout L = ComputeHudLayout(screenWidth, screenHeight);
     bool pad = IsGamepadAvailable(0);
+
+    // The skill bar and the XP strip below it are UI, not walkable ground.
+    UIHit_Claim((Rectangle){ (float)L.startX, (float)L.y,
+                             (float)L.totalWidth, (float)(screenHeight - L.y) });
 
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
         int x = L.startX + i * (L.slotSize + L.gap);
@@ -167,6 +152,8 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
     int centerX = L.startX + L.totalWidth / 2;
 
     int hpX = centerX - centerGap / 2 - barW;
+    UIHit_Claim((Rectangle){ (float)(centerX - centerGap / 2 - barW), (float)barY,
+                             (float)(barW * 2 + centerGap), (float)barH });
     DrawResourceBar(hpX, barY, barW, barH, L.font,
                     (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, player->hp);
 

@@ -1,5 +1,6 @@
 #include "skill.h"
 #include "entity.h"
+#include "raylib.h"
 #include <string.h>
 
 // This is a small hand-authored slice standing in for what would be a
@@ -32,8 +33,19 @@ static Skill MakeSkill(const char *name, SkillType type, AttributeKind attr,
     s.range = range;
     s.isElite = elite;
     s.targeting = targeting;
+    s.aoeRadius = 64.0f; // sensible default; AoE skills may override
     s.stepCount = 0;
     return s;
+}
+
+// Registers a skill and verifies it landed on the SkillId slot the rest
+// of the code will reference it by.
+static void RegisterAs(SkillId id, Skill s) {
+    int got = SkillDB_Register(s);
+    if (got != (int)id) {
+        TraceLog(LOG_WARNING, "SKILL: '%s' registered at %d, expected SkillId %d - bars will be wrong",
+                 s.name, got, (int)id);
+    }
 }
 
 static void AddStep(Skill *s, EffectKind kind, float base, float perRank, int cond, float duration) {
@@ -46,11 +58,7 @@ static void AddStep(Skill *s, EffectKind kind, float base, float perRank, int co
     step->duration = duration;
 }
 
-// Skill DB indices, in registration order below:
-//  0 Gash            4 Fire Bolt      8 Claw Swipe (monster)    12 Banish
-//  1 Rush Strike      5 Cinder Storm    9 Distracting Blow       13 Smite
-//  2 Battle Cry        6 Mind Sear      10 Feral Howl (monster)   14 Bane Signet
-//  3 Deathblow (elite)  7 Meteor (elite) 11 Orison of Healing
+// Registration order below must match the SkillId enum in skill.h.
 void SkillDB_Init(void) {
     g_skillCount = 0;
     Skill s;
@@ -60,51 +68,51 @@ void SkillDB_Init(void) {
                   0, 25, 0.0f, 4.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 8, 1.5f, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 8.0f);
-    SkillDB_Register(s);
+    RegisterAs(SK_GASH, s);
 
     s = MakeSkill("Rush Strike", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
                   0, 25, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 12, 2.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_RUSH_STRIKE, s);
 
     s = MakeSkill("Battle Cry", SKILLTYPE_SHOUT, ATTR_TACTICS,
                   0, 0, 0.0f, 20.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_ADRENALINE_DELTA, 15, 0, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_BATTLE_CRY, s);
 
     s = MakeSkill("Deathblow", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
                   0, 40, 0.0f, 10.0f, 28.0f, true, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 20, 3.0f, 0, 0);
     AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
-    SkillDB_Register(s);
+    RegisterAs(SK_DEATHBLOW, s);
 
     // --- Elementalist-like ("Pyromancer") skills: energy, spells, cast time ---
     s = MakeSkill("Fire Bolt", SKILLTYPE_SPELL, ATTR_FIRE_MAGIC,
                   10, 0, 1.0f, 2.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 5, 3.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_FIRE_BOLT, s);
 
     s = MakeSkill("Cinder Storm", SKILLTYPE_SPELL, ATTR_FIRE_MAGIC,
                   15, 0, 2.0f, 8.0f, 200.0f, false, TARGET_AOE_FOES);
     AddStep(&s, FX_DAMAGE, 10, 2.5f, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BURNING, 3.0f);
-    SkillDB_Register(s);
+    RegisterAs(SK_CINDER_STORM, s);
 
     s = MakeSkill("Mind Sear", SKILLTYPE_SPELL, ATTR_ENERGY_STORAGE,
                   5, 0, 0.25f, 1.0f, 999.0f, false, TARGET_SELF);
     AddStep(&s, FX_ENERGY_DELTA, 8, 1.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_MIND_SEAR, s);
 
     s = MakeSkill("Meteor", SKILLTYPE_SPELL, ATTR_FIRE_MAGIC,
                   25, 0, 3.0f, 15.0f, 200.0f, true, TARGET_AOE_FOES);
     AddStep(&s, FX_DAMAGE, 25, 4.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_METEOR, s);
 
     // --- Monster skills ---
     s = MakeSkill("Claw Swipe", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
                   0, 25, 0.0f, 3.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 10, 0, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_CLAW_SWIPE, s);
 
     // --- Interrupt: demonstrates cast time actually meaning something -
     // this only has a target to punish because Fire Bolt/Cinder Storm/
@@ -113,7 +121,7 @@ void SkillDB_Init(void) {
                   0, 25, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 5, 1.0f, 0, 0);
     AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_DISTRACTING_BLOW, s);
 
     // Gives the monster a cast-time skill worth interrupting - without
     // this its only skill (Claw Swipe) is instant and has nothing an
@@ -121,7 +129,7 @@ void SkillDB_Init(void) {
     s = MakeSkill("Feral Howl", SKILLTYPE_SPELL, ATTR_STRENGTH,
                   5, 0, 1.5f, 10.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_HEAL, 30, 0, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_FERAL_HOWL, s);
 
     // --- Monk skills: energy spells, Divine Favor bonus healing applies
     // to FX_HEAL (see effect.c), no adrenaline anywhere on this bar ---
@@ -131,17 +139,17 @@ void SkillDB_Init(void) {
     s = MakeSkill("Orison of Healing", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
                   5, 0, 1.0f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
     AddStep(&s, FX_HEAL, 20, 3.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_ORISON_OF_HEALING, s);
 
     s = MakeSkill("Banish", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
                   5, 0, 1.0f, 4.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 15, 2.5f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_BANISH, s);
 
     s = MakeSkill("Smite", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
                   10, 0, 1.0f, 6.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 25, 3.0f, 0, 0);
-    SkillDB_Register(s);
+    RegisterAs(SK_SMITE, s);
 
     // Signet: free, but pays for it in cast time and a long recharge -
     // the type's whole identity in GW1.
@@ -149,5 +157,5 @@ void SkillDB_Init(void) {
                   0, 0, 2.0f, 15.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 20, 2.0f, 0, 0);
     AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
-    SkillDB_Register(s);
+    RegisterAs(SK_BANE_SIGNET, s);
 }

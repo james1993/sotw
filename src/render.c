@@ -30,72 +30,10 @@ static void DrawDrops(void) {
     }
 }
 
-// Basic environmental art: a fixed, hand-placed scatter of trees/rocks/
-// grass tufts built from primitive shapes, since the prototype has no
-// sprite assets yet. Purely decorative - no collision or LoS blocking.
-typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE } PropType;
-typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
-
-// Ashford Camp: a small circle of tents around a fire, palisade-ish
-// rocks, a couple of trees for shade.
-static const EnvProp g_outpostProps[] = {
-    { { 0, -140 }, PROP_FIRE, 1.0f },
-    { { -150, -140 }, PROP_TENT, 1.0f },
-    { { -190, -40 }, PROP_TENT, 0.9f },
-    { { 150, -150 }, PROP_TENT, 1.1f },
-    { { 190, -50 }, PROP_TENT, 0.9f },
-    { { -120, 150 }, PROP_TENT, 1.0f },
-    { { 140, 160 }, PROP_TENT, 0.95f },
-    { { -260, -180 }, PROP_TREE, 1.0f },
-    { { 280, -200 }, PROP_TREE, 1.1f },
-    { { -280, 120 }, PROP_ROCK, 1.0f },
-    { { 240, 140 }, PROP_ROCK, 0.9f },
-};
-#define OUTPOST_PROP_COUNT (int)(sizeof(g_outpostProps) / sizeof(g_outpostProps[0]))
-
-static const EnvProp g_envProps[] = {
-    { { -320, -160 }, PROP_TREE, 1.1f },
-    { { -260, -230 }, PROP_TREE, 0.85f },
-    { { -140, -260 }, PROP_TREE, 1.0f },
-    { { 120, -260 }, PROP_TREE, 0.9f },
-    { { 340, -180 }, PROP_TREE, 1.2f },
-    { { 420, -60 }, PROP_TREE, 0.8f },
-    { { 400, 160 }, PROP_TREE, 1.0f },
-    { { 300, 260 }, PROP_TREE, 0.9f },
-    { { -80, 260 }, PROP_TREE, 1.1f },
-    { { -300, 200 }, PROP_TREE, 0.85f },
-    { { -420, 40 }, PROP_TREE, 1.0f },
-    { { -220, -60 }, PROP_ROCK, 1.0f },
-    { { -160, 120 }, PROP_ROCK, 0.8f },
-    { { 140, -80 }, PROP_ROCK, 1.1f },
-    { { 380, 40 }, PROP_ROCK, 0.9f },
-    { { 60, 180 }, PROP_ROCK, 0.7f },
-    { { -60, -160 }, PROP_ROCK, 0.9f },
-    { { 200, 140 }, PROP_GRASS, 1.0f },
-    { { -180, 20 }, PROP_GRASS, 0.9f },
-    { { 100, -40 }, PROP_GRASS, 1.1f },
-    { { -100, 140 }, PROP_GRASS, 0.8f },
-    { { 320, -20 }, PROP_GRASS, 1.0f },
-    { { -20, 220 }, PROP_GRASS, 0.9f },
-    { { 220, -160 }, PROP_GRASS, 1.0f },
-    // Eastern reaches of the expanded plains.
-    { { 620, -420 }, PROP_TREE, 1.1f },
-    { { 980, -400 }, PROP_TREE, 0.9f },
-    { { 1180, -160 }, PROP_TREE, 1.2f },
-    { { 1240, 240 }, PROP_TREE, 1.0f },
-    { { 760, 430 }, PROP_TREE, 1.1f },
-    { { 1050, 60 }, PROP_ROCK, 1.1f },
-    { { 640, 200 }, PROP_ROCK, 0.9f },
-    { { 880, -60 }, PROP_ROCK, 0.8f },
-    { { 1300, -60 }, PROP_ROCK, 1.0f },
-    { { 720, -120 }, PROP_GRASS, 1.0f },
-    { { 1000, 180 }, PROP_GRASS, 1.1f },
-    { { 1150, -280 }, PROP_GRASS, 0.9f },
-    { { 560, 60 }, PROP_GRASS, 1.0f },
-    { { 1330, 150 }, PROP_GRASS, 1.0f },
-};
-#define ENV_PROP_COUNT (int)(sizeof(g_envProps) / sizeof(g_envProps[0]))
-
+// Environmental art drawers: primitive-shape trees/rocks/grass/tents,
+// since the prototype has no sprite assets yet. WHAT to draw and WHERE
+// comes from the current zone's prop table (world.c) - render.c only
+// knows how each prop type looks.
 static void DrawTree(Vector2 pos, float scale) {
     DrawRectangle((int)(pos.x - 3 * scale), (int)(pos.y - 2 * scale), (int)(6 * scale), (int)(14 * scale),
         (Color){ 90, 60, 40, 255 });
@@ -151,22 +89,21 @@ static void DrawProps(const EnvProp *props, int count) {
 }
 
 static void DrawEnvironment(void) {
-    if (World_GetMode() == MODE_OUTPOST) {
-        DrawProps(g_outpostProps, OUTPOST_PROP_COUNT);
-    } else {
-        DrawProps(g_envProps, ENV_PROP_COUNT);
-    }
+    int propCount = 0;
+    const EnvProp *props = World_GetProps(&propCount);
+    DrawProps(props, propCount);
 
-    // The zone portal: a swirl of blue, labeled with where it goes -
-    // GW1's map-travel gates reduced to their essence.
-    Vector2 portalPos;
-    const char *portalLabel;
-    World_GetPortal(&portalPos, &portalLabel);
-    DrawCircleGradient((int)portalPos.x, (int)portalPos.y, 34.0f,
-                       (Color){ 90, 150, 255, 200 }, (Color){ 30, 40, 90, 40 });
-    DrawCircleLines((int)portalPos.x, (int)portalPos.y, 34.0f, (Color){ 120, 170, 255, 180 });
-    int tw = UITextWidth(portalLabel, 11);
-    UIText(portalLabel, (int)(portalPos.x - tw / 2), (int)(portalPos.y + 40), 11, (Color){ 150, 190, 255, 255 });
+    // Zone portals: swirls of blue, labeled with where they go - GW1's
+    // map-travel gates reduced to their essence. Zones may have several.
+    for (int i = 0; i < World_GetPortalCount(); i++) {
+        const ZonePortal *portal = World_GetPortal(i);
+        Vector2 portalPos = portal->pos;
+        DrawCircleGradient((int)portalPos.x, (int)portalPos.y, 34.0f,
+                           (Color){ 90, 150, 255, 200 }, (Color){ 30, 40, 90, 40 });
+        DrawCircleLines((int)portalPos.x, (int)portalPos.y, 34.0f, (Color){ 120, 170, 255, 180 });
+        int tw = UITextWidth(portal->label, 11);
+        UIText(portal->label, (int)(portalPos.x - tw / 2), (int)(portalPos.y + 40), 11, (Color){ 150, 190, 255, 255 });
+    }
 
     // Resurrection shrine: a stone marker with a soft glow. On a party
     // wipe everyone respawns here with their death penalty, like GW1.
@@ -233,9 +170,8 @@ void Render_World(Camera2D camera) {
     int endY = ((int)ceilf(bottomRight.y / gridSpacing) + 1) * gridSpacing;
 
     // Ground tint sells the zone: packed dirt in the camp, green grass
-    // out in the plains.
-    Color gridColor = (World_GetMode() == MODE_OUTPOST)
-        ? (Color){ 80, 68, 52, 255 } : (Color){ 52, 76, 48, 255 };
+    // out in the plains. Per-zone data (world.c).
+    Color gridColor = World_GetGridColor();
     for (int x = startX; x <= endX; x += gridSpacing) {
         DrawLine(x, startY, x, endY, gridColor);
     }
@@ -251,12 +187,12 @@ void Render_World(Camera2D camera) {
     // outposts are safe.
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (player && player->alive && World_GetMode() == MODE_EXPLORABLE) {
-        DrawCircleLines((int)player->pos.x, (int)player->pos.y, 130.0f, (Color){ 220, 170, 60, 60 });
+        DrawCircleLines((int)player->pos.x, (int)player->pos.y, AGGRO_RING_RADIUS, (Color){ 220, 170, 60, 60 });
     }
 
     // Ring under the player's current target, so it's obvious at a glance
     // which entity the target panel/skill-bar actions apply to.
-    Entity *currentTarget = player ? Entity_Get(player->targetIndex) : NULL;
+    Entity *currentTarget = player ? Entity_Resolve(player->targetRef) : NULL;
     if (currentTarget && currentTarget->alive) {
         DrawCircleLines((int)currentTarget->pos.x, (int)currentTarget->pos.y, currentTarget->radius + 6.0f, GOLD);
         DrawCircleLines((int)currentTarget->pos.x, (int)currentTarget->pos.y, currentTarget->radius + 7.5f, GOLD);

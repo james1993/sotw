@@ -1,4 +1,5 @@
 #include "ui_panels.h"
+#include "ui_hit.h"
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
@@ -30,28 +31,13 @@ static const ShopEntry g_shopStock[] = {
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
 
-static float UIScale(int screenHeight) {
-    float scale = (float)screenHeight / 800.0f;
-    if (scale < 0.85f) scale = 0.85f;
-    if (scale > 5.0f) scale = 5.0f;
-    return scale;
-}
-
-bool UI_PointerOverPanels(Vector2 point) {
-    if (g_invOpen && CheckCollisionPointRec(point, g_invRect)) return true;
-    if (g_attrOpen && CheckCollisionPointRec(point, g_attrRect)) return true;
-    if (g_dialogNpc >= 0 && CheckCollisionPointRec(point, g_dialogRect)) return true;
-    if (g_shopOpen && CheckCollisionPointRec(point, g_shopRect)) return true;
-    return false;
-}
-
 void UI_OpenNpcDialog(int entityIndex) {
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
 }
 
 static void DrawInventory(Entity *player, int screenHeight) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int rowH = (int)(24 * scale);
     int font = (int)(12 * scale);
     int pad = (int)(10 * scale);
@@ -60,6 +46,7 @@ static void DrawInventory(Entity *player, int screenHeight) {
 
     // Below the party window, which now owns the upper-left.
     g_invRect = (Rectangle){ (float)(20 * scale), (float)(310 * scale), (float)w, (float)h };
+    UIHit_Claim(g_invRect);
     DrawRectangleRec(g_invRect, (Color){ 20, 22, 30, 235 });
     DrawRectangleLinesEx(g_invRect, 2, (Color){ 120, 120, 140, 255 });
 
@@ -103,7 +90,7 @@ static void DrawInventory(Entity *player, int screenHeight) {
 }
 
 static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int rowH = (int)(28 * scale);
     int font = (int)(12 * scale);
     int pad = (int)(10 * scale);
@@ -116,6 +103,7 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
     int h = pad * 3 + font + (accessible + 1) * rowH;
 
     g_attrRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(140 * scale), (float)w, (float)h };
+    UIHit_Claim(g_attrRect);
     DrawRectangleRec(g_attrRect, (Color){ 20, 22, 30, 235 });
     DrawRectangleLinesEx(g_attrRect, 2, (Color){ 120, 120, 140, 255 });
 
@@ -187,7 +175,7 @@ static bool DialogButton(Rectangle rect, const char *label, int font, bool enabl
 }
 
 static void DrawShop(int screenWidth, int screenHeight) {
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int rowH = (int)(26 * scale);
     int font = (int)(12 * scale);
     int pad = (int)(10 * scale);
@@ -196,6 +184,7 @@ static void DrawShop(int screenWidth, int screenHeight) {
     int h = pad * 4 + font * 2 + (rows + 2) * rowH;
 
     g_shopRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale), (float)w, (float)h };
+    UIHit_Claim(g_shopRect);
     DrawRectangleRec(g_shopRect, (Color){ 20, 22, 30, 240 });
     DrawRectangleLinesEx(g_shopRect, 2, (Color){ 120, 120, 140, 255 });
 
@@ -271,7 +260,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
         return;
     }
 
-    float scale = UIScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int font = (int)(13 * scale);
     int pad = (int)(12 * scale);
     int btnH = (int)(30 * scale);
@@ -280,6 +269,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
 
     g_dialogRect = (Rectangle){ (float)(screenWidth - w) / 2.0f,
                                 (float)screenHeight - (float)(220 * scale), (float)w, (float)h };
+    UIHit_Claim(g_dialogRect);
     DrawRectangleRec(g_dialogRect, (Color){ 20, 22, 30, 240 });
     DrawRectangleLinesEx(g_dialogRect, 2, (Color){ 120, 120, 140, 255 });
 
@@ -334,24 +324,12 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             if (DialogButton(btn, "Hire Little Thom (free)", font, true)) {
                 World_SetThomHired(true);
                 // Convert the standing NPC into a fighting party member on
-                // the spot; zone loads keep him from then on.
+                // the spot; zone loads keep him from then on. Stats come
+                // from the same setup zone loads use, so the two copies
+                // of his stat block can't drift.
                 npc->kind = ENT_HERO;
                 npc->npcRole = NPC_NONE;
-                npc->isHenchman = true;
-                npc->primaryProfession = PROF_WARRIOR;
-                npc->secondaryProfession = PROF_MONK;
-                npc->level = 5;
-                npc->baseMaxHp = 100 + 20 * (npc->level - 1);
-                npc->baseMaxEnergy = 20;
-                Entity_RecomputePenalizedStats(npc);
-                npc->hp = npc->maxHp;
-                npc->energy = npc->maxEnergy;
-                npc->armor = 80;
-                npc->attributeRank[ATTR_STRENGTH] = 4;
-                npc->attributeRank[ATTR_TACTICS] = 3;
-                npc->skillBar[0] = 0; // Gash
-                npc->skillBar[1] = 1; // Rush Strike
-                npc->skillBar[2] = 2; // Battle Cry
+                World_SetupThomStats(npc);
                 g_dialogNpc = -1;
             }
             break;

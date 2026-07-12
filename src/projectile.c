@@ -26,8 +26,8 @@ void Projectile_Spawn(int shooterIndex, int targetIndex, int damage) {
         p->active = true;
         p->pos = shooter->pos;
         p->landingPoint = target->pos; // locked NOW - this is what makes dodging possible
-        p->targetIndex = targetIndex;
-        p->shooterIndex = shooterIndex;
+        p->targetRef = Entity_RefOf(targetIndex);
+        p->shooterRef = Entity_RefOf(shooterIndex);
         p->damage = damage;
         p->speed = PROJECTILE_SPEED;
         p->color = (shooter->team == 0) ? (Color){ 230, 220, 160, 255 }
@@ -37,8 +37,8 @@ void Projectile_Spawn(int shooterIndex, int targetIndex, int damage) {
 }
 
 static void Impact(Projectile *p) {
-    Entity *target = Entity_Get(p->targetIndex);
-    Entity *shooter = Entity_Get(p->shooterIndex);
+    Entity *target = Entity_Resolve(p->targetRef);
+    Entity *shooter = Entity_Resolve(p->shooterRef);
     if (!target || !target->alive) return;
 
     float dx = target->pos.x - p->landingPoint.x;
@@ -56,7 +56,7 @@ static void Impact(Projectile *p) {
         if (target->kind == ENT_MONSTER && !target->aggroed) {
             // A landed ranged hit wakes a sleeping monster - the wand pull.
             target->aggroed = true;
-            target->targetIndex = p->shooterIndex;
+            target->targetRef = p->shooterRef;
         }
     }
 }

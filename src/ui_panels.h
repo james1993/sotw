@@ -10,10 +10,6 @@
 // the draw phase.
 void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight);
 
-// True if the point (screen space) is over an open panel - input.c uses
-// this so clicking a panel doesn't also click-to-move the player.
-bool UI_PointerOverPanels(Vector2 point);
-
 // Opens the interaction dialog for an outpost NPC (quest giver,
 // merchant, henchman). Closed by Escape or walking away.
 void UI_OpenNpcDialog(int entityIndex);

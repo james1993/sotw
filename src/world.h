@@ -15,17 +15,52 @@ typedef enum {
     MODE_EXPLORABLE
 } GameMode;
 
+// Zone indices into the zone table in world.c. Adding a zone means
+// adding an entry there (name, portals, spawns, props, colors) - no
+// code changes elsewhere.
+typedef enum {
+    ZONE_ASHFORD_CAMP = 0,
+    ZONE_ASHFORD_PLAINS,
+    ZONE_COUNT
+} ZoneId;
+
+#define MAX_ZONE_PORTALS 4
+
+// A gate to another zone. Zones can have several (hub outposts with
+// multiple exits), each with its own destination and arrival point.
+typedef struct {
+    Vector2 pos;
+    const char *label;   // "To Ashford Plains" - drawn under the swirl
+    ZoneId destZone;
+    Vector2 destEntry;   // where the player appears on the other side
+} ZonePortal;
+
+// Decorative environment props, hand-placed per zone. Drawn by render.c;
+// purely visual, no collision or LoS.
+typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE } PropType;
+typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
+
 GameMode World_GetMode(void);
 const char *World_GetZoneName(void);
+
+// Zone look: window clear color and ground-grid color (warm dirt in
+// camp, cool grass in the plains).
+Color World_GetClearColor(void);
+Color World_GetGridColor(void);
 
 // Creates the player + loads the starting outpost. Call once at startup.
 void World_Init(void);
 
-// Portal proximity check + zone transitions. Call every frame.
+// Portal proximity checks + zone transitions. Call every frame.
 void World_Update(struct Entity *player, float dt);
 
-// Portal location + destination label for rendering.
-void World_GetPortal(Vector2 *pos, const char **label);
+// The current zone's portals, for render.c (world gates) and
+// ui_compass.c (blue squares).
+int World_GetPortalCount(void);
+const ZonePortal *World_GetPortal(int index);
+
+// The current zone's decorative props, for render.c.
+const EnvProp *World_GetProps(int *count);
 
 // Whether Little Thom has been hired into the party (persists across
 // zone loads; GW1 henchmen stay in the party until dismissed).
@@ -35,6 +70,10 @@ void World_SetThomHired(bool hired);
 // Dismiss a hired henchman entity: outposts only, GW1's rule for party
 // editing. Converts the party member back into the standing NPC.
 void World_DismissHenchman(struct Entity *henchman);
+
+// Fills in Little Thom's Warrior stat block and skill bar - the single
+// source of truth shared by zone loads and the hire dialog.
+void World_SetupThomStats(struct Entity *thom);
 
 // Resurrection shrine (explorable zones only). On a full party wipe the
 // party respawns here, each member carrying their stacked death penalty

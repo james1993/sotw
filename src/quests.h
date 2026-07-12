@@ -26,9 +26,12 @@ typedef enum {
 typedef struct {
     const char *name;
     const char *objective;
+    const char *giverName;  // who to return to for the reward
     QuestType type;
     int killsRequired;
     int kills;
+    const char *targetName; // QTYPE_KILL: only kills whose victim's name
+                            // contains this substring count (NULL = any)
     Vector2 targetPos;  // QTYPE_REACH: where to go (explorable coords)
     float reachRadius;
     int rewardXP;
@@ -51,7 +54,10 @@ bool Quests_GiverHasAttention(void);
 
 void Quests_Accept(int index);
 void Quests_TurnIn(struct Entity *player, int index);
-void Quests_NotifyMonsterKill(void);
+
+// Called on every monster death; each active kill quest counts the
+// victim only if it matches the quest's targetName filter.
+void Quests_NotifyMonsterKill(const struct Entity *victim);
 
 // Per-frame objective checks (reach quests). Only meaningful in the
 // explorable zone.

@@ -112,3 +112,19 @@ These are content/scope gaps, not architecture gaps: the effect VM,
 entity model, and AI loop the doc describes are what's actually running,
 so extending to more skills/professions is additive work on top of a
 validated foundation, not a rewrite.
+
+### Known limitations
+
+- **macOS Retina renders at logical (non-Retina) resolution.** raylib's
+  `FLAG_WINDOW_HIGHDPI` is deliberately off: with OS display scaling it
+  made `GetScreenWidth()` and `GetMousePosition()` disagree, sending
+  click-to-move wildly off target. Coordinates staying consistent beats
+  crispness, so Retina displays get an OS-upscaled (slightly soft)
+  image until the flag can be re-enabled together with mouse-coordinate
+  scaling and verified on real hardware.
+- **Gamepad support is desk-checked, not hardware-tested.** The mapping
+  (left stick move, L2/R2 + face buttons for skills, D-pad targeting)
+  follows raylib's XInput-style layout; DirectInput pads that report
+  triggers or the D-pad differently may need remapping.
+- **No save/load.** Progression (level, gold, inventory, quest states)
+  lives in memory only and resets when the game exits.

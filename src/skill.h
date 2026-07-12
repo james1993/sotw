@@ -7,6 +7,29 @@
 #define MAX_SKILLS 32
 #define MAX_STEPS_PER_SKILL 3
 
+// Stable names for every skill in the DB. SkillDB_Init registers in
+// exactly this order (and warns loudly if the two ever drift), so skill
+// bars reference these instead of bare numbers - inserting a skill
+// mid-table can no longer silently renumber every bar in the game.
+typedef enum {
+    SK_GASH = 0,
+    SK_RUSH_STRIKE,
+    SK_BATTLE_CRY,
+    SK_DEATHBLOW,
+    SK_FIRE_BOLT,
+    SK_CINDER_STORM,
+    SK_MIND_SEAR,
+    SK_METEOR,
+    SK_CLAW_SWIPE,
+    SK_DISTRACTING_BLOW,
+    SK_FERAL_HOWL,
+    SK_ORISON_OF_HEALING,
+    SK_BANISH,
+    SK_SMITE,
+    SK_BANE_SIGNET,
+    SK_COUNT
+} SkillId;
+
 // Mirrors GW1's skill-type hierarchy at a reduced scale (see
 // docs/research/gw1-mechanics.md #5). What matters for the demake is
 // that TYPE, not just effect, is what removal/interrupt skills key off.
@@ -59,6 +82,7 @@ typedef struct {
     float castTime;
     float recharge;
     float range;
+    float aoeRadius; // TARGET_AOE_FOES: blast radius around the target
     bool isElite;
     TargetKind targeting;
     EffectStep steps[MAX_STEPS_PER_SKILL];

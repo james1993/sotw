@@ -13,6 +13,7 @@
 #include "ui_party.h"
 #include "ui_compass.h"
 #include "ui_panels.h"
+#include "ui_hit.h"
 #include "ui_font.h"
 #include "render.h"
 
@@ -38,6 +39,11 @@ int main(void) {
     SetWindowMinSize(960, 600);
     SetTargetFPS(60);
 
+    // raylib quits on Escape by default; we use Escape to clear the
+    // current target (input.c) and close dialogs (ui_panels.c), so the
+    // default would exit the game on the first target-drop.
+    SetExitKey(KEY_NULL);
+
     UIFont_Init();
     SkillDB_Init();
     World_Init(); // creates the player and loads Ashford Camp
@@ -50,11 +56,25 @@ int main(void) {
     camera.zoom = GetScreenWidth() / 700.0f;
     if (camera.zoom < MIN_CAMERA_ZOOM) camera.zoom = MIN_CAMERA_ZOOM;
     if (camera.zoom > MAX_CAMERA_ZOOM) camera.zoom = MAX_CAMERA_ZOOM;
+    int lastScreenWidth = GetScreenWidth();
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
+
+        // The maximize request above lands asynchronously on some window
+        // managers, so the width the startup zoom was computed from may
+        // have been the pre-maximize fallback. Until the player takes
+        // manual control of zoom, re-derive the default whenever the
+        // window size actually changes (maximize landing, resize, monitor
+        // move).
+        if (screenWidth != lastScreenWidth && !Input_UserAdjustedZoom()) {
+            camera.zoom = screenWidth / 700.0f;
+            if (camera.zoom < MIN_CAMERA_ZOOM) camera.zoom = MIN_CAMERA_ZOOM;
+            if (camera.zoom > MAX_CAMERA_ZOOM) camera.zoom = MAX_CAMERA_ZOOM;
+        }
+        lastScreenWidth = screenWidth;
 
         // Re-centered every frame so resizing the window (or moving it to
         // a different monitor) doesn't leave the camera offset stale.
@@ -73,11 +93,16 @@ int main(void) {
         if (playerNow) camera.target = playerNow->pos;
 
         BeginDrawing();
-        // Warm dirt tones in camp, cool grass tones in the plains.
-        ClearBackground(World_GetMode() == MODE_OUTPOST
-            ? (Color){ 24, 20, 14, 255 } : (Color){ 14, 22, 13, 255 });
+        // Warm dirt tones in camp, cool grass tones in the plains -
+        // per-zone data (world.c).
+        ClearBackground(World_GetClearColor());
 
         Render_World(camera);
+
+        // Screen-space UI from here down; every widget claims its rect
+        // with UIHit so next frame's clicks stop at the UI instead of
+        // falling through into the world.
+        UIHit_NewFrame();
 
         // Zone name, top center - how GW1 tells you where you are.
         {

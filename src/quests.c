@@ -5,16 +5,20 @@
 #include "world.h"
 #include "ui_party.h"
 #include "ui_compass.h"
+#include "ui_hit.h"
 #include "ui_font.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 Quest g_quests[QUEST_COUNT] = {
     {
         .name = "Charr at the Gate",
         .objective = "Slay the Charr in Ashford Plains",
+        .giverName = "Captain Osric",
         .type = QTYPE_KILL,
         .killsRequired = 3,
+        .targetName = "Charr", // only Charr kills advance this quest
         .rewardXP = 250,
         .rewardGold = 100,
         .state = QUEST_AVAILABLE,
@@ -23,6 +27,7 @@ Quest g_quests[QUEST_COUNT] = {
     {
         .name = "Scout the Eastern Ridge",
         .objective = "Reach the ridge marker east of the plains",
+        .giverName = "Captain Osric",
         .type = QTYPE_REACH,
         .targetPos = { 1340, 40 }, // past the prowler's beat - you'll meet it on the road
         .reachRadius = 70.0f,
@@ -71,10 +76,13 @@ void Quests_TurnIn(Entity *player, int index) {
     g_gold += g_quests[index].rewardGold;
 }
 
-void Quests_NotifyMonsterKill(void) {
+void Quests_NotifyMonsterKill(const Entity *victim) {
     for (int i = 0; i < QUEST_COUNT; i++) {
         Quest *q = &g_quests[i];
         if (q->type != QTYPE_KILL || q->state != QUEST_ACTIVE) continue;
+        // Two kill quests can be active at once; each counts only its
+        // own targets.
+        if (q->targetName && (!victim || !strstr(victim->name, q->targetName))) continue;
         q->kills++;
         if (q->kills >= q->killsRequired) q->state = QUEST_READY_TO_TURN_IN;
     }
@@ -96,9 +104,7 @@ void Quests_Update(Entity *player) {
 }
 
 void Quests_DrawTracker(int screenWidth, int screenHeight) {
-    float scale = (float)screenHeight / 800.0f;
-    if (scale < 0.85f) scale = 0.85f;
-    if (scale > 5.0f) scale = 5.0f;
+    float scale = UI_Scale(screenHeight);
 
     int font = (int)(11 * scale);
     int pad = (int)(8 * scale);
@@ -118,7 +124,7 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
 
         char line2[80];
         if (q->state == QUEST_READY_TO_TURN_IN) {
-            snprintf(line2, sizeof(line2), "Return to Captain Osric");
+            snprintf(line2, sizeof(line2), "Return to %s", q->giverName);
         } else if (q->type == QTYPE_KILL) {
             snprintf(line2, sizeof(line2), "%s (%d/%d)", q->objective, q->kills, q->killsRequired);
         } else {
@@ -126,6 +132,7 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
         }
 
         int h = pad * 2 + font * 2 + 6;
+        UIHit_Claim((Rectangle){ (float)x, (float)y, (float)w, (float)h });
         DrawRectangle(x, y, w, h, (Color){ 20, 22, 30, 210 });
         DrawRectangleLines(x, y, w, h, (Color){ 120, 120, 140, 255 });
         UIText(q->name, x + pad, y + pad, font, GOLD);

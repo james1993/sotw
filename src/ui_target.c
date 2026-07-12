@@ -3,24 +3,18 @@
 #include "skill.h"
 #include "raylib.h"
 #include "ui_font.h"
+#include "ui_hit.h"
 #include <stdio.h>
 
 #define PLAYER_INDEX 0
 
-static float PanelScale(int screenHeight) {
-    float scale = (float)screenHeight / 800.0f;
-    if (scale < 0.85f) scale = 0.85f;
-    if (scale > 5.0f) scale = 5.0f;
-    return scale;
-}
-
 void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player) return;
-    Entity *target = Entity_Get(player->targetIndex);
+    Entity *target = Entity_Resolve(player->targetRef);
     if (!target || !target->alive) return;
 
-    float scale = PanelScale(screenHeight);
+    float scale = UI_Scale(screenHeight);
     int panelW = (int)(340 * scale);
     int barH = (int)(20 * scale);
     int font = (int)(14 * scale);
@@ -29,6 +23,11 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
 
     int x = (screenWidth - panelW) / 2;
     int y = startY;
+
+    // Claim the panel's maximum footprint (name + HP bar + cast bar) so
+    // clicks near the top-center HUD never leak into the world.
+    UIHit_Claim((Rectangle){ (float)x, (float)y,
+                             (float)panelW, (float)(font + barH + (int)(18 * scale) + pad * 3) });
 
     Color teamColor = (target->team == 0) ? SKYBLUE : (Color){ 255, 140, 140, 255 };
     UIText(target->name, x, y, font, teamColor);

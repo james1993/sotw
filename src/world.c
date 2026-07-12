@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
+#include "skill.h"
 #include "projectile.h"
 #include <math.h>
 #include <string.h>
@@ -10,37 +11,225 @@
 #define PORTAL_TRIGGER_RADIUS 40.0f
 #define PORTAL_COOLDOWN 1.5f
 
-static GameMode g_mode = MODE_OUTPOST;
+// ---------------------------------------------------------------------
+// Zone content data. A zone is a ZoneDef: name, mode, colors, portals,
+// shrine, decorative props, and a spawn table. Adding a zone = adding
+// data here plus a ZoneId in world.h; the loader below is generic.
+// ---------------------------------------------------------------------
+
+typedef enum {
+    SPAWN_MONSTER,
+    SPAWN_MONSTER_PATROL,
+    SPAWN_NPC
+} SpawnKind;
+
+typedef struct {
+    SpawnKind kind;
+    const char *name;
+    Vector2 pos;      // spawn point; patrols: waypoint A
+    Vector2 posB;     // patrols: waypoint B
+    int level, hp, armor;
+    float aggro;
+    int strengthRank;
+    bool withHowl;    // monsters: carry Feral Howl, the interruptible self-heal
+    NpcRole npcRole;  // NPCs only
+    Color npcColor;   // NPCs only
+} SpawnDef;
+
+typedef struct {
+    const char *name;
+    GameMode mode;
+    Color clearColor; // window background
+    Color gridColor;  // ground grid
+    ZonePortal portals[MAX_ZONE_PORTALS];
+    int portalCount;
+    bool hasShrine;
+    Vector2 shrinePos;
+    const EnvProp *props;
+    int propCount;
+    const SpawnDef *spawns;
+    int spawnCount;
+} ZoneDef;
+
+// --- Ashford Camp: a small circle of tents around a fire ---
+
+static const EnvProp g_campProps[] = {
+    { { 0, -140 }, PROP_FIRE, 1.0f },
+    { { -150, -140 }, PROP_TENT, 1.0f },
+    { { -190, -40 }, PROP_TENT, 0.9f },
+    { { 150, -150 }, PROP_TENT, 1.1f },
+    { { 190, -50 }, PROP_TENT, 0.9f },
+    { { -120, 150 }, PROP_TENT, 1.0f },
+    { { 140, 160 }, PROP_TENT, 0.95f },
+    { { -260, -180 }, PROP_TREE, 1.0f },
+    { { 280, -200 }, PROP_TREE, 1.1f },
+    { { -280, 120 }, PROP_ROCK, 1.0f },
+    { { 240, 140 }, PROP_ROCK, 0.9f },
+};
+
+static const SpawnDef g_campSpawns[] = {
+    // Little Thom's standing NPC only appears while he isn't hired -
+    // the loader skips henchman NPCs who are currently in the party.
+    { .kind = SPAWN_NPC, .name = "Little Thom", .pos = { 40, 110 },
+      .npcRole = NPC_HENCHMAN, .npcColor = { 170, 80, 60, 255 } },
+    { .kind = SPAWN_NPC, .name = "Captain Osric", .pos = { -120, -60 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Merchant", .pos = { 90, -90 },
+      .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+};
+
+// --- Ashford Plains: three static camps spaced beyond each other's
+// aggro bubbles, two patrols sweeping the ground between them. The
+// strategy is pure GW1 - watch the compass, pull a camp when the patrol
+// is at the far end of its route, and finish the fight before it swings
+// back through. ---
+
+static const EnvProp g_plainsProps[] = {
+    { { -320, -160 }, PROP_TREE, 1.1f },
+    { { -260, -230 }, PROP_TREE, 0.85f },
+    { { -140, -260 }, PROP_TREE, 1.0f },
+    { { 120, -260 }, PROP_TREE, 0.9f },
+    { { 340, -180 }, PROP_TREE, 1.2f },
+    { { 420, -60 }, PROP_TREE, 0.8f },
+    { { 400, 160 }, PROP_TREE, 1.0f },
+    { { 300, 260 }, PROP_TREE, 0.9f },
+    { { -80, 260 }, PROP_TREE, 1.1f },
+    { { -300, 200 }, PROP_TREE, 0.85f },
+    { { -420, 40 }, PROP_TREE, 1.0f },
+    { { -220, -60 }, PROP_ROCK, 1.0f },
+    { { -160, 120 }, PROP_ROCK, 0.8f },
+    { { 140, -80 }, PROP_ROCK, 1.1f },
+    { { 380, 40 }, PROP_ROCK, 0.9f },
+    { { 60, 180 }, PROP_ROCK, 0.7f },
+    { { -60, -160 }, PROP_ROCK, 0.9f },
+    { { 200, 140 }, PROP_GRASS, 1.0f },
+    { { -180, 20 }, PROP_GRASS, 0.9f },
+    { { 100, -40 }, PROP_GRASS, 1.1f },
+    { { -100, 140 }, PROP_GRASS, 0.8f },
+    { { 320, -20 }, PROP_GRASS, 1.0f },
+    { { -20, 220 }, PROP_GRASS, 0.9f },
+    { { 220, -160 }, PROP_GRASS, 1.0f },
+    // Eastern reaches of the expanded plains.
+    { { 620, -420 }, PROP_TREE, 1.1f },
+    { { 980, -400 }, PROP_TREE, 0.9f },
+    { { 1180, -160 }, PROP_TREE, 1.2f },
+    { { 1240, 240 }, PROP_TREE, 1.0f },
+    { { 760, 430 }, PROP_TREE, 1.1f },
+    { { 1050, 60 }, PROP_ROCK, 1.1f },
+    { { 640, 200 }, PROP_ROCK, 0.9f },
+    { { 880, -60 }, PROP_ROCK, 0.8f },
+    { { 1300, -60 }, PROP_ROCK, 1.0f },
+    { { 720, -120 }, PROP_GRASS, 1.0f },
+    { { 1000, 180 }, PROP_GRASS, 1.1f },
+    { { 1150, -280 }, PROP_GRASS, 0.9f },
+    { { 560, 60 }, PROP_GRASS, 1.0f },
+    { { 1330, 150 }, PROP_GRASS, 1.0f },
+};
+
+static const SpawnDef g_plainsSpawns[] = {
+    // Camp 1, near the entrance - the first pull.
+    { .kind = SPAWN_MONSTER, .name = "Charr Brute", .pos = { 300, 40 },
+      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 380, -50 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+
+    // Camp 2, northeast.
+    { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 820, -300 },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 760, -220 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 900, -230 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+
+    // Camp 3, southeast.
+    { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 900, 320 },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 830, 250 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 980, 260 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+
+    // Patrols. The north-south sweep crosses the corridor between camp 1
+    // and the eastern camps; the east-west prowler covers the road to the
+    // ridge. Aggro capped at AGGRO_RING_RADIUS so the drawn bubble never
+    // under-promises what a patrol can notice.
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Patrol",
+      .pos = { 560, -320 }, .posB = { 560, 320 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7 },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Prowler",
+      .pos = { 700, 40 }, .posB = { 1240, 40 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7 },
+};
+
+#define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
+
+static const ZoneDef g_zones[ZONE_COUNT] = {
+    [ZONE_ASHFORD_CAMP] = {
+        .name = "Ashford Camp",
+        .mode = MODE_OUTPOST,
+        .clearColor = { 24, 20, 14, 255 },  // warm dirt tones
+        .gridColor = { 80, 68, 52, 255 },
+        .portals = {
+            { { 260, 0 }, "To Ashford Plains", ZONE_ASHFORD_PLAINS, { -320, 0 } },
+        },
+        .portalCount = 1,
+        .hasShrine = false,
+        .props = g_campProps, .propCount = COUNT(g_campProps),
+        .spawns = g_campSpawns, .spawnCount = COUNT(g_campSpawns),
+    },
+    [ZONE_ASHFORD_PLAINS] = {
+        .name = "Ashford Plains",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 14, 22, 13, 255 },  // cool grass tones
+        .gridColor = { 52, 76, 48, 255 },
+        .portals = {
+            { { -420, 0 }, "To Ashford Camp", ZONE_ASHFORD_CAMP, { 160, 0 } },
+        },
+        .portalCount = 1,
+        .hasShrine = true,
+        .shrinePos = { -320, 140 },
+        .props = g_plainsProps, .propCount = COUNT(g_plainsProps),
+        .spawns = g_plainsSpawns, .spawnCount = COUNT(g_plainsSpawns),
+    },
+};
+
+// ---------------------------------------------------------------------
+// Zone state + accessors
+// ---------------------------------------------------------------------
+
+static const ZoneDef *g_zone = &g_zones[ZONE_ASHFORD_CAMP];
 static bool g_thomHired = false;
 static float g_portalCooldown = 0.0f;
-
-static Vector2 g_portalPos;
-static const char *g_portalLabel = "";
-static const char *g_zoneName = "";
-
-static Vector2 g_shrinePos;
-static bool g_hasShrine = false;
 static float g_wipeTimer = 0.0f;
 static float g_autoResTimer = 0.0f;
 
-GameMode World_GetMode(void) { return g_mode; }
-const char *World_GetZoneName(void) { return g_zoneName; }
+GameMode World_GetMode(void) { return g_zone->mode; }
+const char *World_GetZoneName(void) { return g_zone->name; }
+Color World_GetClearColor(void) { return g_zone->clearColor; }
+Color World_GetGridColor(void) { return g_zone->gridColor; }
 bool World_IsThomHired(void) { return g_thomHired; }
 void World_SetThomHired(bool hired) { g_thomHired = hired; }
 
-void World_GetPortal(Vector2 *pos, const char **label) {
-    if (pos) *pos = g_portalPos;
-    if (label) *label = g_portalLabel;
+int World_GetPortalCount(void) { return g_zone->portalCount; }
+
+const ZonePortal *World_GetPortal(int index) {
+    if (index < 0 || index >= g_zone->portalCount) return NULL;
+    return &g_zone->portals[index];
+}
+
+const EnvProp *World_GetProps(int *count) {
+    if (count) *count = g_zone->propCount;
+    return g_zone->props;
 }
 
 bool World_GetShrine(Vector2 *pos) {
-    if (pos) *pos = g_shrinePos;
-    return g_hasShrine;
+    if (pos) *pos = g_zone->shrinePos;
+    return g_zone->hasShrine;
 }
 
 void World_DismissHenchman(Entity *henchman) {
     if (!henchman || !henchman->isHenchman) return;
-    if (g_mode != MODE_OUTPOST) return; // GW1: party changes only in outposts
+    if (g_zone->mode != MODE_OUTPOST) return; // GW1: party changes only in outposts
 
     g_thomHired = false;
     henchman->kind = ENT_NPC;
@@ -48,9 +237,13 @@ void World_DismissHenchman(Entity *henchman) {
     henchman->isHenchman = false;
     henchman->alive = true;
     henchman->hp = henchman->maxHp;
-    henchman->targetIndex = -1;
+    henchman->targetRef = Entity_NoRef();
     henchman->hasMoveTarget = false;
 }
+
+// ---------------------------------------------------------------------
+// Spawning
+// ---------------------------------------------------------------------
 
 // Strips combat/zone-transient state off the persistent player entity
 // when crossing a portal; progression (level/xp/attributes) and the
@@ -60,7 +253,7 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     p->pos = entryPos;
     p->moveTarget = entryPos;
     p->hasMoveTarget = false;
-    p->targetIndex = -1;
+    p->targetRef = Entity_NoRef();
     p->castingSlot = -1;
     p->lastCastSkillSlot = -1;
     p->postCastDisplayTimer = 0.0f;
@@ -87,18 +280,16 @@ static void SpawnVekk(Vector2 pos) {
     hero->attackRange = 220.0f; // caster keeps distance
     hero->attributeRank[ATTR_FIRE_MAGIC] = 4;
     hero->attributeRank[ATTR_ENERGY_STORAGE] = 3;
-    hero->skillBar[0] = 4; // Fire Bolt
-    hero->skillBar[1] = 5; // Cinder Storm
-    hero->skillBar[2] = 6; // Mind Sear (energy management)
+    hero->skillBar[0] = SK_FIRE_BOLT;
+    hero->skillBar[1] = SK_CINDER_STORM;
+    hero->skillBar[2] = SK_MIND_SEAR; // energy management
 }
 
-// Little Thom, the pre-Searing Warrior henchman. As a party member he
-// fights with a fixed Warrior bar - fixed skill sets being exactly what
-// separates henchmen from heroes in GW1
-// (docs/research/gw1-mechanics.md #10).
-static void SpawnThomCompanion(Vector2 pos) {
-    int idx = Entity_Spawn(ENT_HERO, "Little Thom", 0, pos, (Color){ 170, 80, 60, 255 });
-    Entity *thom = Entity_Get(idx);
+// Everything that makes Little Thom a fighting Warrior henchman - used
+// both when zone loads respawn him as a party member (below) and when
+// the hire dialog converts his standing NPC (ui_panels.c), so the two
+// copies of his stat block can't drift apart.
+void World_SetupThomStats(Entity *thom) {
     thom->isHenchman = true;
     thom->primaryProfession = PROF_WARRIOR;
     thom->secondaryProfession = PROF_MONK;
@@ -111,47 +302,52 @@ static void SpawnThomCompanion(Vector2 pos) {
     thom->armor = 80; // warriors wear heavy armor
     thom->attributeRank[ATTR_STRENGTH] = 4;
     thom->attributeRank[ATTR_TACTICS] = 3;
-    thom->skillBar[0] = 0; // Gash
-    thom->skillBar[1] = 1; // Rush Strike
-    thom->skillBar[2] = 2; // Battle Cry
+    thom->skillBar[0] = SK_GASH;
+    thom->skillBar[1] = SK_RUSH_STRIKE;
+    thom->skillBar[2] = SK_BATTLE_CRY;
 }
 
-static void SpawnNpc(const char *name, NpcRole role, Vector2 pos, Color color) {
-    int idx = Entity_Spawn(ENT_NPC, name, 0, pos, color);
-    Entity *npc = Entity_Get(idx);
-    npc->npcRole = role;
+// Little Thom, the pre-Searing Warrior henchman. As a party member he
+// fights with a fixed Warrior bar - fixed skill sets being exactly what
+// separates henchmen from heroes in GW1
+// (docs/research/gw1-mechanics.md #10).
+static void SpawnThomCompanion(Vector2 pos) {
+    int idx = Entity_Spawn(ENT_HERO, "Little Thom", 0, pos, (Color){ 170, 80, 60, 255 });
+    World_SetupThomStats(Entity_Get(idx));
 }
 
-static Entity *SpawnCharr(const char *name, Vector2 pos, int level, int hp, int armor,
-                          float aggro, int strengthRank, bool withHowl) {
-    int idx = Entity_Spawn(ENT_MONSTER, name, 1, pos, (Color){ 100, 90, 80, 255 });
+static Entity *SpawnMonster(const SpawnDef *def) {
+    int idx = Entity_Spawn(ENT_MONSTER, def->name, 1, def->pos, (Color){ 100, 90, 80, 255 });
     Entity *m = Entity_Get(idx);
-    m->level = level;
-    m->maxHp = m->hp = hp;
+    if (!m) return NULL;
+    m->level = def->level;
+    m->maxHp = m->hp = def->hp;
     m->maxEnergy = m->energy = 20;
-    m->armor = armor;
-    m->aggroRange = aggro;
-    m->leashRange = aggro * 2.5f;
-    m->attributeRank[ATTR_STRENGTH] = strengthRank;
-    if (withHowl) {
-        m->skillBar[0] = 10; // Feral Howl (self-heal - interrupt it!)
-        m->skillBar[1] = 8;  // Claw Swipe
+    m->armor = def->armor;
+    m->aggroRange = def->aggro;
+    m->leashRange = def->aggro * 2.5f;
+    m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
+    if (def->withHowl) {
+        m->skillBar[0] = SK_FERAL_HOWL; // self-heal - interrupt it!
+        m->skillBar[1] = SK_CLAW_SWIPE;
     } else {
-        m->skillBar[0] = 8;  // Claw Swipe
+        m->skillBar[0] = SK_CLAW_SWIPE;
     }
     return m;
 }
 
-// A Charr that walks a route between two points instead of standing
+// A monster that walks a route between two points instead of standing
 // still - GW1's roaming patrols, the reason pull timing matters: fight
 // a static group in a patrol's path and the patrol joins in.
-static void SpawnCharrPatrol(const char *name, Vector2 a, Vector2 b, int level, int hp,
-                             int armor, float aggro, int strengthRank) {
-    Vector2 mid = { (a.x + b.x) / 2.0f, (a.y + b.y) / 2.0f };
-    Entity *m = SpawnCharr(name, mid, level, hp, armor, aggro, strengthRank, false);
+static void SpawnMonsterPatrol(const SpawnDef *def) {
+    Entity *m = SpawnMonster(def);
     if (!m) return;
-    m->pos = a;             // start at one end; spawnPos stays at the route
-    m->hasPatrol = true;    // midpoint so the leash covers the whole path
+    Vector2 a = def->pos, b = def->posB;
+    // spawnPos anchors at the route midpoint so the leash covers the
+    // whole path; the monster itself starts at one end.
+    m->spawnPos = (Vector2){ (a.x + b.x) / 2.0f, (a.y + b.y) / 2.0f };
+    m->pos = a;
+    m->hasPatrol = true;
     m->patrolA = a;
     m->patrolB = b;
     m->patrolDir = +1;
@@ -160,10 +356,16 @@ static void SpawnCharrPatrol(const char *name, Vector2 a, Vector2 b, int level, 
     m->color = (Color){ 120, 85, 65, 255 }; // reads differently from statics
 }
 
+static void SpawnNpc(const SpawnDef *def) {
+    int idx = Entity_Spawn(ENT_NPC, def->name, 0, def->pos, def->npcColor);
+    Entity *npc = Entity_Get(idx);
+    if (npc) npc->npcRole = def->npcRole;
+}
+
 // Rebuilds the entity array for a zone while carrying the player
 // (slot 0) across. GW1 semantics: explorables are a fresh instance on
 // every entry; returning to an outpost fully restores the party.
-static void LoadZone(GameMode mode, Vector2 playerEntry) {
+static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     Entity saved = g_entities[PLAYER_INDEX];
     g_entityCount = 0;
     memset(g_drops, 0, sizeof(g_drops)); // ground loot doesn't survive rezoning, like GW1
@@ -173,65 +375,40 @@ static void LoadZone(GameMode mode, Vector2 playerEntry) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     ResetPlayerTransientState(player, playerEntry);
 
-    g_mode = mode;
+    g_zone = &g_zones[zoneId];
     g_portalCooldown = PORTAL_COOLDOWN;
-
     g_wipeTimer = 0.0f;
     g_autoResTimer = 0.0f;
 
-    if (mode == MODE_OUTPOST) {
-        g_zoneName = "Ashford Camp";
-        g_portalPos = (Vector2){ 260, 0 };
-        g_portalLabel = "To Ashford Plains";
-        g_hasShrine = false;
-
+    if (g_zone->mode == MODE_OUTPOST) {
         // Outposts restore the party completely, GW1-style.
         player->hp = player->maxHp;
         player->energy = player->maxEnergy;
+    }
 
-        SpawnVekk((Vector2){ -50, 50 });
-        if (g_thomHired) {
-            SpawnThomCompanion((Vector2){ 40, 70 });
-        } else {
-            SpawnNpc("Little Thom", NPC_HENCHMAN, (Vector2){ 40, 110 }, (Color){ 170, 80, 60, 255 });
+    // The party spawns around the player's entry point.
+    SpawnVekk((Vector2){ playerEntry.x - 50, playerEntry.y + 50 });
+    if (g_thomHired) {
+        SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
+    }
+
+    for (int i = 0; i < g_zone->spawnCount; i++) {
+        const SpawnDef *def = &g_zone->spawns[i];
+        switch (def->kind) {
+            case SPAWN_MONSTER:
+                SpawnMonster(def);
+                break;
+            case SPAWN_MONSTER_PATROL:
+                SpawnMonsterPatrol(def);
+                break;
+            case SPAWN_NPC:
+                // A henchman standing in the outpost is the same person
+                // as the one in your party - don't spawn his NPC while
+                // he's hired.
+                if (def->npcRole == NPC_HENCHMAN && g_thomHired) break;
+                SpawnNpc(def);
+                break;
         }
-        SpawnNpc("Captain Osric", NPC_QUEST_GIVER, (Vector2){ -120, -60 }, (Color){ 90, 170, 90, 255 });
-        SpawnNpc("Merchant", NPC_MERCHANT, (Vector2){ 90, -90 }, (Color){ 90, 170, 90, 255 });
-    } else {
-        g_zoneName = "Ashford Plains";
-        g_portalPos = (Vector2){ -420, 0 };
-        g_portalLabel = "To Ashford Camp";
-        g_shrinePos = (Vector2){ -320, 140 };
-        g_hasShrine = true;
-
-        SpawnVekk((Vector2){ playerEntry.x - 40, playerEntry.y + 50 });
-        if (g_thomHired) SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
-
-        // The expanded plains: three static camps spaced beyond each
-        // other's aggro bubbles, with two patrols sweeping the ground
-        // between them. The strategy is pure GW1 - watch the compass,
-        // pull a camp when the patrol is at the far end of its route,
-        // and finish the fight before it swings back through.
-        //
-        // Camp 1, near the entrance - the first pull.
-        SpawnCharr("Charr Brute", (Vector2){ 300, 40 }, 5, 220, 60, 130.0f, 8, true);
-        SpawnCharr("Charr Grunt", (Vector2){ 380, -50 }, 2, 140, 40, 120.0f, 6, false);
-
-        // Camp 2, northeast.
-        SpawnCharr("Charr Stalker", (Vector2){ 820, -300 }, 4, 180, 50, 130.0f, 7, true);
-        SpawnCharr("Charr Grunt", (Vector2){ 760, -220 }, 2, 140, 40, 120.0f, 6, false);
-        SpawnCharr("Charr Grunt", (Vector2){ 900, -230 }, 3, 160, 40, 120.0f, 6, false);
-
-        // Camp 3, southeast.
-        SpawnCharr("Charr Stalker", (Vector2){ 900, 320 }, 4, 180, 50, 130.0f, 7, true);
-        SpawnCharr("Charr Grunt", (Vector2){ 830, 250 }, 2, 140, 40, 120.0f, 6, false);
-        SpawnCharr("Charr Grunt", (Vector2){ 980, 260 }, 3, 160, 40, 120.0f, 6, false);
-
-        // Patrols. The north-south sweep crosses the corridor between
-        // camp 1 and the eastern camps; the east-west prowler covers the
-        // road to the ridge.
-        SpawnCharrPatrol("Charr Patrol", (Vector2){ 560, -320 }, (Vector2){ 560, 320 }, 4, 170, 45, 140.0f, 7);
-        SpawnCharrPatrol("Charr Prowler", (Vector2){ 700, 40 }, (Vector2){ 1240, 40 }, 4, 170, 45, 140.0f, 7);
     }
 }
 
@@ -255,11 +432,11 @@ void World_Init(void) {
     player->attributeRank[ATTR_SMITING_PRAYERS] = 3;
     player->attributeRank[ATTR_DIVINE_FAVOR] = 1;
     player->attributePoints = 3;
-    player->skillBar[0] = 11; // Orison of Healing
-    player->skillBar[1] = 12; // Banish
-    player->skillBar[2] = 13; // Smite
-    player->skillBar[3] = 14; // Bane Signet
-    player->skillBar[4] = 4;  // Fire Bolt (Elementalist secondary)
+    player->skillBar[0] = SK_ORISON_OF_HEALING;
+    player->skillBar[1] = SK_BANISH;
+    player->skillBar[2] = SK_SMITE;
+    player->skillBar[3] = SK_BANE_SIGNET;
+    player->skillBar[4] = SK_FIRE_BOLT; // Elementalist secondary
 
     // Starting equipment, GW1-style fixed-power items.
     Item startRod = { ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0 };
@@ -269,7 +446,7 @@ void World_Init(void) {
     Items_EquipWeapon(player, 0);
     Items_EquipArmor(player, 1);
 
-    LoadZone(MODE_OUTPOST, (Vector2){ 0, 0 });
+    LoadZone(ZONE_ASHFORD_CAMP, (Vector2){ 0, 0 });
 }
 
 void World_Update(Entity *player, float dt) {
@@ -280,7 +457,7 @@ void World_Update(Entity *player, float dt) {
     if (!player) return;
 
     // --- Death & resurrection bookkeeping (explorable only) ---
-    if (g_mode == MODE_EXPLORABLE) {
+    if (g_zone->mode == MODE_EXPLORABLE) {
         int aliveCount = 0, deadCount = 0;
         for (int i = 0; i < g_entityCount; i++) {
             Entity *e = &g_entities[i];
@@ -302,11 +479,11 @@ void World_Update(Entity *player, float dt) {
                     e->alive = true;
                     e->hp = e->maxHp; // already penalized by DP
                     e->energy = e->maxEnergy;
-                    e->pos = (Vector2){ g_shrinePos.x + (slot % 2) * 34.0f,
-                                        g_shrinePos.y + (slot / 2) * 34.0f };
+                    e->pos = (Vector2){ g_zone->shrinePos.x + (slot % 2) * 34.0f,
+                                        g_zone->shrinePos.y + (slot / 2) * 34.0f };
                     e->moveTarget = e->pos;
                     e->hasMoveTarget = false;
-                    e->targetIndex = -1;
+                    e->targetRef = Entity_NoRef();
                     e->castingSlot = -1;
                     for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) e->effects[j].active = false;
                     slot++;
@@ -341,7 +518,7 @@ void World_Update(Entity *player, float dt) {
                         e->hp = e->maxHp / 2; // revived weakened, like a res signet
                         e->energy = e->maxEnergy / 2;
                         e->pos = (Vector2){ anchor->pos.x + 30.0f, anchor->pos.y + 30.0f };
-                        e->targetIndex = -1;
+                        e->targetRef = Entity_NoRef();
                         e->castingSlot = -1;
                         for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) e->effects[j].active = false;
                     }
@@ -354,15 +531,14 @@ void World_Update(Entity *player, float dt) {
 
     if (!player->alive) return;
 
-    float dx = player->pos.x - g_portalPos.x;
-    float dy = player->pos.y - g_portalPos.y;
-    if (sqrtf(dx * dx + dy * dy) > PORTAL_TRIGGER_RADIUS) return;
-
-    if (g_mode == MODE_OUTPOST) {
-        // Enter the explorable next to its return portal, offset past the
-        // trigger radius so we don't immediately bounce back.
-        LoadZone(MODE_EXPLORABLE, (Vector2){ -320, 0 });
-    } else {
-        LoadZone(MODE_OUTPOST, (Vector2){ 160, 0 });
+    // --- Portals: walk into a gate and cross to its destination ---
+    for (int i = 0; i < g_zone->portalCount; i++) {
+        const ZonePortal *portal = &g_zone->portals[i];
+        float dx = player->pos.x - portal->pos.x;
+        float dy = player->pos.y - portal->pos.y;
+        if (sqrtf(dx * dx + dy * dy) <= PORTAL_TRIGGER_RADIUS) {
+            LoadZone(portal->destZone, portal->destEntry);
+            return;
+        }
     }
 }
