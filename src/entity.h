@@ -120,6 +120,13 @@ typedef struct Entity {
     float leashRange;
     bool aggroed;
 
+    // Patrol route: monsters with hasPatrol ping-pong between patrolA
+    // and patrolB while idle, scanning for foes the whole way - the
+    // GW1 patrols that punish a badly timed pull by wandering into it.
+    bool hasPatrol;
+    Vector2 patrolA, patrolB;
+    int patrolDir; // +1 toward B, -1 toward A
+
     ActiveEffect effects[MAX_ACTIVE_EFFECTS];
 } Entity;
 

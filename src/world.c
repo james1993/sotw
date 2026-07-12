@@ -122,8 +122,8 @@ static void SpawnNpc(const char *name, NpcRole role, Vector2 pos, Color color) {
     npc->npcRole = role;
 }
 
-static void SpawnCharr(const char *name, Vector2 pos, int level, int hp, int armor,
-                       float aggro, int strengthRank, bool withHowl) {
+static Entity *SpawnCharr(const char *name, Vector2 pos, int level, int hp, int armor,
+                          float aggro, int strengthRank, bool withHowl) {
     int idx = Entity_Spawn(ENT_MONSTER, name, 1, pos, (Color){ 100, 90, 80, 255 });
     Entity *m = Entity_Get(idx);
     m->level = level;
@@ -139,6 +139,25 @@ static void SpawnCharr(const char *name, Vector2 pos, int level, int hp, int arm
     } else {
         m->skillBar[0] = 8;  // Claw Swipe
     }
+    return m;
+}
+
+// A Charr that walks a route between two points instead of standing
+// still - GW1's roaming patrols, the reason pull timing matters: fight
+// a static group in a patrol's path and the patrol joins in.
+static void SpawnCharrPatrol(const char *name, Vector2 a, Vector2 b, int level, int hp,
+                             int armor, float aggro, int strengthRank) {
+    Vector2 mid = { (a.x + b.x) / 2.0f, (a.y + b.y) / 2.0f };
+    Entity *m = SpawnCharr(name, mid, level, hp, armor, aggro, strengthRank, false);
+    if (!m) return;
+    m->pos = a;             // start at one end; spawnPos stays at the route
+    m->hasPatrol = true;    // midpoint so the leash covers the whole path
+    m->patrolA = a;
+    m->patrolB = b;
+    m->patrolDir = +1;
+    float dx = b.x - a.x, dy = b.y - a.y;
+    m->leashRange = sqrtf(dx * dx + dy * dy) / 2.0f + 380.0f;
+    m->color = (Color){ 120, 85, 65, 255 }; // reads differently from statics
 }
 
 // Rebuilds the entity array for a zone while carrying the player
@@ -188,13 +207,31 @@ static void LoadZone(GameMode mode, Vector2 playerEntry) {
         SpawnVekk((Vector2){ playerEntry.x - 40, playerEntry.y + 50 });
         if (g_thomHired) SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
 
-        // The Charr, spaced further apart than any single aggro bubble so
-        // pulling one at a time stays a real option.
-        SpawnCharr("Charr Brute", (Vector2){ 260, 20 }, 5, 220, 60, 130.0f, 8, true);
-        SpawnCharr("Charr Grunt", (Vector2){ 440, 150 }, 2, 140, 40, 120.0f, 6, false);
-        SpawnCharr("Charr Grunt", (Vector2){ 420, -170 }, 2, 140, 40, 120.0f, 6, false);
-        SpawnCharr("Charr Grunt", (Vector2){ 640, -40 }, 3, 160, 40, 120.0f, 6, false);
-        SpawnCharr("Charr Stalker", (Vector2){ 700, 190 }, 4, 180, 50, 130.0f, 7, true);
+        // The expanded plains: three static camps spaced beyond each
+        // other's aggro bubbles, with two patrols sweeping the ground
+        // between them. The strategy is pure GW1 - watch the compass,
+        // pull a camp when the patrol is at the far end of its route,
+        // and finish the fight before it swings back through.
+        //
+        // Camp 1, near the entrance - the first pull.
+        SpawnCharr("Charr Brute", (Vector2){ 300, 40 }, 5, 220, 60, 130.0f, 8, true);
+        SpawnCharr("Charr Grunt", (Vector2){ 380, -50 }, 2, 140, 40, 120.0f, 6, false);
+
+        // Camp 2, northeast.
+        SpawnCharr("Charr Stalker", (Vector2){ 820, -300 }, 4, 180, 50, 130.0f, 7, true);
+        SpawnCharr("Charr Grunt", (Vector2){ 760, -220 }, 2, 140, 40, 120.0f, 6, false);
+        SpawnCharr("Charr Grunt", (Vector2){ 900, -230 }, 3, 160, 40, 120.0f, 6, false);
+
+        // Camp 3, southeast.
+        SpawnCharr("Charr Stalker", (Vector2){ 900, 320 }, 4, 180, 50, 130.0f, 7, true);
+        SpawnCharr("Charr Grunt", (Vector2){ 830, 250 }, 2, 140, 40, 120.0f, 6, false);
+        SpawnCharr("Charr Grunt", (Vector2){ 980, 260 }, 3, 160, 40, 120.0f, 6, false);
+
+        // Patrols. The north-south sweep crosses the corridor between
+        // camp 1 and the eastern camps; the east-west prowler covers the
+        // road to the ridge.
+        SpawnCharrPatrol("Charr Patrol", (Vector2){ 560, -320 }, (Vector2){ 560, 320 }, 4, 170, 45, 140.0f, 7);
+        SpawnCharrPatrol("Charr Prowler", (Vector2){ 700, 40 }, (Vector2){ 1240, 40 }, 4, 170, 45, 140.0f, 7);
     }
 }
 

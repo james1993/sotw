@@ -1,6 +1,7 @@
 #include "ui_party.h"
 #include "entity.h"
 #include "world.h"
+#include "ui_compass.h"
 #include "raylib.h"
 #include "ui_font.h"
 #include <stdio.h>
@@ -55,12 +56,11 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     int panelH = pad * 2 + members * rowH;
     // GW1 uses both positions: the in-mission party health list sits
     // top-LEFT, while the outpost party-formation window (the one you
-    // hire and dismiss from) opens on the RIGHT. Our panel plays both
-    // roles, so it follows the mode.
-    int x = (World_GetMode() == MODE_OUTPOST)
-        ? screenWidth - panelW - (int)(14 * scale)
-        : (int)(14 * scale);
-    int y = (int)(80 * scale);
+    // hire and dismiss from) opens on the RIGHT - stacked below the
+    // compass, which owns the top-right corner.
+    bool outpost = (World_GetMode() == MODE_OUTPOST);
+    int x = outpost ? screenWidth - panelW - (int)(14 * scale) : (int)(14 * scale);
+    int y = outpost ? (int)UI_CompassBottom(screenHeight) + (int)(24 * scale) : (int)(80 * scale);
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
 
     DrawRectangle(x, y, panelW, panelH, (Color){ 20, 22, 30, 210 });

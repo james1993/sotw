@@ -78,6 +78,21 @@ static const EnvProp g_envProps[] = {
     { { 320, -20 }, PROP_GRASS, 1.0f },
     { { -20, 220 }, PROP_GRASS, 0.9f },
     { { 220, -160 }, PROP_GRASS, 1.0f },
+    // Eastern reaches of the expanded plains.
+    { { 620, -420 }, PROP_TREE, 1.1f },
+    { { 980, -400 }, PROP_TREE, 0.9f },
+    { { 1180, -160 }, PROP_TREE, 1.2f },
+    { { 1240, 240 }, PROP_TREE, 1.0f },
+    { { 760, 430 }, PROP_TREE, 1.1f },
+    { { 1050, 60 }, PROP_ROCK, 1.1f },
+    { { 640, 200 }, PROP_ROCK, 0.9f },
+    { { 880, -60 }, PROP_ROCK, 0.8f },
+    { { 1300, -60 }, PROP_ROCK, 1.0f },
+    { { 720, -120 }, PROP_GRASS, 1.0f },
+    { { 1000, 180 }, PROP_GRASS, 1.1f },
+    { { 1150, -280 }, PROP_GRASS, 0.9f },
+    { { 560, 60 }, PROP_GRASS, 1.0f },
+    { { 1330, 150 }, PROP_GRASS, 1.0f },
 };
 #define ENV_PROP_COUNT (int)(sizeof(g_envProps) / sizeof(g_envProps[0]))
 

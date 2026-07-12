@@ -92,11 +92,43 @@ static void UpdateHero(int index) {
 // entered notices you, and an overextended pull can be broken off by
 // retreating past the leash. See docs/research/gw1-mechanics.md #7 and
 // docs/design/demake-design.md #2 (aggro bubble).
+static int FindFoeInAggroRange(const Entity *self) {
+    int best = -1;
+    float bestDist = 1e9f;
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *other = &g_entities[i];
+        if (!other->alive || other->team == self->team) continue;
+        float d = Dist(self->pos, other->pos);
+        if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return (best >= 0 && bestDist <= self->aggroRange) ? best : -1;
+}
+
 static void UpdateMonster(int index) {
     Entity *self = &g_entities[index];
     if (!self->alive || Entity_IsCasting(self)) return;
 
     if (!self->aggroed) {
+        if (self->hasPatrol) {
+            // Patrols scan for foes the whole way along their route -
+            // that's the interception threat: linger near their path
+            // mid-fight and they'll walk into aggro range and join in.
+            int foe = FindFoeInAggroRange(self);
+            if (foe >= 0) {
+                self->aggroed = true;
+                self->targetIndex = foe;
+                return;
+            }
+            Vector2 wp = (self->patrolDir >= 0) ? self->patrolB : self->patrolA;
+            if (Dist(self->pos, wp) < 10.0f) {
+                self->patrolDir = -self->patrolDir;
+            } else if (!self->hasMoveTarget) {
+                self->moveTarget = wp;
+                self->hasMoveTarget = true;
+            }
+            return;
+        }
+
         float distHome = Dist(self->pos, self->spawnPos);
         if (distHome > 4.0f) return; // still walking home - Combat_UpdateEntity is moving us
 
@@ -109,17 +141,10 @@ static void UpdateMonster(int index) {
             for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) self->effects[i].active = false;
         }
 
-        int best = -1;
-        float bestDist = 1e9f;
-        for (int i = 0; i < g_entityCount; i++) {
-            Entity *other = &g_entities[i];
-            if (!other->alive || other->team == self->team) continue;
-            float d = Dist(self->pos, other->pos);
-            if (d < bestDist) { bestDist = d; best = i; }
-        }
-        if (best >= 0 && bestDist <= self->aggroRange) {
+        int foe = FindFoeInAggroRange(self);
+        if (foe >= 0) {
             self->aggroed = true;
-            self->targetIndex = best;
+            self->targetIndex = foe;
         }
         return;
     }
@@ -129,7 +154,18 @@ static void UpdateMonster(int index) {
     if (giveUp) {
         self->aggroed = false;
         self->targetIndex = -1;
-        self->moveTarget = self->spawnPos;
+        if (self->hasPatrol) {
+            // Patrollers reset on the spot and resume the route from the
+            // nearest waypoint (GW1 leash-regen, condensed).
+            self->hp = self->maxHp;
+            self->energy = self->maxEnergy;
+            self->adrenaline = 0;
+            for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) self->effects[i].active = false;
+            self->patrolDir = (Dist(self->pos, self->patrolB) < Dist(self->pos, self->patrolA)) ? +1 : -1;
+            self->moveTarget = (self->patrolDir >= 0) ? self->patrolB : self->patrolA;
+        } else {
+            self->moveTarget = self->spawnPos;
+        }
         self->hasMoveTarget = true;
         return;
     }

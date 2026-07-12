@@ -11,6 +11,7 @@
 #include "ui_skillbar.h"
 #include "ui_target.h"
 #include "ui_party.h"
+#include "ui_compass.h"
 #include "ui_panels.h"
 #include "ui_font.h"
 #include "render.h"
@@ -88,6 +89,7 @@ int main(void) {
 
         UI_DrawSkillBar(screenWidth, screenHeight);
         UI_DrawResourceBars(screenWidth, screenHeight);
+        UI_DrawCompass(screenWidth, screenHeight);
         UI_DrawPartyPanel(screenWidth, screenHeight);
         UI_DrawTargetPanel(screenWidth, screenHeight, 50);
         Quests_DrawTracker(screenWidth, screenHeight);
