@@ -14,4 +14,9 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight);
 // merchant, henchman). Closed by Escape or walking away.
 void UI_OpenNpcDialog(int entityIndex);
 
+// True while an NPC dialog is on screen. input.c uses this so the
+// gamepad talk button (X/Square) opens conversations when none is up
+// but advances the current one instead of re-opening it.
+bool UI_IsNpcDialogOpen(void);
+
 #endif

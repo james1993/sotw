@@ -11,6 +11,9 @@
 #define GAMEPAD_ID 0
 #define STICK_DEADZONE 0.25f
 #define TRIGGER_AXIS_THRESHOLD 0.3f
+// How close you must be for a talk action (click or the X/Square
+// button) to open an NPC's dialog rather than walk toward them.
+#define NPC_TALK_DISTANCE 90.0f
 
 // True while the player's most recent input came from the gamepad. In
 // gamepad mode the game auto-targets the nearest foe in attack range
@@ -139,6 +142,33 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             player->targetRef = Entity_NoRef();
             g_manualGamepadTarget = false;
             g_gamepadMode = true;
+        } else if (face == 2) {
+            // Bare X (Xbox) / Square (PS): talk to the nearest NPC - the
+            // controller equivalent of clicking one. In range the dialog
+            // opens; farther away the press walks you over (press again
+            // on arrival), the same two-step as the mouse. While a
+            // dialog is already open this is a no-op here: ui_panels.c
+            // treats the same button as "advance the conversation".
+            if (!UI_IsNpcDialogOpen()) {
+                int best = -1;
+                float bestDist = 1e9f;
+                for (int i = 0; i < g_entityCount; i++) {
+                    Entity *e = &g_entities[i];
+                    if (!e->alive || e->kind != ENT_NPC) continue;
+                    float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
+                    float d = sqrtf(dx * dx + dy * dy);
+                    if (d < bestDist) { bestDist = d; best = i; }
+                }
+                if (best >= 0) {
+                    if (bestDist <= NPC_TALK_DISTANCE) {
+                        UI_OpenNpcDialog(best);
+                    } else {
+                        player->moveTarget = g_entities[best].pos;
+                        player->hasMoveTarget = true;
+                    }
+                }
+            }
+            g_gamepadMode = true;
         }
     }
 
@@ -256,7 +286,7 @@ void Input_Update(Camera2D *camera, float dt) {
             // them (click again on arrival to open the conversation).
             Entity *npc = &g_entities[clickedEntity];
             float dx = npc->pos.x - player->pos.x, dy = npc->pos.y - player->pos.y;
-            if (sqrtf(dx * dx + dy * dy) <= 90.0f) {
+            if (sqrtf(dx * dx + dy * dy) <= NPC_TALK_DISTANCE) {
                 UI_OpenNpcDialog(clickedEntity);
             } else {
                 player->moveTarget = npc->pos;

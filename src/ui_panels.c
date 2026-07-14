@@ -31,9 +31,19 @@ static const ShopEntry g_shopStock[] = {
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
 
+// Set on the frame a dialog opens so the very same X/Square press that
+// opened it can't also "click" its button (input runs before drawing,
+// IsGamepadButtonPressed stays true for the whole frame).
+static bool g_dialogOpenedThisFrame = false;
+
 void UI_OpenNpcDialog(int entityIndex) {
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
+    g_dialogOpenedThisFrame = true;
+}
+
+bool UI_IsNpcDialogOpen(void) {
+    return g_dialogNpc >= 0;
 }
 
 static void DrawInventory(Entity *player, int screenHeight) {
@@ -162,7 +172,16 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
     }
 }
 
-// One clickable dialog button; returns true when clicked this frame.
+// The gamepad talk button doubles as "advance the conversation" while
+// a dialog is up - suppressed on the frame the dialog opened so one
+// press can't both open and confirm.
+static bool GamepadDialogConfirm(void) {
+    return !g_dialogOpenedThisFrame && IsGamepadAvailable(0) &&
+           IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+}
+
+// One clickable dialog button; returns true when clicked this frame
+// (or, for the dialog's single action button, confirmed on the pad).
 static bool DialogButton(Rectangle rect, const char *label, int font, bool enabled) {
     Vector2 mouse = GetMousePosition();
     bool hovered = enabled && CheckCollisionPointRec(mouse, rect);
@@ -171,6 +190,7 @@ static bool DialogButton(Rectangle rect, const char *label, int font, bool enabl
     DrawRectangleLinesEx(rect, 1, LIGHTGRAY);
     UIText(label, (int)rect.x + 8, (int)rect.y + ((int)rect.height - font) / 2, font,
            enabled ? RAYWHITE : GRAY);
+    if (enabled && GamepadDialogConfirm()) return true;
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
@@ -351,4 +371,8 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
+
+    // The open-frame guard only needs to cover the frame the dialog
+    // appeared; from the next frame on the pad button confirms.
+    g_dialogOpenedThisFrame = false;
 }

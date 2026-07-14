@@ -79,7 +79,10 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   **L1/R1** cycle backward/forward through visible enemies (nearest
   first). **D-pad up/down** selects party members and **left/right**
   also cycles enemies, matching GW1's official gamepad scheme; bare
-  **B** clears the target.
+  **B** clears the target. Bare **X** (Xbox) / **Square** (PlayStation)
+  talks: it walks you to the nearest NPC, opens their dialog in reach,
+  and advances the conversation (accept quest, hire, browse) once a
+  dialog is up.
 
 ### Zones
 
