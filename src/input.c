@@ -56,14 +56,25 @@ static void CyclePartyTarget(Entity *player, int direction) {
     g_manualGamepadTarget = true;
 }
 
-// D-pad left/right: cycle living foes, nearest first.
-static void CycleFoeTarget(Entity *player, int direction) {
+// True when the entity is inside the current view - GW1's target
+// cycling only walks foes you can actually see, and so does ours.
+static bool OnScreen(const Entity *e, const Camera2D *camera) {
+    Vector2 p = GetWorldToScreen2D(e->pos, *camera);
+    float pad = e->radius * camera->zoom + 8.0f;
+    return p.x >= -pad && p.x <= (float)GetScreenWidth() + pad &&
+           p.y >= -pad && p.y <= (float)GetScreenHeight() + pad;
+}
+
+// L1/R1 (and D-pad left/right, and C/Tab): cycle living, VISIBLE foes,
+// nearest first.
+static void CycleFoeTarget(Entity *player, int direction, const Camera2D *camera) {
     int foes[MAX_ENTITIES];
     float dists[MAX_ENTITIES];
     int count = 0;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (!e->alive || e->team == player->team) continue;
+        if (!OnScreen(e, camera)) continue;
         float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
         foes[count] = i;
         dists[count] = dx * dx + dy * dy;
@@ -86,7 +97,7 @@ static void CycleFoeTarget(Entity *player, int direction) {
     g_manualGamepadTarget = true;
 }
 
-static void UpdateGamepad(Entity *player, float dt) {
+static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     if (!IsGamepadAvailable(GAMEPAD_ID)) return;
 
     // --- Left stick: direct movement (not click-to-move) ---
@@ -131,6 +142,17 @@ static void UpdateGamepad(Entity *player, float dt) {
         }
     }
 
+    // --- Shoulder buttons: cycle visible enemies, L1 backward and R1
+    // forward through the nearest-first order. ---
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_TRIGGER_1)) {
+        CycleFoeTarget(player, -1, camera);
+        g_gamepadMode = true;
+    }
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) {
+        CycleFoeTarget(player, +1, camera);
+        g_gamepadMode = true;
+    }
+
     // --- D-pad targeting, matching GW1's official gamepad scheme:
     // up/down selects party members, left/right cycles enemies. ---
     if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_UP)) {
@@ -142,11 +164,11 @@ static void UpdateGamepad(Entity *player, float dt) {
         g_gamepadMode = true;
     }
     if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) {
-        CycleFoeTarget(player, -1);
+        CycleFoeTarget(player, -1, camera);
         g_gamepadMode = true;
     }
     if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) {
-        CycleFoeTarget(player, +1);
+        CycleFoeTarget(player, +1, camera);
         g_gamepadMode = true;
     }
 
@@ -266,12 +288,12 @@ void Input_Update(Camera2D *camera, float dt) {
         g_manualGamepadTarget = false;
         EntityRef save = player->targetRef;
         player->targetRef = Entity_NoRef(); // force "nearest" rather than "next"
-        CycleFoeTarget(player, +1);
+        CycleFoeTarget(player, +1, camera);
         if (Entity_RefIndex(player->targetRef) < 0) player->targetRef = save;
         g_manualGamepadTarget = false;
     }
     if (IsKeyPressed(KEY_TAB)) {
-        CycleFoeTarget(player, +1);
+        CycleFoeTarget(player, +1, camera);
         g_manualGamepadTarget = false;
     }
 
@@ -282,5 +304,5 @@ void Input_Update(Camera2D *camera, float dt) {
         }
     }
 
-    UpdateGamepad(player, dt);
+    UpdateGamepad(player, dt, camera);
 }

@@ -33,6 +33,9 @@ typedef struct {
     float aggro;
     int strengthRank;
     bool withHowl;    // monsters: carry Feral Howl, the interruptible self-heal
+    int group;        // monsters: spawn group id, 0 = ungrouped. Groups
+                      // aggro as one (pull any member, all join) and are
+                      // kept to at most 4 members so pulls stay winnable.
     NpcRole npcRole;  // NPCs only
     Color npcColor;   // NPCs only
 } SpawnDef;
@@ -130,30 +133,32 @@ static const EnvProp g_plainsProps[] = {
 static const SpawnDef g_plainsSpawns[] = {
     // Camp 1, near the entrance - the first pull.
     { .kind = SPAWN_MONSTER, .name = "Charr Brute", .pos = { 300, 40 },
-      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true },
+      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true, .group = 1 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 380, -50 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 1 },
 
     // Camp 2, northeast.
     { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 820, -300 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 760, -220 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 900, -230 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 2 },
 
     // Camp 3, southeast.
     { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 900, 320 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .group = 3 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 830, 250 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 3 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 980, 260 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 3 },
 
-    // Patrols. The north-south sweep crosses the corridor between camp 1
-    // and the eastern camps; the east-west prowler covers the road to the
-    // ridge. Aggro capped at AGGRO_RING_RADIUS so the drawn bubble never
-    // under-promises what a patrol can notice.
+    // Patrols hunt alone (no .group): their interception threat comes
+    // from timing, not numbers. The north-south sweep crosses the
+    // corridor between camp 1 and the eastern camps; the east-west
+    // prowler covers the road to the ridge. Aggro capped at
+    // AGGRO_RING_RADIUS so the drawn bubble never under-promises what a
+    // patrol can notice.
     { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Patrol",
       .pos = { 560, -320 }, .posB = { 560, 320 },
       .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7 },
@@ -337,6 +342,7 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->aggroRange = def->aggro;
     m->leashRange = def->aggro * 2.5f;
     m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
+    m->groupId = def->group;
     if (def->withHowl) {
         m->skillBar[0] = SK_FERAL_HOWL; // self-heal - interrupt it!
         m->skillBar[1] = SK_CLAW_SWIPE;

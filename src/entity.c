@@ -89,6 +89,23 @@ void Entity_MarkInCombat(Entity *e) {
     e->timeSinceCombat = 0.0f;
 }
 
+void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe) {
+    if (!monster || monster->kind != ENT_MONSTER || !monster->alive) return;
+    if (!monster->aggroed) {
+        monster->aggroed = true;
+        monster->targetRef = foe;
+    }
+    if (monster->groupId <= 0) return;
+
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (e == monster || !e->alive || e->kind != ENT_MONSTER) continue;
+        if (e->groupId != monster->groupId || e->aggroed) continue;
+        e->aggroed = true;
+        e->targetRef = foe;
+    }
+}
+
 void Entity_RecomputePenalizedStats(Entity *e) {
     e->maxHp = e->baseMaxHp * (100 - e->deathPenalty) / 100;
     e->maxEnergy = e->baseMaxEnergy * (100 - e->deathPenalty) / 100;

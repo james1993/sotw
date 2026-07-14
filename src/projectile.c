@@ -54,9 +54,9 @@ static void Impact(Projectile *p) {
         shooter->adrenaline += 4; // landed hits build adrenaline, as in melee
         if (shooter->adrenaline > 100) shooter->adrenaline = 100;
         if (target->kind == ENT_MONSTER && !target->aggroed) {
-            // A landed ranged hit wakes a sleeping monster - the wand pull.
-            target->aggroed = true;
-            target->targetRef = p->shooterRef;
+            // A landed ranged hit wakes a sleeping monster - the wand
+            // pull - and its whole group answers, GW1-style.
+            Entity_WakeMonsterGroup(target, p->shooterRef);
         }
     }
 }

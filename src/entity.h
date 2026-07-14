@@ -138,6 +138,10 @@ typedef struct Entity {
     float aggroRange;
     float leashRange;
     bool aggroed;
+    // Spawn group (monsters): > 0 links campmates together so they
+    // aggro as one - pull any member and the whole group joins, like a
+    // GW1 mob group. 0 = ungrouped (patrols hunt alone).
+    int groupId;
 
     // Patrol route: monsters with hasPatrol ping-pong between patrolA
     // and patrolB while idle, scanning for foes the whole way - the
@@ -174,6 +178,14 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker);
 // GW1 resource with its own pips, but the in/out-of-combat regen split
 // is a faithful simplification of the same idea).
 void Entity_MarkInCombat(Entity *e);
+
+// Wakes a sleeping monster onto a foe and, when it belongs to a spawn
+// group, wakes every groupmate onto the same foe - GW1 mobs aggro as a
+// group: pull one and its campmates all come. This is THE aggro entry
+// point; every path that used to flip `aggroed` directly (proximity
+// scan, melee hit, spell damage, projectile impact) goes through here
+// so no path can forget the group.
+void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe);
 
 // Recomputes penalized maxHp/maxEnergy from base stats and the current
 // death penalty. Call after changing baseMax*, deathPenalty, or both.

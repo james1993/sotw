@@ -76,9 +76,10 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Scroll wheel** zooms.
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
-  **D-pad up/down** selects party members and **left/right** cycles
-  enemies, matching GW1's official gamepad scheme; bare **B** clears
-  the target.
+  **L1/R1** cycle backward/forward through visible enemies (nearest
+  first). **D-pad up/down** selects party members and **left/right**
+  also cycles enemies, matching GW1's official gamepad scheme; bare
+  **B** clears the target.
 
 ### Zones
 
@@ -87,6 +88,11 @@ service NPCs (quest giver, merchant, hireable henchman), and a portal to
 **Ashford Plains** — a combat instance that reloads fresh on every
 entry, exactly like GW1's per-party explorable areas. Returning to the
 outpost fully restores the party.
+
+Charr camp out in small **groups** (never more than four) that share
+aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
+spell — and the whole camp answers. Patrols hunt alone; their threat is
+walking into your fight at the wrong moment.
 
 Captain Osric's quests chain GW1-style: finish *Charr at the Gate*
 (kill quest) and he offers *Scout the Eastern Ridge* (reach the green

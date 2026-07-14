@@ -116,8 +116,7 @@ static void UpdateMonster(int index) {
             // mid-fight and they'll walk into aggro range and join in.
             int foe = FindFoeInAggroRange(self);
             if (foe >= 0) {
-                self->aggroed = true;
-                self->targetRef = Entity_RefOf(foe);
+                Entity_WakeMonsterGroup(self, Entity_RefOf(foe));
                 return;
             }
             Vector2 wp = (self->patrolDir >= 0) ? self->patrolB : self->patrolA;
@@ -144,8 +143,7 @@ static void UpdateMonster(int index) {
 
         int foe = FindFoeInAggroRange(self);
         if (foe >= 0) {
-            self->aggroed = true;
-            self->targetRef = Entity_RefOf(foe);
+            Entity_WakeMonsterGroup(self, Entity_RefOf(foe));
         }
         return;
     }

@@ -214,8 +214,8 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         // Landing a hit wakes a sleeping monster up regardless
                         // of its aggro range - pulling with melee still works,
                         // it just means getting close enough to swing first.
-                        target->aggroed = true;
-                        target->targetRef = Entity_RefOf((int)(e - g_entities));
+                        // Group members join in, GW1-style.
+                        Entity_WakeMonsterGroup(target, Entity_RefOf((int)(e - g_entities)));
                     }
                     e->adrenaline += 4; // basic attacks also build adrenaline in GW1
                     if (e->adrenaline > 100) e->adrenaline = 100;

@@ -19,8 +19,8 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 // A ranged pull: damaging a sleeping monster wakes it up
                 // even from outside its passive aggro range, same as
                 // GW1 - this is what lets a bow/spell pull work at all.
-                target->aggroed = true;
-                target->targetRef = Entity_RefOf((int)(caster - g_entities));
+                // Its campmates come with it (group aggro).
+                Entity_WakeMonsterGroup(target, Entity_RefOf((int)(caster - g_entities)));
             }
             break;
         }
