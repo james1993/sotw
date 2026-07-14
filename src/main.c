@@ -15,6 +15,7 @@
 #include "ui_compass.h"
 #include "ui_panels.h"
 #include "ui_hit.h"
+#include "ui_cursor.h"
 #include "ui_menu.h"
 #include "ui_font.h"
 #include "render.h"
@@ -166,6 +167,7 @@ int main(void) {
         UI_DrawTargetPanel(screenWidth, screenHeight, 50);
         Quests_DrawTracker(screenWidth, screenHeight);
         UI_PanelsUpdateAndDraw(screenWidth, screenHeight);
+        UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
 
         // Death overlay: GW1 dims the world and tells you plainly.
         if (playerNow && !playerNow->alive) {

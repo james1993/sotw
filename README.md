@@ -82,7 +82,11 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   **B** clears the target. Bare **X** (Xbox) / **Square** (PlayStation)
   talks: it walks you to the nearest NPC, opens their dialog in reach,
   and advances the conversation (accept quest, hire, browse) once a
-  dialog is up.
+  dialog is up. While a dialog or the merchant window is open, a
+  GW1-style **menu cursor** appears: the **left stick** steers it, **A**
+  clicks whatever it hovers (individual shop rows included), and **B**
+  backs out of the conversation; touching the mouse hands the pointer
+  back instantly.
 
 ### Zones
 

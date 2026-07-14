@@ -1,5 +1,6 @@
 #include "ui_panels.h"
 #include "ui_hit.h"
+#include "ui_cursor.h"
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
@@ -46,6 +47,11 @@ bool UI_IsNpcDialogOpen(void) {
     return g_dialogNpc >= 0;
 }
 
+void UI_CloseNpcDialog(void) {
+    g_dialogNpc = -1;
+    g_shopOpen = false;
+}
+
 static void DrawInventory(Entity *player, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(24 * scale);
@@ -67,8 +73,8 @@ static void DrawInventory(Entity *player, int screenHeight) {
     UIText(title, x, y, font, GOLD);
     y += font + pad;
 
-    bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    Vector2 mouse = GetMousePosition();
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
 
     for (int i = 0; i < g_inventoryCount; i++) {
         Item *it = &g_inventory[i];
@@ -124,8 +130,8 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
     UIText(title, x, y, font, GOLD);
     y += font + pad;
 
-    bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    Vector2 mouse = GetMousePosition();
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
     int btn = (int)(20 * scale);
 
     for (int a = 0; a < ATTR_COUNT; a++) {
@@ -183,7 +189,7 @@ static bool GamepadDialogConfirm(void) {
 // One clickable dialog button; returns true when clicked this frame
 // (or, for the dialog's single action button, confirmed on the pad).
 static bool DialogButton(Rectangle rect, const char *label, int font, bool enabled) {
-    Vector2 mouse = GetMousePosition();
+    Vector2 mouse = UI_PointerPos();
     bool hovered = enabled && CheckCollisionPointRec(mouse, rect);
     DrawRectangleRec(rect, !enabled ? (Color){ 40, 40, 40, 255 }
                      : hovered ? (Color){ 80, 90, 120, 255 } : (Color){ 55, 60, 80, 255 });
@@ -191,7 +197,7 @@ static bool DialogButton(Rectangle rect, const char *label, int font, bool enabl
     UIText(label, (int)rect.x + 8, (int)rect.y + ((int)rect.height - font) / 2, font,
            enabled ? RAYWHITE : GRAY);
     if (enabled && GamepadDialogConfirm()) return true;
-    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    return hovered && UI_PointerClicked();
 }
 
 static void DrawShop(int screenWidth, int screenHeight) {
@@ -215,8 +221,8 @@ static void DrawShop(int screenWidth, int screenHeight) {
     UIText(title, x, y, font, GOLD);
     y += font + pad;
 
-    bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-    Vector2 mouse = GetMousePosition();
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
 
     for (int i = 0; i < SHOP_STOCK_COUNT; i++) {
         const ShopEntry *entry = &g_shopStock[i];
@@ -365,7 +371,7 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
 
     if (IsKeyPressed(KEY_I)) g_invOpen = !g_invOpen;
     if (IsKeyPressed(KEY_K)) g_attrOpen = !g_attrOpen;
-    if (IsKeyPressed(KEY_ESCAPE)) { g_dialogNpc = -1; g_shopOpen = false; }
+    if (IsKeyPressed(KEY_ESCAPE)) UI_CloseNpcDialog();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
     if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);

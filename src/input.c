@@ -3,6 +3,7 @@
 #include "combat.h"
 #include "ui_panels.h"
 #include "ui_hit.h"
+#include "ui_cursor.h"
 #include <math.h>
 #include <stdbool.h>
 
@@ -103,11 +104,14 @@ static void CycleFoeTarget(Entity *player, int direction, const Camera2D *camera
 static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     if (!IsGamepadAvailable(GAMEPAD_ID)) return;
 
-    // --- Left stick: direct movement (not click-to-move) ---
+    // --- Left stick: direct movement (not click-to-move). While a
+    // menu cursor is up (NPC dialog open), the stick steers the cursor
+    // instead - ui_cursor.c reads it directly; we just stay out of the
+    // way so browsing a shop doesn't also walk the player around. ---
     float lx = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X);
     float ly = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_Y);
     float mag = sqrtf(lx * lx + ly * ly);
-    if (mag > STICK_DEADZONE) {
+    if (mag > STICK_DEADZONE && !UICursor_Active()) {
         if (mag > 1.0f) { lx /= mag; ly /= mag; }
         // Casting roots the caster, same as the click-to-move path.
         if (!Entity_IsCasting(player)) {
@@ -137,10 +141,15 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             Combat_ActivateSkill(PLAYER_INDEX, 4 + face, Entity_RefIndex(player->targetRef));
             g_gamepadMode = true;
         } else if (face == 1) {
-            // Bare B (no trigger): drop the current target, GW1-gamepad's
-            // escape hatch.
-            player->targetRef = Entity_NoRef();
-            g_manualGamepadTarget = false;
+            // Bare B (no trigger): back out of an open conversation,
+            // otherwise drop the current target - GW1-gamepad's escape
+            // hatch.
+            if (UI_IsNpcDialogOpen()) {
+                UI_CloseNpcDialog();
+            } else {
+                player->targetRef = Entity_NoRef();
+                g_manualGamepadTarget = false;
+            }
             g_gamepadMode = true;
         } else if (face == 2) {
             // Bare X (Xbox) / Square (PS): talk to the nearest NPC - the
@@ -246,6 +255,12 @@ void Input_Update(Camera2D *camera, float dt) {
         if (camera->zoom < MIN_CAMERA_ZOOM) camera->zoom = MIN_CAMERA_ZOOM;
         if (camera->zoom > MAX_CAMERA_ZOOM) camera->zoom = MAX_CAMERA_ZOOM;
     }
+
+    // The GW1-style menu cursor: exists while an NPC dialog is open and
+    // a pad is present; the left stick steers it (see UpdateGamepad's
+    // movement suppression) and A clicks. Updated here in the input
+    // phase so the same frame's menu drawing sees fresh pointer state.
+    UICursor_Update(dt, UI_IsNpcDialogOpen());
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player || !player->alive) return;

@@ -19,4 +19,8 @@ void UI_OpenNpcDialog(int entityIndex);
 // but advances the current one instead of re-opening it.
 bool UI_IsNpcDialogOpen(void);
 
+// Closes the dialog (and the shop under it). Escape and the gamepad's
+// B both back out of a conversation through this.
+void UI_CloseNpcDialog(void);
+
 #endif
