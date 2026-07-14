@@ -62,6 +62,15 @@ const ZonePortal *World_GetPortal(int index);
 // The current zone's decorative props, for render.c.
 const EnvProp *World_GetProps(int *count);
 
+// The last OUTPOST the player was in (the current zone when it's an
+// outpost). This is what the save system stores: loading a save "logs
+// back in" there, GW1-style - explorable instances are never saved.
+ZoneId World_GetLastOutpostId(void);
+
+// Loads straight into an outpost (save-game login). Falls back to the
+// starting camp if the id isn't an outpost.
+void World_RestoreToOutpost(ZoneId zone);
+
 // Whether Little Thom has been hired into the party (persists across
 // zone loads; GW1 henchmen stay in the party until dismissed).
 bool World_IsThomHired(void);

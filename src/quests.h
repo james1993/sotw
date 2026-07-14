@@ -52,6 +52,10 @@ int Quests_ReadyToTurnInIndex(void);
 // green "!" marker.
 bool Quests_GiverHasAttention(void);
 
+// Back to the fresh-start quest log (everything available, no kills
+// counted) - for New Game from the menu.
+void Quests_Reset(void);
+
 void Quests_Accept(int index);
 void Quests_TurnIn(struct Entity *player, int index);
 

@@ -4,6 +4,7 @@
 #include "attributes.h"
 #include "skill.h"
 #include "projectile.h"
+#include "save.h"
 #include <math.h>
 #include <string.h>
 
@@ -198,6 +199,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
 // ---------------------------------------------------------------------
 
 static const ZoneDef *g_zone = &g_zones[ZONE_ASHFORD_CAMP];
+static ZoneId g_zoneId = ZONE_ASHFORD_CAMP;
+static ZoneId g_lastOutpostId = ZONE_ASHFORD_CAMP;
 static bool g_thomHired = false;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
@@ -208,7 +211,13 @@ const char *World_GetZoneName(void) { return g_zone->name; }
 Color World_GetClearColor(void) { return g_zone->clearColor; }
 Color World_GetGridColor(void) { return g_zone->gridColor; }
 bool World_IsThomHired(void) { return g_thomHired; }
-void World_SetThomHired(bool hired) { g_thomHired = hired; }
+
+void World_SetThomHired(bool hired) {
+    g_thomHired = hired;
+    Save_Write(); // party composition is part of the saved character
+}
+
+ZoneId World_GetLastOutpostId(void) { return g_lastOutpostId; }
 
 int World_GetPortalCount(void) { return g_zone->portalCount; }
 
@@ -239,6 +248,7 @@ void World_DismissHenchman(Entity *henchman) {
     henchman->hp = henchman->maxHp;
     henchman->targetRef = Entity_NoRef();
     henchman->hasMoveTarget = false;
+    Save_Write();
 }
 
 // ---------------------------------------------------------------------
@@ -376,6 +386,8 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     ResetPlayerTransientState(player, playerEntry);
 
     g_zone = &g_zones[zoneId];
+    g_zoneId = zoneId;
+    if (g_zone->mode == MODE_OUTPOST) g_lastOutpostId = zoneId;
     g_portalCooldown = PORTAL_COOLDOWN;
     g_wipeTimer = 0.0f;
     g_autoResTimer = 0.0f;
@@ -410,11 +422,28 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
                 break;
         }
     }
+
+    // GW1 autosaves around zone transitions; so do we. (No-op until the
+    // save system is enabled, so the initial World_Init load and the
+    // save-restore load can never clobber an existing file.)
+    Save_Write();
+}
+
+void World_RestoreToOutpost(ZoneId zone) {
+    if (zone < 0 || zone >= ZONE_COUNT || g_zones[zone].mode != MODE_OUTPOST) {
+        zone = ZONE_ASHFORD_CAMP;
+    }
+    LoadZone(zone, (Vector2){ 0, 0 });
 }
 
 void World_Init(void) {
-    // The persistent player, created exactly once; every zone load
-    // carries this entity across. Monk primary / Elementalist secondary
+    // Fresh-start state, so a New Game from the menu after a previous
+    // run doesn't inherit the old party composition.
+    g_thomHired = false;
+    g_lastOutpostId = ZONE_ASHFORD_CAMP;
+
+    // The persistent player; every zone load carries this entity
+    // across. Monk primary / Elementalist secondary
     // (docs/research/gw1-mechanics.md #4).
     int playerIdx = Entity_Spawn(ENT_PLAYER, "Player (Mo/E)", 0, (Vector2){ 0, 0 }, (Color){ 220, 200, 120, 255 });
     Entity *player = Entity_Get(playerIdx);

@@ -102,6 +102,18 @@ wipes, everyone respawns at the zone's resurrection shrine, penalty
 intact. Hired henchmen can be dismissed from the party window — in the
 outpost only, GW1's rule for party changes.
 
+### Saving
+
+The game saves like GW1: the **character** persists, the world doesn't.
+Level, XP, attributes, skill bar, gold, inventory, equipment, quest log,
+and party composition are autosaved on zone transitions, quest changes,
+hiring/dismissing, and quit - there is no save button. Loading (the
+menu's *Continue*) logs you back in at the last outpost you visited,
+party restored; explorable instances are never saved, so re-entering
+one always spawns it fresh. One slot, plain text, at
+`$XDG_DATA_HOME/sotw-demake/save.txt` (Linux, default
+`~/.local/share/...`) or `%APPDATA%\sotw-demake\save.txt` (Windows).
+
 ### What's deliberately not built yet
 
 Only two professions' worth of sample skills (see `src/skill.c`), one
@@ -126,5 +138,3 @@ validated foundation, not a rewrite.
   (left stick move, L2/R2 + face buttons for skills, D-pad targeting)
   follows raylib's XInput-style layout; DirectInput pads that report
   triggers or the D-pad differently may need remapping.
-- **No save/load.** Progression (level, gold, inventory, quest states)
-  lives in memory only and resets when the game exits.

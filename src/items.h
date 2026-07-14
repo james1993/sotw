@@ -43,6 +43,11 @@ extern int g_equippedArmor;
 
 extern GroundDrop g_drops[MAX_DROPS];
 
+// Wipes inventory, gold, equipment, and ground drops - the fresh-start
+// state a New Game (or a save load about to re-fill the inventory)
+// begins from.
+void Items_Reset(void);
+
 // Adds to inventory; returns false if full.
 bool Items_AddToInventory(Item item);
 

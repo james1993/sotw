@@ -29,6 +29,14 @@ static const Item g_armorTable[] = {
 };
 #define ARMOR_TABLE_COUNT (int)(sizeof(g_armorTable) / sizeof(g_armorTable[0]))
 
+void Items_Reset(void) {
+    g_inventoryCount = 0;
+    g_gold = 0;
+    g_equippedWeapon = -1;
+    g_equippedArmor = -1;
+    memset(g_drops, 0, sizeof(g_drops));
+}
+
 bool Items_AddToInventory(Item item) {
     if (g_inventoryCount >= MAX_INVENTORY) return false;
     g_inventory[g_inventoryCount++] = item;

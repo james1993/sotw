@@ -8,16 +8,41 @@
 #include "projectile.h"
 #include "world.h"
 #include "quests.h"
+#include "save.h"
 #include "ui_skillbar.h"
 #include "ui_target.h"
 #include "ui_party.h"
 #include "ui_compass.h"
 #include "ui_panels.h"
 #include "ui_hit.h"
+#include "ui_menu.h"
 #include "ui_font.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
+
+typedef enum {
+    APP_MENU,
+    APP_PLAYING
+} AppState;
+
+// Fresh-start (or save-restored) world. Reset order matters: globals
+// first, then World_Init hands out the starting kit, then a save (if
+// requested) replaces that kit and logs in at the last outpost.
+// Autosaving only turns on once the state on disk can't be clobbered
+// by defaults.
+static void StartGame(bool loadSave, Camera2D *camera) {
+    Items_Reset();
+    Quests_Reset();
+    g_entityCount = 0; // generation counters keep climbing, killing stale refs
+
+    World_Init();
+    if (loadSave) Save_LoadAndApply();
+    Save_Enable();
+
+    Entity *player = Entity_Get(PLAYER_INDEX);
+    if (player) camera->target = player->pos;
+}
 
 int main(void) {
     // Deliberately NOT using FLAG_WINDOW_HIGHDPI: on displays with OS-level
@@ -46,11 +71,11 @@ int main(void) {
 
     UIFont_Init();
     SkillDB_Init();
-    World_Init(); // creates the player and loads Ashford Camp
+
+    AppState app = APP_MENU;
 
     Camera2D camera = { 0 };
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
-    camera.target = Entity_Get(PLAYER_INDEX)->pos;
     // Default zoom scales with window width so the starting area fills a
     // comfortable fraction of the window on any resolution.
     camera.zoom = GetScreenWidth() / 700.0f;
@@ -58,7 +83,9 @@ int main(void) {
     if (camera.zoom > MAX_CAMERA_ZOOM) camera.zoom = MAX_CAMERA_ZOOM;
     int lastScreenWidth = GetScreenWidth();
 
-    while (!WindowShouldClose()) {
+    bool quitRequested = false;
+
+    while (!WindowShouldClose() && !quitRequested) {
         float dt = GetFrameTime();
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
@@ -80,6 +107,26 @@ int main(void) {
         // a different monitor) doesn't leave the camera offset stale.
         camera.offset = (Vector2){ screenWidth / 2.0f, screenHeight / 2.0f };
 
+        // --- Main menu: the world doesn't exist until a choice is made ---
+        if (app == APP_MENU) {
+            BeginDrawing();
+            ClearBackground((Color){ 16, 15, 18, 255 });
+            MenuAction action = UI_DrawMainMenu(screenWidth, screenHeight, Save_Exists());
+            EndDrawing();
+
+            if (action == MENU_QUIT) {
+                quitRequested = true;
+            } else if (action == MENU_NEW_GAME) {
+                StartGame(false, &camera);
+                app = APP_PLAYING;
+            } else if (action == MENU_CONTINUE) {
+                StartGame(true, &camera);
+                app = APP_PLAYING;
+            }
+            continue;
+        }
+
+        // --- In-game frame ---
         Input_Update(&camera, dt);
         AI_Update(dt);
         Combat_TickTimers(dt);
@@ -142,6 +189,10 @@ int main(void) {
 
         EndDrawing();
     }
+
+    // Final autosave on the way out (no-op if the menu never started a
+    // game) - quitting from the X button loses nothing, like GW1.
+    Save_Write();
 
     CloseWindow();
     return 0;

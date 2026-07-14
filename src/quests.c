@@ -7,6 +7,7 @@
 #include "ui_compass.h"
 #include "ui_hit.h"
 #include "ui_font.h"
+#include "save.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -61,10 +62,18 @@ bool Quests_GiverHasAttention(void) {
     return Quests_OfferableIndex() >= 0 || Quests_ReadyToTurnInIndex() >= 0;
 }
 
+void Quests_Reset(void) {
+    for (int i = 0; i < QUEST_COUNT; i++) {
+        g_quests[i].state = QUEST_AVAILABLE;
+        g_quests[i].kills = 0;
+    }
+}
+
 void Quests_Accept(int index) {
     if (index < 0 || index >= QUEST_COUNT) return;
     if (g_quests[index].state == QUEST_AVAILABLE && PrereqMet(index)) {
         g_quests[index].state = QUEST_ACTIVE;
+        Save_Write(); // the quest log is part of the saved character
     }
 }
 
@@ -74,6 +83,7 @@ void Quests_TurnIn(Entity *player, int index) {
     g_quests[index].state = QUEST_DONE;
     Progression_AwardXP(player, g_quests[index].rewardXP);
     g_gold += g_quests[index].rewardGold;
+    Save_Write();
 }
 
 void Quests_NotifyMonsterKill(const Entity *victim) {
