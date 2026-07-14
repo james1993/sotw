@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "skill.h"
 #include "combat.h"
+#include "world.h"
 #include <math.h>
 
 #define PLAYER_INDEX 0
@@ -59,6 +60,11 @@ static int FindHeroEngageTarget(const Entity *self, const Entity *player) {
 static void UpdateHero(int index) {
     Entity *self = &g_entities[index];
     if (!self->alive || Entity_IsCasting(self)) return;
+
+    // In outposts party members stand at their spots instead of
+    // trailing the player around town - GW1's heroes and henchmen wait
+    // near the gate until you actually leave.
+    if (World_GetMode() == MODE_OUTPOST) return;
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     int foe = FindHeroEngageTarget(self, player);

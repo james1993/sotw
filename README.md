@@ -86,7 +86,9 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   GW1-style **menu cursor** appears: the **left stick** steers it, **A**
   clicks whatever it hovers (individual shop rows included), and **B**
   backs out of the conversation; touching the mouse hands the pointer
-  back instantly.
+  back instantly. The main menu is fully pad-navigable too: **D-pad**
+  or **left stick** moves the highlight, **A** confirms (Up/Down + Enter
+  on keyboard).
 
 ### Zones
 
@@ -94,7 +96,9 @@ The game starts in **Ashford Camp**, a GW1-style outpost: no combat,
 service NPCs (quest giver, merchant, hireable henchman), and a portal to
 **Ashford Plains** — a combat instance that reloads fresh on every
 entry, exactly like GW1's per-party explorable areas. Returning to the
-outpost fully restores the party.
+outpost fully restores the party, and party members wait near the gate
+while you wander the outpost instead of trailing you around town -
+they only fall in behind you out in the field.
 
 Charr camp out in small **groups** (never more than four) that share
 aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a

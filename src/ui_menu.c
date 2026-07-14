@@ -1,17 +1,27 @@
 #include "ui_menu.h"
 #include "ui_font.h"
 #include "raylib.h"
+#include <math.h>
 
-static bool MenuButton(Rectangle r, const char *label, int font, bool isDefault) {
+#define GAMEPAD_ID 0
+#define MENU_STICK_THRESHOLD 0.5f
+
+// Which entry is highlighted. Driven by D-pad/left stick/arrow keys;
+// mouse hover moves it too (only on actual mouse motion, so a parked
+// pointer doesn't pin the highlight and fight the pad).
+static int g_selected = 0;
+static bool g_stickLatched = false;
+static Vector2 g_lastMouse;
+
+static bool MenuButton(Rectangle r, const char *label, int font, bool selected) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, r);
 
-    Color bg = hovered ? (Color){ 80, 90, 120, 255 }
-             : isDefault ? (Color){ 58, 66, 92, 255 }
-                         : (Color){ 45, 50, 70, 255 };
+    Color bg = (hovered || selected) ? (Color){ 80, 90, 120, 255 }
+                                     : (Color){ 45, 50, 70, 255 };
     DrawRectangleRec(r, bg);
-    DrawRectangleLinesEx(r, 2, hovered ? (Color){ 200, 200, 215, 255 }
-                                       : (Color){ 130, 130, 150, 255 });
+    DrawRectangleLinesEx(r, 2, selected ? (Color){ 210, 195, 150, 255 }
+                                        : (Color){ 130, 130, 150, 255 });
 
     int tw = UITextWidth(label, font);
     UIText(label, (int)(r.x + (r.width - tw) / 2),
@@ -39,6 +49,34 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
                subFont, LIGHTGRAY);
     }
 
+    // The entry list depends on whether a save exists.
+    const char *labels[3];
+    MenuAction actions[3];
+    int count = 0;
+    if (hasSave) { labels[count] = "Continue"; actions[count++] = MENU_CONTINUE; }
+    labels[count] = "New Game"; actions[count++] = MENU_NEW_GAME;
+    labels[count] = "Quit";     actions[count++] = MENU_QUIT;
+
+    // --- Selection movement: D-pad / left stick / arrow keys / W-S ---
+    int nav = 0;
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) nav++;
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) nav--;
+    if (IsGamepadAvailable(GAMEPAD_ID)) {
+        if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_DOWN)) nav++;
+        if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_UP)) nav--;
+        // Stick with a latch: one step per push, re-armed at center.
+        float ly = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_Y);
+        if (fabsf(ly) < MENU_STICK_THRESHOLD) {
+            g_stickLatched = false;
+        } else if (!g_stickLatched) {
+            nav += (ly > 0.0f) ? 1 : -1;
+            g_stickLatched = true;
+        }
+    }
+    if (g_selected >= count) g_selected = count - 1;
+    g_selected = (g_selected + nav + count) % count;
+
+    // --- Buttons ---
     int btnW = (int)(280 * scale);
     int btnH = (int)(48 * scale);
     int gap = (int)(16 * scale);
@@ -46,37 +84,27 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     int x = (screenWidth - btnW) / 2;
     int y = (int)(screenHeight * 0.45f);
 
-    MenuAction defaultAction = hasSave ? MENU_CONTINUE : MENU_NEW_GAME;
-    MenuAction result = MENU_NONE;
+    Vector2 mouse = GetMousePosition();
+    bool mouseMoved = (mouse.x != g_lastMouse.x || mouse.y != g_lastMouse.y);
+    g_lastMouse = mouse;
 
-    if (hasSave) {
-        if (MenuButton((Rectangle){ (float)x, (float)y, (float)btnW, (float)btnH },
-                       "Continue", font, defaultAction == MENU_CONTINUE)) {
-            result = MENU_CONTINUE;
-        }
+    MenuAction result = MENU_NONE;
+    for (int i = 0; i < count; i++) {
+        Rectangle r = { (float)x, (float)y, (float)btnW, (float)btnH };
+        if (mouseMoved && CheckCollisionPointRec(mouse, r)) g_selected = i;
+        if (MenuButton(r, labels[i], font, i == g_selected)) result = actions[i];
         y += btnH + gap;
     }
 
-    if (MenuButton((Rectangle){ (float)x, (float)y, (float)btnW, (float)btnH },
-                   "New Game", font, defaultAction == MENU_NEW_GAME)) {
-        result = MENU_NEW_GAME;
-    }
-    y += btnH + gap;
-
-    if (MenuButton((Rectangle){ (float)x, (float)y, (float)btnW, (float)btnH },
-                   "Quit", font, false)) {
-        result = MENU_QUIT;
-    }
-    y += btnH + gap;
-
-    // Enter / gamepad A takes the default path.
+    // Enter / gamepad A confirm the highlighted entry.
     if (result == MENU_NONE &&
         (IsKeyPressed(KEY_ENTER) ||
-         (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)))) {
-        result = defaultAction;
+         (IsGamepadAvailable(GAMEPAD_ID) &&
+          IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)))) {
+        result = actions[g_selected];
     }
 
-    const char *hint = hasSave ? "Enter: continue your journey" : "Enter: begin";
+    const char *hint = "Up/Down or D-pad selects - Enter or (A) confirms";
     int hintFont = (int)(11 * scale);
     int hw = UITextWidth(hint, hintFont);
     UIText(hint, (screenWidth - hw) / 2, y + (int)(6 * scale), hintFont, GRAY);
