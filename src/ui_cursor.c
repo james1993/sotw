@@ -65,11 +65,23 @@ bool UI_PointerClicked(void) {
 
 void UICursor_Draw(int screenHeight) {
     if (!g_active || !g_padDrives) return;
-    float s = UI_Scale(screenHeight);
-    // A pointer arrow: tip at the hotspot, tail down-right.
+    // Big and loud on purpose: a gold arrow with a dark drop shadow and
+    // a black rim, so it stays findable over any menu at any window
+    // size - the small white arrow was easy to lose.
+    float s = UI_Scale(screenHeight) * 1.7f;
     Vector2 tip = g_pos;
     Vector2 flank = { g_pos.x + 12.0f * s, g_pos.y + 12.0f * s };
     Vector2 tail = { g_pos.x, g_pos.y + 17.0f * s };
-    DrawTriangle(tip, flank, tail, RAYWHITE);
+
+    Vector2 off = { 3.0f, 3.0f };
+    DrawTriangle((Vector2){ tip.x + off.x, tip.y + off.y },
+                 (Vector2){ flank.x + off.x, flank.y + off.y },
+                 (Vector2){ tail.x + off.x, tail.y + off.y },
+                 (Color){ 0, 0, 0, 140 });
+
+    DrawTriangle(tip, flank, tail, (Color){ 255, 210, 90, 255 });
     DrawTriangleLines(tip, flank, tail, BLACK);
+    // Inner notch gives it a highlight so it still pops on gold-ish UI.
+    Vector2 core = { g_pos.x + 3.0f * s, g_pos.y + 4.0f * s };
+    DrawCircleV(core, 1.6f * s, RAYWHITE);
 }

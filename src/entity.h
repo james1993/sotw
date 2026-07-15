@@ -61,6 +61,11 @@ typedef struct {
     unsigned gen; // g_entityGen[idx] at the time the ref was taken
 } EntityRef;
 
+// One energy pip of regen every this many seconds at baseline. Shared
+// by the regen tick (combat.c) and the resource bars, which use the
+// regen accumulator to fill smoothly between whole-point ticks.
+#define ENERGY_REGEN_INTERVAL 3.0f
+
 typedef struct Entity {
     bool alive;
     EntityKind kind;

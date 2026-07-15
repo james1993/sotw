@@ -47,6 +47,7 @@ typedef struct {
     Color gridColor;  // ground grid
     ZonePortal portals[MAX_ZONE_PORTALS];
     int portalCount;
+    Rectangle bounds; // playable area; movement clamps to this
     bool hasShrine;
     Vector2 shrinePos;
     const EnvProp *props;
@@ -179,6 +180,7 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
             { { 260, 0 }, "To Ashford Plains", ZONE_ASHFORD_PLAINS, { -320, 0 } },
         },
         .portalCount = 1,
+        .bounds = { -450, -300, 900, 600 },
         .hasShrine = false,
         .props = g_campProps, .propCount = COUNT(g_campProps),
         .spawns = g_campSpawns, .spawnCount = COUNT(g_campSpawns),
@@ -192,6 +194,7 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
             { { -420, 0 }, "To Ashford Camp", ZONE_ASHFORD_CAMP, { 160, 0 } },
         },
         .portalCount = 1,
+        .bounds = { -520, -480, 1980, 960 },
         .hasShrine = true,
         .shrinePos = { -320, 140 },
         .props = g_plainsProps, .propCount = COUNT(g_plainsProps),
@@ -234,6 +237,10 @@ const ZonePortal *World_GetPortal(int index) {
 const EnvProp *World_GetProps(int *count) {
     if (count) *count = g_zone->propCount;
     return g_zone->props;
+}
+
+Rectangle World_GetBounds(void) {
+    return g_zone->bounds;
 }
 
 bool World_GetShrine(Vector2 *pos) {

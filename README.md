@@ -73,7 +73,10 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **I** toggles the inventory (walk over drops to pick them up; click an
   item to equip it). **K** toggles the attributes panel for spending
   earned attribute points at GW1's real rank costs.
-- **Scroll wheel** zooms.
+- **Scroll wheel** zooms. **M** opens the full-region map (the whole
+  zone, its boundary, portals, quest markers, and every contact);
+  **P** pauses with an in-game menu (Resume / Quit to Main Menu / Quit
+  Game). The world freezes while paused.
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
   **L1/R1** cycle backward/forward through visible enemies (nearest
@@ -86,9 +89,11 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   GW1-style **menu cursor** appears: the **left stick** steers it, **A**
   clicks whatever it hovers (individual shop rows included), and **B**
   backs out of the conversation; touching the mouse hands the pointer
-  back instantly. The main menu is fully pad-navigable too: **D-pad**
-  or **left stick** moves the highlight, **A** confirms (Up/Down + Enter
-  on keyboard).
+  back instantly. Bare **Y** toggles the inventory (cursor + A equips,
+  B closes), **Select/Back** opens the region map, and **Start** opens
+  the pause menu. The main menu and pause menu are fully pad-navigable:
+  **D-pad** or **left stick** moves the highlight, **A** confirms
+  (Up/Down + Enter on keyboard).
 
 ### Zones
 
@@ -99,6 +104,10 @@ entry, exactly like GW1's per-party explorable areas. Returning to the
 outpost fully restores the party, and party members wait near the gate
 while you wander the outpost instead of trailing you around town -
 they only fall in behind you out in the field.
+
+Every zone has a hard **boundary** - drawn as a wall line in the
+world, dashed on the compass, and framing the region map - so the
+instance's edges are never a mystery.
 
 Charr camp out in small **groups** (never more than four) that share
 aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a

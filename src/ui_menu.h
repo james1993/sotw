@@ -17,4 +17,16 @@ typedef enum {
 
 MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave);
 
+// The in-game pause menu (P / gamepad Start), drawn over the frozen
+// world: Resume, Quit to Main Menu, Quit Game. Same navigation as the
+// main menu. The game autosaves regardless of which exit is taken.
+typedef enum {
+    PAUSE_NONE = 0,
+    PAUSE_RESUME,
+    PAUSE_QUIT_TO_MENU,
+    PAUSE_QUIT_GAME
+} PauseAction;
+
+PauseAction UI_DrawPauseMenu(int screenWidth, int screenHeight);
+
 #endif

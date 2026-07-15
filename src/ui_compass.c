@@ -59,6 +59,26 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
 
     Vector2 p;
 
+    // The instance boundary, dashed - sampled along each edge so only
+    // the stretch inside compass range shows, like a radar wall.
+    {
+        Rectangle b = World_GetBounds();
+        const float step = 30.0f;
+        Color wall = { 190, 90, 70, 230 };
+        for (float x = b.x; x <= b.x + b.width; x += step) {
+            if (WorldToCompass((Vector2){ x, b.y }, player->pos, center, radius, 3.0f, &p))
+                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
+            if (WorldToCompass((Vector2){ x, b.y + b.height }, player->pos, center, radius, 3.0f, &p))
+                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
+        }
+        for (float y = b.y; y <= b.y + b.height; y += step) {
+            if (WorldToCompass((Vector2){ b.x, y }, player->pos, center, radius, 3.0f, &p))
+                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
+            if (WorldToCompass((Vector2){ b.x + b.width, y }, player->pos, center, radius, 3.0f, &p))
+                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
+        }
+    }
+
     // Portal and shrine landmarks.
     for (int i = 0; i < World_GetPortalCount(); i++) {
         const ZonePortal *portal = World_GetPortal(i);
@@ -84,7 +104,9 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
     }
 
     // Entities: allies green, NPCs pale green, monsters red (brighter
-    // when awake and hunting).
+    // when awake and hunting). The player's current target gets a gold
+    // ring so it reads on the compass too.
+    int targetIdx = Entity_RefIndex(player->targetRef);
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (!e->alive || i == PLAYER_INDEX) continue;
@@ -99,6 +121,9 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
             c = (Color){ 80, 210, 90, 255 };
         }
         DrawCircleV(p, 3.5f, c);
+        if (i == targetIdx) {
+            DrawCircleLines((int)p.x, (int)p.y, 5.5f, GOLD);
+        }
     }
 
     // The player, dead center.

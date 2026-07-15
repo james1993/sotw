@@ -127,7 +127,9 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         // Thin energy strip under each member's health, like GW1's party
         // window gives heroes.
         int enY = barY + barH + 2;
-        float enPct = (e->maxEnergy > 0) ? (float)e->energy / (float)e->maxEnergy : 0.0f;
+        float smoothEn = (float)e->energy + e->energyRegenAccum / ENERGY_REGEN_INTERVAL;
+        float enPct = (e->maxEnergy > 0) ? smoothEn / (float)e->maxEnergy : 0.0f;
+        if (enPct > 1.0f) enPct = 1.0f;
         DrawRectangle(x + pad, enY, barW, energyH, (Color){ 40, 40, 40, 255 });
         if (e->alive) {
             DrawRectangle(x + pad, enY, (int)(barW * enPct), energyH, (Color){ 60, 130, 220, 255 });

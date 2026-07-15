@@ -52,6 +52,16 @@ void UI_CloseNpcDialog(void) {
     g_shopOpen = false;
 }
 
+bool UI_IsInventoryOpen(void) { return g_invOpen; }
+bool UI_IsAttributesOpen(void) { return g_attrOpen; }
+
+void UI_ToggleInventory(void) { g_invOpen = !g_invOpen; }
+
+void UI_ClosePanels(void) {
+    g_invOpen = false;
+    g_attrOpen = false;
+}
+
 static void DrawInventory(Entity *player, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(24 * scale);
@@ -200,14 +210,20 @@ static bool DialogButton(Rectangle rect, const char *label, int font, bool enabl
     return hovered && UI_PointerClicked();
 }
 
+// Which merchant tab is showing: GW1's merchant window splits trade
+// into a Buy tab (the merchant's stock) and a Sell tab (your bags).
+static int g_shopTab = 0; // 0 = Buy, 1 = Sell
+
 static void DrawShop(int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(26 * scale);
     int font = (int)(12 * scale);
     int pad = (int)(10 * scale);
     int w = (int)(380 * scale);
-    int rows = SHOP_STOCK_COUNT + g_inventoryCount;
-    int h = pad * 4 + font * 2 + (rows + 2) * rowH;
+    int tabH = (int)(30 * scale);
+    int rows = (g_shopTab == 0) ? SHOP_STOCK_COUNT
+                                : (g_inventoryCount > 0 ? g_inventoryCount : 1);
+    int h = pad * 4 + font + tabH + (rows + 1) * rowH;
 
     g_shopRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale), (float)w, (float)h };
     UIHit_Claim(g_shopRect);
@@ -224,53 +240,80 @@ static void DrawShop(int screenWidth, int screenHeight) {
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
 
-    for (int i = 0; i < SHOP_STOCK_COUNT; i++) {
-        const ShopEntry *entry = &g_shopStock[i];
-        Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
-        bool canAfford = g_gold >= entry->price && g_inventoryCount < MAX_INVENTORY;
-        bool hovered = CheckCollisionPointRec(mouse, row);
-        if (hovered && canAfford) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
-
-        char label[80];
-        if (entry->item.kind == ITEM_WEAPON) {
-            snprintf(label, sizeof(label), "Buy: %s %d-%d  (%dg)", entry->item.name,
-                     entry->item.dmgMin, entry->item.dmgMax, entry->price);
-        } else {
-            snprintf(label, sizeof(label), "Buy: %s  (%dg)", entry->item.name, entry->price);
+    // --- Tabs: Buy | Sell ---
+    {
+        float tabW = (g_shopRect.width - 2 * pad) / 2.0f;
+        const char *names[2] = { "Buy", "Sell" };
+        for (int t = 0; t < 2; t++) {
+            Rectangle tab = { g_shopRect.x + pad + t * tabW, (float)y, tabW, (float)tabH };
+            bool active = (g_shopTab == t);
+            bool hovered = CheckCollisionPointRec(mouse, tab);
+            DrawRectangleRec(tab, active ? (Color){ 60, 66, 90, 255 }
+                            : hovered ? (Color){ 45, 50, 70, 255 } : (Color){ 32, 35, 48, 255 });
+            DrawRectangleLinesEx(tab, 1, (Color){ 120, 120, 140, 255 });
+            if (active) {
+                // Gold underline marks the live tab.
+                DrawRectangle((int)tab.x, (int)(tab.y + tab.height - 3), (int)tab.width, 3,
+                              (Color){ 200, 170, 90, 255 });
+            }
+            int tw = UITextWidth(names[t], font);
+            UIText(names[t], (int)(tab.x + (tab.width - tw) / 2),
+                   (int)(tab.y + (tab.height - font) / 2), font, active ? RAYWHITE : LIGHTGRAY);
+            if (hovered && click) g_shopTab = t;
         }
-        UIText(label, x, y, font, canAfford ? RAYWHITE : GRAY);
-
-        if (hovered && click && canAfford) {
-            g_gold -= entry->price;
-            Items_AddToInventory(entry->item);
-        }
-        y += rowH;
+        y += tabH + pad;
     }
 
-    y += pad;
-    UIText("Sell (click - equipped items can't be sold):", x, y, font, LIGHTGRAY);
-    y += font + 6;
+    if (g_shopTab == 0) {
+        // --- Buy: the merchant's stock ---
+        for (int i = 0; i < SHOP_STOCK_COUNT; i++) {
+            const ShopEntry *entry = &g_shopStock[i];
+            Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
+            bool canAfford = g_gold >= entry->price && g_inventoryCount < MAX_INVENTORY;
+            bool hovered = CheckCollisionPointRec(mouse, row);
+            if (hovered && canAfford) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
 
-    for (int i = 0; i < g_inventoryCount; i++) {
-        Item *it = &g_inventory[i];
-        bool equipped = (i == g_equippedWeapon || i == g_equippedArmor);
-        Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
-        bool hovered = !equipped && CheckCollisionPointRec(mouse, row);
-        if (hovered) DrawRectangleRec(row, (Color){ 80, 60, 60, 255 });
-
-        char label[80];
-        snprintf(label, sizeof(label), "%s  (+%dg)%s", it->name, Items_SellValue(it),
-                 equipped ? "  [equipped]" : "");
-        UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
-
-        if (hovered && click) {
-            int value = Items_SellValue(it);
-            if (Items_RemoveFromInventory(i)) {
-                g_gold += value;
+            char label[80];
+            if (entry->item.kind == ITEM_WEAPON) {
+                snprintf(label, sizeof(label), "%s %d-%d  (%dg)", entry->item.name,
+                         entry->item.dmgMin, entry->item.dmgMax, entry->price);
+            } else {
+                snprintf(label, sizeof(label), "%s  (%dg)", entry->item.name, entry->price);
             }
-            break; // indices shifted - redo layout next frame
+            UIText(label, x, y, font, canAfford ? RAYWHITE : GRAY);
+
+            if (hovered && click && canAfford) {
+                g_gold -= entry->price;
+                Items_AddToInventory(entry->item);
+            }
+            y += rowH;
         }
-        y += rowH;
+    } else {
+        // --- Sell: your inventory (equipped items can't be sold) ---
+        if (g_inventoryCount == 0) {
+            UIText("(nothing to sell)", x, y, font, GRAY);
+        }
+        for (int i = 0; i < g_inventoryCount; i++) {
+            Item *it = &g_inventory[i];
+            bool equipped = (i == g_equippedWeapon || i == g_equippedArmor);
+            Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
+            bool hovered = !equipped && CheckCollisionPointRec(mouse, row);
+            if (hovered) DrawRectangleRec(row, (Color){ 80, 60, 60, 255 });
+
+            char label[80];
+            snprintf(label, sizeof(label), "%s  (+%dg)%s", it->name, Items_SellValue(it),
+                     equipped ? "  [equipped]" : "");
+            UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
+
+            if (hovered && click) {
+                int value = Items_SellValue(it);
+                if (Items_RemoveFromInventory(i)) {
+                    g_gold += value;
+                }
+                break; // indices shifted - redo layout next frame
+            }
+            y += rowH;
+        }
     }
 }
 

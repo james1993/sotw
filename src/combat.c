@@ -112,11 +112,12 @@ static void ResolveCast(Entity *caster) {
 void Combat_UpdateEntity(Entity *e, float dt) {
     if (!e->alive) return;
 
-    // Energy regen: roughly one pip every 3 seconds at baseline.
+    // Energy regen: roughly one pip every 3 seconds at baseline. The
+    // accumulator doubles as the fractional part the resource bars use
+    // to fill smoothly between whole-point ticks.
     e->energyRegenAccum += dt;
-    const float regenInterval = 3.0f;
-    if (e->energyRegenAccum >= regenInterval) {
-        e->energyRegenAccum -= regenInterval;
+    if (e->energyRegenAccum >= ENERGY_REGEN_INTERVAL) {
+        e->energyRegenAccum -= ENERGY_REGEN_INTERVAL;
         e->energy++;
         if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
     }
@@ -192,6 +193,15 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         } else {
             e->hasMoveTarget = false;
         }
+    }
+
+    // The zone's playable area is a hard wall for everyone.
+    {
+        Rectangle b = World_GetBounds();
+        if (e->pos.x < b.x) e->pos.x = b.x;
+        if (e->pos.y < b.y) e->pos.y = b.y;
+        if (e->pos.x > b.x + b.width) e->pos.x = b.x + b.width;
+        if (e->pos.y > b.y + b.height) e->pos.y = b.y + b.height;
     }
 
     Entity *target = Entity_Resolve(e->targetRef);

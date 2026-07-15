@@ -179,6 +179,12 @@ void Render_World(Camera2D camera) {
         DrawLine(startX, y, endX, y, gridColor);
     }
 
+    // The instance boundary: a visible wall line at the playable edge.
+    {
+        Rectangle b = World_GetBounds();
+        DrawRectangleLinesEx(b, 5.0f, (Color){ 150, 70, 55, 200 });
+    }
+
     DrawEnvironment();
     DrawDrops();
 

@@ -16,6 +16,7 @@
 #include "ui_panels.h"
 #include "ui_hit.h"
 #include "ui_cursor.h"
+#include "ui_map.h"
 #include "ui_menu.h"
 #include "ui_font.h"
 #include "render.h"
@@ -85,6 +86,7 @@ int main(void) {
     int lastScreenWidth = GetScreenWidth();
 
     bool quitRequested = false;
+    bool paused = false;
 
     while (!WindowShouldClose() && !quitRequested) {
         float dt = GetFrameTime();
@@ -128,16 +130,27 @@ int main(void) {
         }
 
         // --- In-game frame ---
-        Input_Update(&camera, dt);
-        AI_Update(dt);
-        Combat_TickTimers(dt);
-        Projectile_Update(dt);
+        // P or the gamepad's Start button toggles the pause menu; while
+        // paused the world is frozen (single-player privilege GW1 never
+        // had) and only the pause menu takes input.
+        if (IsKeyPressed(KEY_P) ||
+            (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT))) {
+            paused = !paused;
+        }
 
         Entity *playerNow = Entity_Get(PLAYER_INDEX);
-        World_Update(playerNow, dt);
-        playerNow = Entity_Get(PLAYER_INDEX); // zone loads rebuild the array
-        Items_UpdatePickup(playerNow);
-        Quests_Update(playerNow);
+        if (!paused) {
+            Input_Update(&camera, dt);
+            AI_Update(dt);
+            Combat_TickTimers(dt);
+            Projectile_Update(dt);
+
+            playerNow = Entity_Get(PLAYER_INDEX);
+            World_Update(playerNow, dt);
+            playerNow = Entity_Get(PLAYER_INDEX); // zone loads rebuild the array
+            Items_UpdatePickup(playerNow);
+            Quests_Update(playerNow);
+        }
         if (playerNow) camera.target = playerNow->pos;
 
         BeginDrawing();
@@ -166,8 +179,25 @@ int main(void) {
         UI_DrawPartyPanel(screenWidth, screenHeight);
         UI_DrawTargetPanel(screenWidth, screenHeight, 50);
         Quests_DrawTracker(screenWidth, screenHeight);
-        UI_PanelsUpdateAndDraw(screenWidth, screenHeight);
-        UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
+        if (!paused) {
+            // Interactive UI is skipped under the pause overlay so its
+            // buttons can't be clicked through the menu.
+            UI_PanelsUpdateAndDraw(screenWidth, screenHeight);
+            UI_MapUpdateAndDraw(screenWidth, screenHeight); // region map (M/Select)
+            UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
+        } else {
+            PauseAction pa = UI_DrawPauseMenu(screenWidth, screenHeight);
+            if (pa == PAUSE_RESUME) {
+                paused = false;
+            } else if (pa == PAUSE_QUIT_TO_MENU) {
+                Save_Write();
+                paused = false;
+                app = APP_MENU;
+            } else if (pa == PAUSE_QUIT_GAME) {
+                paused = false;
+                quitRequested = true; // final autosave runs after the loop
+            }
+        }
 
         // Death overlay: GW1 dims the world and tells you plainly.
         if (playerNow && !playerNow->alive) {

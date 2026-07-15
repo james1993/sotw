@@ -62,6 +62,11 @@ const ZonePortal *World_GetPortal(int index);
 // The current zone's decorative props, for render.c.
 const EnvProp *World_GetProps(int *count);
 
+// The zone's playable area (world-space). Movement is clamped to it,
+// render.c draws it as a wall line, and the compass/region map show it
+// so you can always tell where the instance ends.
+Rectangle World_GetBounds(void);
+
 // The last OUTPOST the player was in (the current zone when it's an
 // outpost). This is what the save system stores: loading a save "logs
 // back in" there, GW1-style - explorable instances are never saved.

@@ -4,6 +4,8 @@
 #include "ui_panels.h"
 #include "ui_hit.h"
 #include "ui_cursor.h"
+#include "ui_map.h"
+#include "world.h"
 #include <math.h>
 #include <stdbool.h>
 
@@ -117,6 +119,11 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
         if (!Entity_IsCasting(player)) {
             player->pos.x += lx * player->moveSpeed * dt;
             player->pos.y += ly * player->moveSpeed * dt;
+            Rectangle b = World_GetBounds();
+            if (player->pos.x < b.x) player->pos.x = b.x;
+            if (player->pos.y < b.y) player->pos.y = b.y;
+            if (player->pos.x > b.x + b.width) player->pos.x = b.x + b.width;
+            if (player->pos.y > b.y + b.height) player->pos.y = b.y + b.height;
             player->hasMoveTarget = false; // stick overrides any pending click-move
         }
         g_gamepadMode = true;
@@ -141,11 +148,17 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             Combat_ActivateSkill(PLAYER_INDEX, 4 + face, Entity_RefIndex(player->targetRef));
             g_gamepadMode = true;
         } else if (face == 1) {
-            // Bare B (no trigger): back out of an open conversation,
-            // otherwise drop the current target - GW1-gamepad's escape
-            // hatch.
-            if (UI_IsNpcDialogOpen()) {
+            // Bare B (no trigger): close the map, then back out of an
+            // open conversation, then drop the current target -
+            // GW1-gamepad's escape hatch, layered.
+            if (UI_IsMapOpen()) {
+                // handled as a toggle in ui_map.c via Select; B mirrors
+                // Escape here by just closing it
+                UI_CloseMapOverlay();
+            } else if (UI_IsNpcDialogOpen()) {
                 UI_CloseNpcDialog();
+            } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen()) {
+                UI_ClosePanels();
             } else {
                 player->targetRef = Entity_NoRef();
                 g_manualGamepadTarget = false;
@@ -177,6 +190,12 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                     }
                 }
             }
+            g_gamepadMode = true;
+        } else if (face == 3) {
+            // Bare Y (Xbox) / Triangle (PS): toggle the inventory - with
+            // it open the menu cursor takes the stick, A equips, B
+            // closes. The pad's route to changing gear.
+            UI_ToggleInventory();
             g_gamepadMode = true;
         }
     }
@@ -260,7 +279,7 @@ void Input_Update(Camera2D *camera, float dt) {
     // a pad is present; the left stick steers it (see UpdateGamepad's
     // movement suppression) and A clicks. Updated here in the input
     // phase so the same frame's menu drawing sees fresh pointer state.
-    UICursor_Update(dt, UI_IsNpcDialogOpen());
+    UICursor_Update(dt, UI_IsNpcDialogOpen() || UI_IsInventoryOpen() || UI_IsAttributesOpen());
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player || !player->alive) return;

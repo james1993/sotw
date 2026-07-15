@@ -157,9 +157,13 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
     DrawResourceBar(hpX, barY, barW, barH, L.font,
                     (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, player->hp);
 
+    // The fill uses the regen accumulator as a fractional pip so the
+    // bar rises smoothly instead of jumping a notch every few seconds;
+    // the number stays whole, like GW1's energy readout.
+    float smoothEnergy = (float)player->energy + player->energyRegenAccum / ENERGY_REGEN_INTERVAL;
     int enX = centerX + centerGap / 2;
     DrawResourceBar(enX, barY, barW, barH, L.font,
-                    (float)player->energy / (float)player->maxEnergy, (Color){ 60, 130, 220, 255 }, player->energy);
+                    smoothEnergy / (float)player->maxEnergy, (Color){ 60, 130, 220, 255 }, player->energy);
 
     // Energy regen pips: small arrows in the energy bar, GW1's language
     // for "how fast this refills". Regen isn't per-profession yet, so

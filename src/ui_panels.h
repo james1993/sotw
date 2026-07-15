@@ -23,4 +23,11 @@ bool UI_IsNpcDialogOpen(void);
 // B both back out of a conversation through this.
 void UI_CloseNpcDialog(void);
 
+// Panel state for the gamepad: bare Y toggles the inventory, the menu
+// cursor activates over any open panel, and B closes them.
+bool UI_IsInventoryOpen(void);
+bool UI_IsAttributesOpen(void);
+void UI_ToggleInventory(void);
+void UI_ClosePanels(void);
+
 #endif
