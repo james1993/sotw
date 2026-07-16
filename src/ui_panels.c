@@ -1,6 +1,7 @@
 #include "ui_panels.h"
 #include "ui_hit.h"
 #include "ui_cursor.h"
+#include "save.h"
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
@@ -26,9 +27,12 @@ static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect, g
 // spirit where the merchant sells the basics and rarity is cosmetic.
 typedef struct { Item item; int price; } ShopEntry;
 static const ShopEntry g_shopStock[] = {
-    { { ITEM_WEAPON, "Long Sword",  15, 22, 28.0f,  1.33f, 0, 1 }, 80 },
-    { { ITEM_WEAPON, "War Hammer",  19, 35, 30.0f,  1.75f, 0, 1 }, 120 },
-    { { ITEM_WEAPON, "Fire Staff",  11, 22, 220.0f, 1.75f, 0, 1 }, 100 },
+    { { ITEM_WEAPON, "Long Sword",  15, 22, 28.0f,  1.33f, 0, 1, false }, 80 },
+    { { ITEM_WEAPON, "War Hammer",  19, 35, 30.0f,  1.75f, 0, 1, false }, 120 },
+    { { ITEM_WEAPON, "Fire Staff",  11, 22, 220.0f, 1.75f, 0, 1, false }, 100 },
+    // GW1's two workhorse kits, at GW1's merchant price point.
+    { { ITEM_KIT_SALVAGE, "Salvage Kit", 0, 0, 0, 0, 0, 25, false }, 100 },
+    { { ITEM_KIT_ID, "Identification Kit", 0, 0, 0, 0, 0, 25, false }, 100 },
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
 
@@ -36,11 +40,15 @@ static const ShopEntry g_shopStock[] = {
 // craft-only armor economy. No armor ever drops or sits in a shop.
 typedef struct { Item item; int gold; int hides; } CraftEntry;
 static const CraftEntry g_craftList[] = {
-    { { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45, 1 }, 100, 3 },
-    { { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60, 1 }, 250, 6 },
+    { { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45, 1, false }, 100, 3 },
+    { { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60, 1, false }, 250, 6 },
 };
 #define CRAFT_LIST_COUNT (int)(sizeof(g_craftList) / sizeof(g_craftList[0]))
 #define CRAFT_MATERIAL "Charr Hide"
+
+// GW1's kit flow: click a kit to arm it, then click the item to use it
+// on. -1 = no kit armed. Cleared when panels close or the kit is spent.
+static int g_armedKit = -1;
 
 // Set on the frame a dialog opens so the very same X/Square press that
 // opened it can't also "click" its button (input runs before drawing,
@@ -80,6 +88,7 @@ void UI_ClosePanels(void) {
     g_invOpen = false;
     g_attrOpen = false;
     g_equipOpen = false;
+    g_armedKit = -1;
 }
 
 static void DrawInventory(Entity *player, int screenHeight) {
@@ -98,10 +107,17 @@ static void DrawInventory(Entity *player, int screenHeight) {
 
     int x = (int)g_invRect.x + pad;
     int y = (int)g_invRect.y + pad;
-    char title[48];
-    snprintf(title, sizeof(title), "Inventory        %d gold", g_gold);
+    char title[64];
+    if (g_armedKit >= 0 && g_armedKit < g_inventoryCount) {
+        snprintf(title, sizeof(title), "%s: click a target item",
+                 g_inventory[g_armedKit].kind == ITEM_KIT_ID ? "Identify" : "Salvage");
+    } else {
+        snprintf(title, sizeof(title), "Inventory        %d gold", g_gold);
+    }
     UIText(title, x, y, font, GOLD);
     y += font + pad;
+
+    if (g_armedKit >= g_inventoryCount) g_armedKit = -1; // kit vanished
 
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
@@ -115,21 +131,42 @@ static void DrawInventory(Entity *player, int screenHeight) {
         if (hovered) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
 
         char label[64];
-        if (it->kind == ITEM_WEAPON) {
+        Color rowColor;
+        if (it->kind == ITEM_WEAPON && it->unidentified) {
+            // Masked until an Identification Kit reveals it, like GW1.
+            snprintf(label, sizeof(label), "%s", Items_DisplayName(it));
+            rowColor = (Color){ 190, 150, 220, 255 };
+        } else if (it->kind == ITEM_WEAPON) {
             snprintf(label, sizeof(label), "%s %d-%d%s", it->name, it->dmgMin, it->dmgMax,
                      equipped ? "  [equipped]" : "");
+            rowColor = equipped ? SKYBLUE : RAYWHITE;
         } else if (it->kind == ITEM_MATERIAL) {
             snprintf(label, sizeof(label), "%s x%d", it->name, it->count);
+            rowColor = (Color){ 200, 180, 140, 255 };
+        } else if (it->kind == ITEM_KIT_SALVAGE || it->kind == ITEM_KIT_ID) {
+            snprintf(label, sizeof(label), "%s [%d uses]%s", it->name, it->count,
+                     (i == g_armedKit) ? "  <armed>" : "");
+            rowColor = (i == g_armedKit) ? GOLD : (Color){ 160, 200, 210, 255 };
         } else {
             snprintf(label, sizeof(label), "%s%s", it->name, equipped ? "  [equipped]" : "");
+            rowColor = equipped ? SKYBLUE : RAYWHITE;
         }
-        UIText(label, x, y, font,
-               it->kind == ITEM_MATERIAL ? (Color){ 200, 180, 140, 255 }
-                                         : equipped ? SKYBLUE : RAYWHITE);
+        UIText(label, x, y, font, rowColor);
 
         if (hovered && click) {
-            if (it->kind == ITEM_WEAPON) Items_EquipWeapon(player, i);
-            else if (it->kind == ITEM_ARMOR) Items_EquipArmor(player, i);
+            if (it->kind == ITEM_KIT_SALVAGE || it->kind == ITEM_KIT_ID) {
+                // Arm/disarm the kit; the next item click applies it.
+                g_armedKit = (g_armedKit == i) ? -1 : i;
+            } else if (g_armedKit >= 0) {
+                g_armedKit = Items_UseKitOn(g_armedKit, i);
+                if (g_armedKit == -2) g_armedKit = -1; // invalid target: disarm
+                Save_Write();
+                break; // indices may have shifted - relayout next frame
+            } else if (it->kind == ITEM_WEAPON) {
+                Items_EquipWeapon(player, i); // rejects unidentified itself
+            } else if (it->kind == ITEM_ARMOR) {
+                Items_EquipArmor(player, i);
+            }
         }
         y += rowH;
     }
@@ -301,6 +338,9 @@ static void DrawShop(int screenWidth, int screenHeight) {
             if (entry->item.kind == ITEM_WEAPON) {
                 snprintf(label, sizeof(label), "%s %d-%d  (%dg)", entry->item.name,
                          entry->item.dmgMin, entry->item.dmgMax, entry->price);
+            } else if (entry->item.kind == ITEM_KIT_SALVAGE || entry->item.kind == ITEM_KIT_ID) {
+                snprintf(label, sizeof(label), "%s [%d uses]  (%dg)", entry->item.name,
+                         entry->item.count, entry->price);
             } else {
                 snprintf(label, sizeof(label), "%s  (%dg)", entry->item.name, entry->price);
             }
@@ -328,9 +368,12 @@ static void DrawShop(int screenWidth, int screenHeight) {
             if (it->kind == ITEM_MATERIAL) {
                 snprintf(label, sizeof(label), "%s x%d  (+%dg each)", it->name, it->count,
                          Items_SellValue(it));
+            } else if (it->kind == ITEM_KIT_SALVAGE || it->kind == ITEM_KIT_ID) {
+                snprintf(label, sizeof(label), "%s [%d uses]  (+%dg)", it->name, it->count,
+                         Items_SellValue(it));
             } else {
-                snprintf(label, sizeof(label), "%s  (+%dg)%s", it->name, Items_SellValue(it),
-                         equipped ? "  [equipped]" : "");
+                snprintf(label, sizeof(label), "%s  (+%dg)%s", Items_DisplayName(it),
+                         Items_SellValue(it), equipped ? "  [equipped]" : "");
             }
             UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
 
@@ -358,6 +401,7 @@ static void CycleEquip(Entity *player, ItemKind kind) {
         int i = (cur < 0) ? (step - 1) : (cur + step) % n;
         if (i < 0 || i >= n) continue;
         if (g_inventory[i].kind != kind) continue;
+        if (kind == ITEM_WEAPON && g_inventory[i].unidentified) continue;
         if (i == cur) break; // only one option - nothing to cycle to
         if (kind == ITEM_WEAPON) Items_EquipWeapon(player, i);
         else Items_EquipArmor(player, i);

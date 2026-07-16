@@ -113,7 +113,13 @@ instance's edges are never a mystery.
 
 **Armor is crafted, never looted** - GW1's rule. Charr drop **Charr
 Hides** (they stack), and Armorer Dunda in the camp turns hides plus
-gold into raiment. The merchant deals in weapons only.
+gold into raiment. The merchant deals in weapons and **kits**: dropped
+weapons come up **unidentified** (masked name, hidden stats, can't be
+equipped, nearly worthless to sell) until an **Identification Kit**
+reveals them, and a **Salvage Kit** breaks unwanted gear into hides for
+crafting - GW1's full kit economy. Click a kit in the inventory to arm
+it, then click the target item; kits carry 25 uses and vanish when
+spent.
 
 Charr camp out in small **groups** (never more than four) that share
 aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a

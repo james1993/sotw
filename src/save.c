@@ -101,10 +101,11 @@ bool Save_Write(void) {
     for (int i = 0; i < g_inventoryCount; i++) {
         const Item *it = &g_inventory[i];
         // Name goes last so it can contain spaces (never '|').
-        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%d|%s\n", i,
+        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%d|%d|%s\n", i,
                 (int)it->kind, it->dmgMin, it->dmgMax,
                 it->range, it->attackInterval, it->armor,
-                (it->count > 0 ? it->count : 1), it->name);
+                (it->count > 0 ? it->count : 1),
+                it->unidentified ? 1 : 0, it->name);
     }
 
     fclose(f);
@@ -177,24 +178,28 @@ bool Save_LoadAndApply(void) {
         } else if (sscanf(key, "item%d", &idx) == 1) {
             Item it;
             memset(&it, 0, sizeof(it));
-            int kind = 0, consumed = 0;
-            // New format carries a stack count before the name; old
-            // saves lack it and fall through to the second parse.
-            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
-                       &it.range, &it.attackInterval, &it.armor, &it.count, &consumed) >= 7
-                && consumed > 0) {
-                it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_MATERIAL);
-                it.count = ClampInt(it.count, 1, 9999);
-                strncpy(it.name, val + consumed, sizeof(it.name) - 1);
-                Items_AddToInventory(it);
+            int kind = 0, unid = 0, consumed = 0;
+            // Formats, newest first: count+unidentified before the
+            // name; count only; neither. Older saves parse fine.
+            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
+                       &it.range, &it.attackInterval, &it.armor, &it.count, &unid,
+                       &consumed) >= 8 && consumed > 0) {
+                it.unidentified = (unid != 0);
+            } else if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
+                       &it.range, &it.attackInterval, &it.armor, &it.count,
+                       &consumed) >= 7 && consumed > 0) {
+                // count-only format
             } else if (sscanf(val, "%d|%d|%d|%f|%f|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
                        &it.range, &it.attackInterval, &it.armor, &consumed) >= 6
                 && consumed > 0) {
-                it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_MATERIAL);
                 it.count = 1;
-                strncpy(it.name, val + consumed, sizeof(it.name) - 1);
-                Items_AddToInventory(it);
+            } else {
+                continue;
             }
+            it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_KIT_ID);
+            it.count = ClampInt(it.count, 1, 9999);
+            strncpy(it.name, val + consumed, sizeof(it.name) - 1);
+            Items_AddToInventory(it);
         }
         // "version" / "itemCount" are informational; unknown keys are
         // skipped so older builds tolerate newer saves.

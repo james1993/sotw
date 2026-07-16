@@ -483,8 +483,8 @@ void World_Init(void) {
     player->skillBar[4] = SK_FIRE_BOLT; // Elementalist secondary
 
     // Starting equipment, GW1-style fixed-power items.
-    Item startRod = { ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0 };
-    Item startRaiment = { ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30 };
+    Item startRod = { ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
+    Item startRaiment = { ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
     Items_AddToInventory(startRod);
     Items_AddToInventory(startRaiment);
     Items_EquipWeapon(player, 0);

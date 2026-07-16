@@ -24,8 +24,9 @@ static void DrawDrops(void) {
             Color c = (d->item.kind == ITEM_WEAPON) ? SKYBLUE : (Color){ 120, 220, 130, 255 };
             DrawPoly(d->pos, 4, 7.0f, 45.0f, c);
             DrawPolyLines(d->pos, 4, 7.0f, 45.0f, BLACK);
-            int tw = UITextWidth(d->item.name, 10);
-            UIText(d->item.name, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 10), 10, c);
+            const char *label = Items_DisplayName(&d->item);
+            int tw = UITextWidth(label, 10);
+            UIText(label, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 10), 10, c);
         }
     }
 }

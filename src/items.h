@@ -13,7 +13,9 @@ typedef enum {
     ITEM_NONE = 0,
     ITEM_WEAPON,
     ITEM_ARMOR,
-    ITEM_MATERIAL // crafting stock (stacks): armor is crafted, not looted
+    ITEM_MATERIAL,     // crafting stock (stacks): armor is crafted, not looted
+    ITEM_KIT_SALVAGE,  // breaks gear into materials; count = uses left
+    ITEM_KIT_ID        // reveals unidentified weapons; count = uses left
 } ItemKind;
 
 typedef struct {
@@ -27,9 +29,13 @@ typedef struct {
     float attackInterval;
     // Armor field: GW1-style armor level (AL). 60 is the caster max.
     int armor;
-    // Materials stack; everything else is count 1. Zero means 1 (older
-    // saves and struct literals that never set it).
+    // Materials stack and kits carry uses here; everything else is
+    // count 1. Zero means 1 (older saves and short struct literals).
     int count;
+    // GW1's identification loop: dropped weapons come up unidentified -
+    // masked name, hidden stats, can't be equipped, nearly worthless -
+    // until an Identification Kit reveals them.
+    bool unidentified;
 } Item;
 
 typedef struct {
@@ -60,6 +66,18 @@ bool Items_AddToInventory(Item item);
 // and consuming n of them (shrinking or removing the pile).
 int Items_CountMaterial(const char *name);
 bool Items_ConsumeMaterial(const char *name, int n);
+
+// What to show for an item: its name, or the GW1-style mask while a
+// weapon is unidentified. Use everywhere an item is displayed.
+const char *Items_DisplayName(const Item *item);
+
+// Applies a kit to an inventory item, GW1's click-kit-then-item flow.
+// Identification reveals an unidentified weapon; salvage destroys a
+// non-equipped weapon/armor and yields 1-3 Charr Hides. One use per
+// application; the kit disappears at zero uses. Returns the kit's new
+// inventory index (indices shift when salvage removes an item), -1
+// when the kit was consumed by this use, or -2 when nothing happened.
+int Items_UseKitOn(int kitIndex, int targetIndex);
 
 // Removes an item, keeping the equipped-item indices consistent.
 // Refuses to remove something currently equipped (returns false).
