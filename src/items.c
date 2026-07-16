@@ -2,6 +2,7 @@
 #include "entity.h"
 #include <math.h>
 #include <string.h>
+#include <string.h>
 
 #define PICKUP_RADIUS 30.0f
 
@@ -22,12 +23,9 @@ static const Item g_weaponTable[] = {
 };
 #define WEAPON_TABLE_COUNT (int)(sizeof(g_weaponTable) / sizeof(g_weaponTable[0]))
 
-static const Item g_armorTable[] = {
-    { ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30 },
-    { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45 },
-    { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60 },
-};
-#define ARMOR_TABLE_COUNT (int)(sizeof(g_armorTable) / sizeof(g_armorTable[0]))
+// The crafting material Charr leave behind - the Armorer turns these
+// (plus gold) into armor, GW1's craft-only armor economy in miniature.
+static const Item g_charrHide = { ITEM_MATERIAL, "Charr Hide", 0, 0, 0, 0, 0, 1 };
 
 void Items_Reset(void) {
     g_inventoryCount = 0;
@@ -38,9 +36,41 @@ void Items_Reset(void) {
 }
 
 bool Items_AddToInventory(Item item) {
+    if (item.count <= 0) item.count = 1;
+    if (item.kind == ITEM_MATERIAL) {
+        for (int i = 0; i < g_inventoryCount; i++) {
+            if (g_inventory[i].kind == ITEM_MATERIAL &&
+                strcmp(g_inventory[i].name, item.name) == 0) {
+                g_inventory[i].count += item.count;
+                return true;
+            }
+        }
+    }
     if (g_inventoryCount >= MAX_INVENTORY) return false;
     g_inventory[g_inventoryCount++] = item;
     return true;
+}
+
+int Items_CountMaterial(const char *name) {
+    for (int i = 0; i < g_inventoryCount; i++) {
+        if (g_inventory[i].kind == ITEM_MATERIAL &&
+            strcmp(g_inventory[i].name, name) == 0) {
+            return g_inventory[i].count;
+        }
+    }
+    return 0;
+}
+
+bool Items_ConsumeMaterial(const char *name, int n) {
+    for (int i = 0; i < g_inventoryCount; i++) {
+        Item *it = &g_inventory[i];
+        if (it->kind != ITEM_MATERIAL || strcmp(it->name, name) != 0) continue;
+        if (it->count < n) return false;
+        it->count -= n;
+        if (it->count <= 0) Items_RemoveFromInventory(i);
+        return true;
+    }
+    return false;
 }
 
 bool Items_RemoveFromInventory(int inventoryIndex) {
@@ -59,6 +89,7 @@ bool Items_RemoveFromInventory(int inventoryIndex) {
 int Items_SellValue(const Item *item) {
     if (item->kind == ITEM_ARMOR) return 10 + item->armor / 2;
     if (item->kind == ITEM_WEAPON) return 15 + item->dmgMax / 2;
+    if (item->kind == ITEM_MATERIAL) return 5; // per hide
     return 0;
 }
 
@@ -97,21 +128,24 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel) {
         d->gold = 8 + monsterLevel * 4 + GetRandomValue(0, monsterLevel * 3);
     }
 
-    if (GetRandomValue(1, 100) <= 45) {
+    // A weapon sometimes, a crafting hide often - never armor, which is
+    // craft-only like GW1.
+    if (GetRandomValue(1, 100) <= 30) {
         d = FindFreeDrop();
         if (d) {
             memset(d, 0, sizeof(GroundDrop));
             d->active = true;
             d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
             d->item = g_weaponTable[GetRandomValue(0, WEAPON_TABLE_COUNT - 1)];
+            d->item.count = 1;
         }
-    } else if (GetRandomValue(1, 100) <= 25) {
+    } else if (GetRandomValue(1, 100) <= 55) {
         d = FindFreeDrop();
         if (d) {
             memset(d, 0, sizeof(GroundDrop));
             d->active = true;
             d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
-            d->item = g_armorTable[GetRandomValue(0, ARMOR_TABLE_COUNT - 1)];
+            d->item = g_charrHide;
         }
     }
 }

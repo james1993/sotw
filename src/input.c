@@ -157,7 +157,7 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                 UI_CloseMapOverlay();
             } else if (UI_IsNpcDialogOpen()) {
                 UI_CloseNpcDialog();
-            } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen()) {
+            } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen() || UI_IsEquipmentOpen()) {
                 UI_ClosePanels();
             } else {
                 player->targetRef = Entity_NoRef();
@@ -192,10 +192,11 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             }
             g_gamepadMode = true;
         } else if (face == 3) {
-            // Bare Y (Xbox) / Triangle (PS): toggle the inventory - with
-            // it open the menu cursor takes the stick, A equips, B
-            // closes. The pad's route to changing gear.
-            UI_ToggleInventory();
+            // Bare Y (Xbox) / Triangle (PS): open the bags - inventory
+            // AND the equipment screen - with the menu cursor on the
+            // stick, A to equip/cycle, B to close. The pad's route to
+            // changing gear.
+            UI_ToggleBags();
             g_gamepadMode = true;
         }
     }
@@ -279,7 +280,8 @@ void Input_Update(Camera2D *camera, float dt) {
     // a pad is present; the left stick steers it (see UpdateGamepad's
     // movement suppression) and A clicks. Updated here in the input
     // phase so the same frame's menu drawing sees fresh pointer state.
-    UICursor_Update(dt, UI_IsNpcDialogOpen() || UI_IsInventoryOpen() || UI_IsAttributesOpen());
+    UICursor_Update(dt, UI_IsNpcDialogOpen() || UI_IsInventoryOpen() ||
+                        UI_IsAttributesOpen() || UI_IsEquipmentOpen());
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player || !player->alive) return;

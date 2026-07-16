@@ -27,7 +27,8 @@ void UI_CloseNpcDialog(void);
 // cursor activates over any open panel, and B closes them.
 bool UI_IsInventoryOpen(void);
 bool UI_IsAttributesOpen(void);
-void UI_ToggleInventory(void);
+bool UI_IsEquipmentOpen(void);
+void UI_ToggleBags(void); // inventory + equipment together (pad Y)
 void UI_ClosePanels(void);
 
 #endif

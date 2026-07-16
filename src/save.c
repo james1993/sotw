@@ -101,9 +101,10 @@ bool Save_Write(void) {
     for (int i = 0; i < g_inventoryCount; i++) {
         const Item *it = &g_inventory[i];
         // Name goes last so it can contain spaces (never '|').
-        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%s\n", i,
+        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%d|%s\n", i,
                 (int)it->kind, it->dmgMin, it->dmgMax,
-                it->range, it->attackInterval, it->armor, it->name);
+                it->range, it->attackInterval, it->armor,
+                (it->count > 0 ? it->count : 1), it->name);
     }
 
     fclose(f);
@@ -177,10 +178,20 @@ bool Save_LoadAndApply(void) {
             Item it;
             memset(&it, 0, sizeof(it));
             int kind = 0, consumed = 0;
-            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
+            // New format carries a stack count before the name; old
+            // saves lack it and fall through to the second parse.
+            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
+                       &it.range, &it.attackInterval, &it.armor, &it.count, &consumed) >= 7
+                && consumed > 0) {
+                it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_MATERIAL);
+                it.count = ClampInt(it.count, 1, 9999);
+                strncpy(it.name, val + consumed, sizeof(it.name) - 1);
+                Items_AddToInventory(it);
+            } else if (sscanf(val, "%d|%d|%d|%f|%f|%d|%n", &kind, &it.dmgMin, &it.dmgMax,
                        &it.range, &it.attackInterval, &it.armor, &consumed) >= 6
                 && consumed > 0) {
-                it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_ARMOR);
+                it.kind = (ItemKind)ClampInt(kind, 0, (int)ITEM_MATERIAL);
+                it.count = 1;
                 strncpy(it.name, val + consumed, sizeof(it.name) - 1);
                 Items_AddToInventory(it);
             }

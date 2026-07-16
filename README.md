@@ -71,8 +71,10 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   secondary). Vekk, the hero companion, fights automatically the same
   way a GW1 hero does.
 - **I** toggles the inventory (walk over drops to pick them up; click an
-  item to equip it). **K** toggles the attributes panel for spending
-  earned attribute points at GW1's real rank costs.
+  item to equip it). **E** toggles the equipment screen - both slots
+  with their numbers, plus a character summary; click a slot to cycle
+  through compatible gear. **K** toggles the attributes panel for
+  spending earned attribute points at GW1's real rank costs.
 - **Scroll wheel** zooms. **M** opens the full-region map (the whole
   zone, its boundary, portals, quest markers, and every contact);
   **P** pauses with an in-game menu (Resume / Quit to Main Menu / Quit
@@ -89,8 +91,8 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   GW1-style **menu cursor** appears: the **left stick** steers it, **A**
   clicks whatever it hovers (individual shop rows included), and **B**
   backs out of the conversation; touching the mouse hands the pointer
-  back instantly. Bare **Y** toggles the inventory (cursor + A equips,
-  B closes), **Select/Back** opens the region map, and **Start** opens
+  back instantly. Bare **Y** opens the bags - inventory and equipment
+  together (cursor + A equips or cycles a slot, B closes), **Select/Back** opens the region map, and **Start** opens
   the pause menu. The main menu and pause menu are fully pad-navigable:
   **D-pad** or **left stick** moves the highlight, **A** confirms
   (Up/Down + Enter on keyboard).
@@ -108,6 +110,10 @@ they only fall in behind you out in the field.
 Every zone has a hard **boundary** - drawn as a wall line in the
 world, dashed on the compass, and framing the region map - so the
 instance's edges are never a mystery.
+
+**Armor is crafted, never looted** - GW1's rule. Charr drop **Charr
+Hides** (they stack), and Armorer Dunda in the camp turns hides plus
+gold into raiment. The merchant deals in weapons only.
 
 Charr camp out in small **groups** (never more than four) that share
 aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a

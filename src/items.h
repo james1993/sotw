@@ -12,7 +12,8 @@ struct Entity;
 typedef enum {
     ITEM_NONE = 0,
     ITEM_WEAPON,
-    ITEM_ARMOR
+    ITEM_ARMOR,
+    ITEM_MATERIAL // crafting stock (stacks): armor is crafted, not looted
 } ItemKind;
 
 typedef struct {
@@ -26,6 +27,9 @@ typedef struct {
     float attackInterval;
     // Armor field: GW1-style armor level (AL). 60 is the caster max.
     int armor;
+    // Materials stack; everything else is count 1. Zero means 1 (older
+    // saves and struct literals that never set it).
+    int count;
 } Item;
 
 typedef struct {
@@ -48,8 +52,14 @@ extern GroundDrop g_drops[MAX_DROPS];
 // begins from.
 void Items_Reset(void);
 
-// Adds to inventory; returns false if full.
+// Adds to inventory; returns false if full. Materials stack onto an
+// existing pile of the same name instead of taking a new slot.
 bool Items_AddToInventory(Item item);
+
+// Crafting support: how many of a named material the player carries,
+// and consuming n of them (shrinking or removing the pile).
+int Items_CountMaterial(const char *name);
+bool Items_ConsumeMaterial(const char *name, int n);
 
 // Removes an item, keeping the equipped-item indices consistent.
 // Refuses to remove something currently equipped (returns false).
@@ -64,7 +74,8 @@ void Items_EquipWeapon(struct Entity *player, int inventoryIndex);
 void Items_EquipArmor(struct Entity *player, int inventoryIndex);
 
 // Rolls GW1-style loot for a killed monster: always some gold, a decent
-// chance of a weapon, a small chance of armor.
+// chance of a weapon or a crafting material. Armor never drops - like
+// GW1, armor is only crafted (see the Armorer NPC).
 void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel);
 
 // Walk-over pickup: anything within reach of the player is collected.

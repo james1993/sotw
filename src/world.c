@@ -81,6 +81,8 @@ static const SpawnDef g_campSpawns[] = {
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Merchant", .pos = { 90, -90 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Armorer Dunda", .pos = { -200, 60 },
+      .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 // --- Ashford Plains: three static camps spaced beyond each other's

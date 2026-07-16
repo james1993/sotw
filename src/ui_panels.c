@@ -15,22 +15,32 @@
 
 static bool g_invOpen = false;
 static bool g_attrOpen = false;
+static bool g_equipOpen = false;
 static int g_dialogNpc = -1;   // entity index, -1 = closed
 static bool g_shopOpen = false;
+static bool g_craftOpen = false;
 
-static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect;
+static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect, g_craftRect;
 
 // The merchant's stock: fixed-power items at fixed prices, in GW1's
 // spirit where the merchant sells the basics and rarity is cosmetic.
 typedef struct { Item item; int price; } ShopEntry;
 static const ShopEntry g_shopStock[] = {
-    { { ITEM_WEAPON, "Long Sword",  15, 22, 28.0f,  1.33f, 0 }, 80 },
-    { { ITEM_WEAPON, "War Hammer",  19, 35, 30.0f,  1.75f, 0 }, 120 },
-    { { ITEM_WEAPON, "Fire Staff",  11, 22, 220.0f, 1.75f, 0 }, 100 },
-    { { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45 }, 150 },
-    { { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60 }, 300 },
+    { { ITEM_WEAPON, "Long Sword",  15, 22, 28.0f,  1.33f, 0, 1 }, 80 },
+    { { ITEM_WEAPON, "War Hammer",  19, 35, 30.0f,  1.75f, 0, 1 }, 120 },
+    { { ITEM_WEAPON, "Fire Staff",  11, 22, 220.0f, 1.75f, 0, 1 }, 100 },
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
+
+// The Armorer's recipes: gold + Charr Hides in, armor out - GW1's
+// craft-only armor economy. No armor ever drops or sits in a shop.
+typedef struct { Item item; int gold; int hides; } CraftEntry;
+static const CraftEntry g_craftList[] = {
+    { { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45, 1 }, 100, 3 },
+    { { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60, 1 }, 250, 6 },
+};
+#define CRAFT_LIST_COUNT (int)(sizeof(g_craftList) / sizeof(g_craftList[0]))
+#define CRAFT_MATERIAL "Charr Hide"
 
 // Set on the frame a dialog opens so the very same X/Square press that
 // opened it can't also "click" its button (input runs before drawing,
@@ -40,6 +50,7 @@ static bool g_dialogOpenedThisFrame = false;
 void UI_OpenNpcDialog(int entityIndex) {
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
+    g_craftOpen = false;
     g_dialogOpenedThisFrame = true;
 }
 
@@ -50,16 +61,25 @@ bool UI_IsNpcDialogOpen(void) {
 void UI_CloseNpcDialog(void) {
     g_dialogNpc = -1;
     g_shopOpen = false;
+    g_craftOpen = false;
 }
 
 bool UI_IsInventoryOpen(void) { return g_invOpen; }
 bool UI_IsAttributesOpen(void) { return g_attrOpen; }
+bool UI_IsEquipmentOpen(void) { return g_equipOpen; }
 
-void UI_ToggleInventory(void) { g_invOpen = !g_invOpen; }
+// The pad's Y button opens "the bags": inventory + equipment together,
+// since on a controller you almost always want both at once.
+void UI_ToggleBags(void) {
+    bool anyOpen = g_invOpen || g_equipOpen;
+    g_invOpen = !anyOpen;
+    g_equipOpen = !anyOpen;
+}
 
 void UI_ClosePanels(void) {
     g_invOpen = false;
     g_attrOpen = false;
+    g_equipOpen = false;
 }
 
 static void DrawInventory(Entity *player, int screenHeight) {
@@ -98,10 +118,14 @@ static void DrawInventory(Entity *player, int screenHeight) {
         if (it->kind == ITEM_WEAPON) {
             snprintf(label, sizeof(label), "%s %d-%d%s", it->name, it->dmgMin, it->dmgMax,
                      equipped ? "  [equipped]" : "");
+        } else if (it->kind == ITEM_MATERIAL) {
+            snprintf(label, sizeof(label), "%s x%d", it->name, it->count);
         } else {
             snprintf(label, sizeof(label), "%s%s", it->name, equipped ? "  [equipped]" : "");
         }
-        UIText(label, x, y, font, equipped ? SKYBLUE : RAYWHITE);
+        UIText(label, x, y, font,
+               it->kind == ITEM_MATERIAL ? (Color){ 200, 180, 140, 255 }
+                                         : equipped ? SKYBLUE : RAYWHITE);
 
         if (hovered && click) {
             if (it->kind == ITEM_WEAPON) Items_EquipWeapon(player, i);
@@ -301,13 +325,21 @@ static void DrawShop(int screenWidth, int screenHeight) {
             if (hovered) DrawRectangleRec(row, (Color){ 80, 60, 60, 255 });
 
             char label[80];
-            snprintf(label, sizeof(label), "%s  (+%dg)%s", it->name, Items_SellValue(it),
-                     equipped ? "  [equipped]" : "");
+            if (it->kind == ITEM_MATERIAL) {
+                snprintf(label, sizeof(label), "%s x%d  (+%dg each)", it->name, it->count,
+                         Items_SellValue(it));
+            } else {
+                snprintf(label, sizeof(label), "%s  (+%dg)%s", it->name, Items_SellValue(it),
+                         equipped ? "  [equipped]" : "");
+            }
             UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
 
             if (hovered && click) {
                 int value = Items_SellValue(it);
-                if (Items_RemoveFromInventory(i)) {
+                if (it->kind == ITEM_MATERIAL) {
+                    // One hide per click, so a stack isn't dumped by accident.
+                    if (Items_ConsumeMaterial(it->name, 1)) g_gold += value;
+                } else if (Items_RemoveFromInventory(i)) {
                     g_gold += value;
                 }
                 break; // indices shifted - redo layout next frame
@@ -315,6 +347,140 @@ static void DrawShop(int screenWidth, int screenHeight) {
             y += rowH;
         }
     }
+}
+
+// Clicking an equipment slot cycles to the next compatible item in the
+// inventory - quick swapping without hunting through the bag list.
+static void CycleEquip(Entity *player, ItemKind kind) {
+    int cur = (kind == ITEM_WEAPON) ? g_equippedWeapon : g_equippedArmor;
+    int n = g_inventoryCount;
+    for (int step = 1; step <= n; step++) {
+        int i = (cur < 0) ? (step - 1) : (cur + step) % n;
+        if (i < 0 || i >= n) continue;
+        if (g_inventory[i].kind != kind) continue;
+        if (i == cur) break; // only one option - nothing to cycle to
+        if (kind == ITEM_WEAPON) Items_EquipWeapon(player, i);
+        else Items_EquipArmor(player, i);
+        break;
+    }
+}
+
+// The equipment screen: what's in each slot, with the numbers that
+// matter, plus a character summary - so "what do I have equipped
+// where" is never a mystery. E toggles it; the pad's Y opens it with
+// the inventory.
+static void DrawEquipment(Entity *player, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int rowH = (int)(44 * scale);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int w = (int)(300 * scale);
+    int h = pad * 3 + font + rowH * 2 + font + (int)(8 * scale);
+
+    // Above the inventory, left side.
+    g_equipRect = (Rectangle){ (float)(20 * scale), (float)(140 * scale), (float)w, (float)h };
+    UIHit_Claim(g_equipRect);
+    DrawRectangleRec(g_equipRect, (Color){ 20, 22, 30, 235 });
+    DrawRectangleLinesEx(g_equipRect, 2, (Color){ 120, 120, 140, 255 });
+
+    int x = (int)g_equipRect.x + pad;
+    int y = (int)g_equipRect.y + pad;
+    UIText("Equipment", x, y, font, GOLD);
+    y += font + pad;
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    const char *slotNames[2] = { "Weapon", "Armor" };
+    for (int slot = 0; slot < 2; slot++) {
+        ItemKind kind = (slot == 0) ? ITEM_WEAPON : ITEM_ARMOR;
+        int idx = (slot == 0) ? g_equippedWeapon : g_equippedArmor;
+
+        Rectangle row = { g_equipRect.x + 4, (float)y - 2, g_equipRect.width - 8, (float)rowH - 4 };
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        if (hovered) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        DrawRectangleLinesEx(row, 1, (Color){ 90, 90, 110, 255 });
+
+        UIText(slotNames[slot], x, y, small, LIGHTGRAY);
+        char line[96];
+        if (idx >= 0 && idx < g_inventoryCount) {
+            const Item *it = &g_inventory[idx];
+            if (kind == ITEM_WEAPON) {
+                snprintf(line, sizeof(line), "%s   %d-%d dmg, %s, %.2fs",
+                         it->name, it->dmgMin, it->dmgMax,
+                         it->range > 60.0f ? "ranged" : "melee", it->attackInterval);
+            } else {
+                snprintf(line, sizeof(line), "%s   AL %d", it->name, it->armor);
+            }
+        } else {
+            snprintf(line, sizeof(line), "(nothing equipped)");
+        }
+        UIText(line, x, y + small + 3, font, idx >= 0 ? SKYBLUE : GRAY);
+
+        if (hovered && click) CycleEquip(player, kind);
+        y += rowH;
+    }
+
+    char summary[96];
+    snprintf(summary, sizeof(summary), "Level %d   HP %d/%d   Energy %d/%d   AL %d",
+             player->level, player->hp, player->maxHp,
+             player->energy, player->maxEnergy, player->armor);
+    UIText(summary, x, y + 4, small, LIGHTGRAY);
+}
+
+// The Armorer's crafting window: recipes take gold AND Charr Hides,
+// GW1's armor-is-crafted-only economy.
+static void DrawCraft(int screenWidth, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int rowH = (int)(30 * scale);
+    int font = (int)(12 * scale);
+    int pad = (int)(10 * scale);
+    int w = (int)(420 * scale);
+    int h = pad * 4 + font * 2 + (CRAFT_LIST_COUNT + 1) * rowH;
+
+    g_craftRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale), (float)w, (float)h };
+    UIHit_Claim(g_craftRect);
+    DrawRectangleRec(g_craftRect, (Color){ 20, 22, 30, 240 });
+    DrawRectangleLinesEx(g_craftRect, 2, (Color){ 120, 120, 140, 255 });
+
+    int x = (int)g_craftRect.x + pad;
+    int y = (int)g_craftRect.y + pad;
+    char title[80];
+    snprintf(title, sizeof(title), "Armor Crafting     %dg, %d %s", g_gold,
+             Items_CountMaterial(CRAFT_MATERIAL), CRAFT_MATERIAL);
+    UIText(title, x, y, font, GOLD);
+    y += font + pad;
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    for (int i = 0; i < CRAFT_LIST_COUNT; i++) {
+        const CraftEntry *entry = &g_craftList[i];
+        Rectangle row = { g_craftRect.x + 4, (float)y - 2, g_craftRect.width - 8, (float)rowH };
+        bool canCraft = g_gold >= entry->gold &&
+                        Items_CountMaterial(CRAFT_MATERIAL) >= entry->hides &&
+                        g_inventoryCount < MAX_INVENTORY;
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        if (hovered && canCraft) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+
+        char label[112];
+        snprintf(label, sizeof(label), "%s  -  %dg + %d %s", entry->item.name,
+                 entry->gold, entry->hides, CRAFT_MATERIAL);
+        UIText(label, x, y, font, canCraft ? RAYWHITE : GRAY);
+
+        if (hovered && click && canCraft) {
+            if (Items_AddToInventory(entry->item)) {
+                g_gold -= entry->gold;
+                Items_ConsumeMaterial(CRAFT_MATERIAL, entry->hides);
+            }
+        }
+        y += rowH;
+    }
+
+    y += 4;
+    UIText("Hides come from slain Charr - armor is never looted, only crafted.",
+           x, y, (int)(10 * scale), GRAY);
 }
 
 static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
@@ -382,9 +548,16 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             break;
         }
         case NPC_MERCHANT: {
-            UIText("Weapons, armor - fair prices, no haggling.", x, y, font, LIGHTGRAY);
+            UIText("Weapons - fair prices, no haggling. Armor? See Dunda.", x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_shopOpen ? "Close shop" : "Browse wares", font, true)) {
                 g_shopOpen = !g_shopOpen;
+            }
+            break;
+        }
+        case NPC_CRAFTER: {
+            UIText("Bring me Charr hides and coin - I'll fit you properly.", x, y, font, LIGHTGRAY);
+            if (DialogButton(btn, g_craftOpen ? "Close crafting" : "Craft armor", font, true)) {
+                g_craftOpen = !g_craftOpen;
             }
             break;
         }
@@ -414,12 +587,15 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
 
     if (IsKeyPressed(KEY_I)) g_invOpen = !g_invOpen;
     if (IsKeyPressed(KEY_K)) g_attrOpen = !g_attrOpen;
+    if (IsKeyPressed(KEY_E)) g_equipOpen = !g_equipOpen;
     if (IsKeyPressed(KEY_ESCAPE)) UI_CloseNpcDialog();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
+    if (g_equipOpen) DrawEquipment(player, screenHeight);
     if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
+    if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(screenWidth, screenHeight);
 
     // The open-frame guard only needs to cover the frame the dialog
     // appeared; from the next frame on the pad button confirms.

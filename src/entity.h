@@ -28,7 +28,8 @@ typedef enum {
     NPC_NONE = 0,
     NPC_QUEST_GIVER,
     NPC_MERCHANT,
-    NPC_HENCHMAN
+    NPC_HENCHMAN,
+    NPC_CRAFTER // armorer: crafts armor for gold + materials (GW1: armor is craft-only)
 } NpcRole;
 
 typedef enum {
