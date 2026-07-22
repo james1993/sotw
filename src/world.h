@@ -18,9 +18,13 @@ typedef enum {
 // Zone indices into the zone table in world.c. Adding a zone means
 // adding an entry there (name, portals, spawns, props, colors) - no
 // code changes elsewhere.
+// New zones append at the end: the save file stores these values as
+// ints, so reordering would send old saves to the wrong outpost.
 typedef enum {
     ZONE_ASHFORD_CAMP = 0,
     ZONE_ASHFORD_PLAINS,
+    ZONE_CHARR_FOOTHILLS,
+    ZONE_PIKEN_WATCH,
     ZONE_COUNT
 } ZoneId;
 
@@ -42,6 +46,10 @@ typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
 
 GameMode World_GetMode(void);
 const char *World_GetZoneName(void);
+
+// The zone the party is currently in - lets reach-quest markers draw
+// only in the zone their target actually lives in.
+ZoneId World_GetZoneId(void);
 
 // Zone look: window clear color and ground-grid color (warm dirt in
 // camp, cool grass in the plains).

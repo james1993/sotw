@@ -34,6 +34,9 @@ typedef struct {
     float aggro;
     int strengthRank;
     bool withHowl;    // monsters: carry Feral Howl, the interruptible self-heal
+    bool caster;      // monsters: ranged Fire Magic loadout instead of claws
+    Species species;  // monsters: which body sprite.c draws (and whether
+                      // the corpse leaves a Charr Hide - only Charr do)
     int group;        // monsters: spawn group id, 0 = ungrouped. Groups
                       // aggro as one (pull any member, all join) and are
                       // kept to at most 4 members so pulls stay winnable.
@@ -137,25 +140,25 @@ static const EnvProp g_plainsProps[] = {
 static const SpawnDef g_plainsSpawns[] = {
     // Camp 1, near the entrance - the first pull.
     { .kind = SPAWN_MONSTER, .name = "Charr Brute", .pos = { 300, 40 },
-      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true, .group = 1 },
+      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true, .species = SPECIES_CHARR, .group = 1 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 380, -50 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 1 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 1 },
 
     // Camp 2, northeast.
     { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 820, -300 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .group = 2 },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .species = SPECIES_CHARR, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 760, -220 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 2 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 900, -230 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 2 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 2 },
 
     // Camp 3, southeast.
     { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 900, 320 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .group = 3 },
+      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .species = SPECIES_CHARR, .group = 3 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 830, 250 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 3 },
+      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 3 },
     { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 980, 260 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .group = 3 },
+      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 3 },
 
     // Patrols hunt alone (no .group): their interception threat comes
     // from timing, not numbers. The north-south sweep crosses the
@@ -165,10 +168,93 @@ static const SpawnDef g_plainsSpawns[] = {
     // patrol can notice.
     { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Patrol",
       .pos = { 560, -320 }, .posB = { 560, 320 },
-      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
     { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Prowler",
       .pos = { 700, 40 }, .posB = { 1240, 40 },
-      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
+};
+
+// --- Charr Foothills: the ashen ground past the eastern ridge, on the
+// road to Piken Watch. Harder than the plains: warbands bring a Shaman
+// (a ranged Fire Magic caster - kill or interrupt it first), and the
+// gullies crawl with Devourers, whose corpses yield no hides. ---
+
+static const EnvProp g_foothillsProps[] = {
+    { { -380, -200 }, PROP_ROCK, 1.3f },
+    { { -300, 180 },  PROP_ROCK, 1.1f },
+    { { -120, -80 },  PROP_ROCK, 0.9f },
+    { { 60, -260 },   PROP_ROCK, 1.2f },
+    { { 240, 120 },   PROP_ROCK, 1.0f },
+    { { 420, -140 },  PROP_ROCK, 1.4f },
+    { { 620, 220 },   PROP_ROCK, 1.1f },
+    { { 840, -40 },   PROP_ROCK, 0.8f },
+    { { 1020, -260 }, PROP_ROCK, 1.2f },
+    { { 1160, 160 },  PROP_ROCK, 1.0f },
+    { { -200, -320 }, PROP_TREE, 0.8f }, // scorched stragglers
+    { { 500, 320 },   PROP_TREE, 0.7f },
+    { { 900, 340 },   PROP_TREE, 0.75f },
+    { { 1240, -80 },  PROP_TREE, 0.8f },
+    { { 160, 40 },    PROP_GRASS, 0.8f },
+    { { 700, -180 },  PROP_GRASS, 0.9f },
+    { { 1080, 60 },   PROP_GRASS, 0.8f },
+    { { -40, 240 },   PROP_GRASS, 0.9f },
+};
+
+static const SpawnDef g_foothillsSpawns[] = {
+    // Warband 1 guards the road in: the Shaman hangs back and burns you
+    // while the legionnaires close - focus or interrupt it, GW1 rule #1.
+    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 260, -60 },
+      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9, .species = SPECIES_CHARR, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 340, 20 },
+      .level = 6, .hp = 180, .armor = 45, .aggro = 130.0f, .strengthRank = 8, .caster = true, .species = SPECIES_CHARR, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 300, -140 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = 120.0f, .strengthRank = 7, .species = SPECIES_CHARR, .group = 1 },
+
+    // Devourer gully, south: a pinned nest, all melee, hits hard.
+    { .kind = SPAWN_MONSTER, .name = "Plague Devourer", .pos = { 600, 260 },
+      .level = 5, .hp = 200, .armor = 55, .aggro = 125.0f, .strengthRank = 8, .species = SPECIES_DEVOURER, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Whiptail Devourer", .pos = { 680, 320 },
+      .level = 5, .hp = 180, .armor = 50, .aggro = 125.0f, .strengthRank = 8, .species = SPECIES_DEVOURER, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Whiptail Devourer", .pos = { 540, 340 },
+      .level = 4, .hp = 170, .armor = 50, .aggro = 120.0f, .strengthRank = 7, .species = SPECIES_DEVOURER, .group = 2 },
+
+    // Warband 2 holds the pass to Piken Watch: the hardest pull, with a
+    // howling brute AND a shaman behind it.
+    { .kind = SPAWN_MONSTER, .name = "Charr Warcaller", .pos = { 1000, -120 },
+      .level = 7, .hp = 300, .armor = 70, .aggro = 135.0f, .strengthRank = 10, .withHowl = true, .species = SPECIES_CHARR, .group = 3 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 1080, -40 },
+      .level = 6, .hp = 180, .armor = 45, .aggro = 130.0f, .strengthRank = 8, .caster = true, .species = SPECIES_CHARR, .group = 3 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 940, -40 },
+      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9, .species = SPECIES_CHARR, .group = 3 },
+
+    // A lone Devourer prowls the middle ground - no group, pure ambush.
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Lurking Devourer",
+      .pos = { 400, -280 }, .posB = { 820, 160 },
+      .level = 5, .hp = 190, .armor = 50, .aggro = AGGRO_RING_RADIUS, .strengthRank = 8, .species = SPECIES_DEVOURER },
+};
+
+// --- Piken Watch: a forward outpost dug into the foothills. Warmaster
+// Grast hands out the frontier work; a trader keeps the party stocked
+// without the walk home. ---
+
+static const EnvProp g_pikenProps[] = {
+    { { 0, -150 },    PROP_FIRE, 1.1f },
+    { { -160, -120 }, PROP_TENT, 1.0f },
+    { { 150, -130 },  PROP_TENT, 1.05f },
+    { { -190, 60 },   PROP_TENT, 0.9f },
+    { { 180, 80 },    PROP_TENT, 0.95f },
+    { { -300, -60 },  PROP_ROCK, 1.3f },
+    { { 290, -40 },   PROP_ROCK, 1.2f },
+    { { -240, 160 },  PROP_ROCK, 1.0f },
+    { { 250, 170 },   PROP_ROCK, 1.1f },
+    { { 0, 220 },     PROP_ROCK, 0.9f },
+};
+
+static const SpawnDef g_pikenSpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Warmaster Grast", .pos = { -110, -50 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Trader Hurm", .pos = { 100, -80 },
+      .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
 };
 
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
@@ -195,13 +281,45 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .gridColor = { 52, 76, 48, 255 },
         .portals = {
             { { -420, 0 }, "To Ashford Camp", ZONE_ASHFORD_CAMP, { 160, 0 } },
+            // Past the ridge marker the scouting quest sends you to.
+            { { 1400, 40 }, "To Charr Foothills", ZONE_CHARR_FOOTHILLS, { -400, 0 } },
         },
-        .portalCount = 1,
+        .portalCount = 2,
         .bounds = { -520, -480, 1980, 960 },
         .hasShrine = true,
         .shrinePos = { -320, 140 },
         .props = g_plainsProps, .propCount = COUNT(g_plainsProps),
         .spawns = g_plainsSpawns, .spawnCount = COUNT(g_plainsSpawns),
+    },
+    [ZONE_CHARR_FOOTHILLS] = {
+        .name = "Charr Foothills",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 24, 17, 14, 255 },  // ashen scorched ground
+        .gridColor = { 84, 62, 50, 255 },
+        .portals = {
+            { { -480, 0 }, "To Ashford Plains", ZONE_ASHFORD_PLAINS, { 1320, 40 } },
+            { { 1300, -180 }, "To Piken Watch", ZONE_PIKEN_WATCH, { -220, 0 } },
+        },
+        .portalCount = 2,
+        .bounds = { -560, -400, 1960, 800 },
+        .hasShrine = true,
+        .shrinePos = { -380, 120 },
+        .props = g_foothillsProps, .propCount = COUNT(g_foothillsProps),
+        .spawns = g_foothillsSpawns, .spawnCount = COUNT(g_foothillsSpawns),
+    },
+    [ZONE_PIKEN_WATCH] = {
+        .name = "Piken Watch",
+        .mode = MODE_OUTPOST,
+        .clearColor = { 26, 22, 20, 255 },  // stone and torchlight
+        .gridColor = { 88, 76, 66, 255 },
+        .portals = {
+            { { -300, 0 }, "To Charr Foothills", ZONE_CHARR_FOOTHILLS, { 1200, -180 } },
+        },
+        .portalCount = 1,
+        .bounds = { -400, -280, 800, 560 },
+        .hasShrine = false,
+        .props = g_pikenProps, .propCount = COUNT(g_pikenProps),
+        .spawns = g_pikenSpawns, .spawnCount = COUNT(g_pikenSpawns),
     },
 };
 
@@ -219,6 +337,7 @@ static float g_autoResTimer = 0.0f;
 
 GameMode World_GetMode(void) { return g_zone->mode; }
 const char *World_GetZoneName(void) { return g_zone->name; }
+ZoneId World_GetZoneId(void) { return g_zoneId; }
 Color World_GetClearColor(void) { return g_zone->clearColor; }
 Color World_GetGridColor(void) { return g_zone->gridColor; }
 bool World_IsThomHired(void) { return g_thomHired; }
@@ -353,9 +472,17 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->leashRange = def->aggro * 2.5f;
     m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
     m->groupId = def->group;
-    m->species = SPECIES_CHARR; // every current monster is a Charr; new
-                                // species arrive with the foothills data
-    if (def->withHowl) {
+    m->species = def->species;
+    if (def->caster) {
+        // Shaman loadout: hangs back and casts Fire Magic - the ranged
+        // threat that makes the party pick targets instead of piling on.
+        m->attackRange = 210.0f;
+        m->maxEnergy = m->energy = 40;
+        m->attributeRank[ATTR_FIRE_MAGIC] = def->strengthRank;
+        m->skillBar[0] = SK_FIRE_BOLT;
+        m->skillBar[1] = SK_MIND_SEAR;
+        if (def->withHowl) m->skillBar[2] = SK_FERAL_HOWL;
+    } else if (def->withHowl) {
         m->skillBar[0] = SK_FERAL_HOWL; // self-heal - interrupt it!
         m->skillBar[1] = SK_CLAW_SWIPE;
     } else {

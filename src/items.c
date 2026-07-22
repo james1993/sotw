@@ -172,7 +172,7 @@ static GroundDrop *FindFreeDrop(void) {
     return NULL;
 }
 
-void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel) {
+void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, bool dropsHide) {
     GroundDrop *d = FindFreeDrop();
     if (d) {
         memset(d, 0, sizeof(GroundDrop));
@@ -193,7 +193,7 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel) {
             d->item.count = 1;
             d->item.unidentified = true; // looted weapons need an ID kit
         }
-    } else if (GetRandomValue(1, 100) <= 55) {
+    } else if (dropsHide && GetRandomValue(1, 100) <= 55) {
         d = FindFreeDrop();
         if (d) {
             memset(d, 0, sizeof(GroundDrop));

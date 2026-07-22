@@ -127,7 +127,7 @@ static void DrawEnvironment(void) {
     for (int i = 0; i < QUEST_COUNT; i++) {
         const Quest *q = &g_quests[i];
         if (q->type != QTYPE_REACH || q->state != QUEST_ACTIVE) continue;
-        if (World_GetMode() != MODE_EXPLORABLE) continue;
+        if (q->targetZone != World_GetZoneId()) continue;
         Vector2 p = q->targetPos;
         DrawCircleLines((int)p.x, (int)p.y, q->reachRadius, (Color){ 90, 220, 90, 90 });
         DrawLineEx((Vector2){ p.x, p.y + 6 }, (Vector2){ p.x, p.y - 26 }, 3.0f, (Color){ 200, 200, 200, 255 });
@@ -232,7 +232,7 @@ void Render_World(Camera2D camera) {
 
         // GW1's green exclamation point over quest givers with something
         // to offer (or a reward to hand out).
-        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER && Quests_GiverHasAttention()) {
+        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER && Quests_GiverHasAttentionFor(e->name)) {
             int mw = UITextWidth("!", 16);
             UIText("!", (int)(e->pos.x - mw / 2), (int)(e->pos.y - e->radius - 32.0f), 16, (Color){ 90, 230, 90, 255 });
         }

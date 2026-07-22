@@ -108,13 +108,20 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 
 ### Zones
 
-The game starts in **Ashford Camp**, a GW1-style outpost: no combat,
-service NPCs (quest giver, merchant, hireable henchman), and a portal to
-**Ashford Plains** — a combat instance that reloads fresh on every
-entry, exactly like GW1's per-party explorable areas. Returning to the
-outpost fully restores the party, and party members wait near the gate
-while you wander the outpost instead of trailing you around town -
-they only fall in behind you out in the field.
+The world is a four-zone chain. The game starts in **Ashford Camp**, a
+GW1-style outpost: no combat, service NPCs (quest giver, merchant,
+armorer, hireable henchman), and a portal to **Ashford Plains** — a
+combat instance that reloads fresh on every entry, exactly like GW1's
+per-party explorable areas. Past the plains' eastern ridge lie the
+**Charr Foothills**, a harder explorable where warbands field **Charr
+Shamans** (ranged Fire Magic casters worth killing first) and the
+gullies crawl with **Devourers** — a second species with its own look
+and no hides to salvage. The road ends at **Piken Watch**, a forward
+outpost where **Warmaster Grast** offers his own quest book (kill,
+collect, and item-reward quests) and a trader keeps you stocked.
+Returning to any outpost fully restores the party, and party members
+wait near the gate while you wander the outpost instead of trailing
+you around town - they only fall in behind you out in the field.
 
 Every zone has a hard **boundary** - drawn as a wall line in the
 world, dashed on the compass, and framing the region map - so the
@@ -135,9 +142,14 @@ aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
 spell — and the whole camp answers. Patrols hunt alone; their threat is
 walking into your fight at the wrong moment.
 
-Captain Osric's quests chain GW1-style: finish *Charr at the Gate*
-(kill quest) and he offers *Scout the Eastern Ridge* (reach the green
-flag marker deep in the plains).
+Quests are per-giver, GW1-style: Captain Osric's chain in Ashford
+(finish *Charr at the Gate* and he offers *Scout the Eastern Ridge*,
+whose marker points at the foothills gate), and Warmaster Grast's book
+at Piken Watch — *Silence the Shamans* (rewards the Warmaster's
+Hammer), *Clear the Gullies* (rewards an Identification Kit), and the
+collect quest *Hides for the Watch*, which consumes 4 Charr Hides on
+turn-in and tracks your bag live. Item rewards need a free bag slot,
+and each giver's green "!" only lights for their own work.
 
 ### Death
 

@@ -96,7 +96,7 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
     for (int i = 0; i < QUEST_COUNT; i++) {
         const Quest *q = &g_quests[i];
         if (q->type != QTYPE_REACH || q->state != QUEST_ACTIVE) continue;
-        if (World_GetMode() != MODE_EXPLORABLE) continue;
+        if (q->targetZone != World_GetZoneId()) continue;
         if (WorldToCompass(q->targetPos, player->pos, center, radius, 5.0f, &p)) {
             DrawTriangle((Vector2){ p.x, p.y - 5 }, (Vector2){ p.x - 4, p.y + 3 },
                          (Vector2){ p.x + 4, p.y + 3 }, (Color){ 90, 220, 90, 255 });

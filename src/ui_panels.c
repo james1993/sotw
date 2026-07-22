@@ -11,6 +11,7 @@
 #include "ui_theme.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #define PLAYER_INDEX 0
 #define DIALOG_WALKAWAY_DISTANCE 130.0f
@@ -555,33 +556,44 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
 
     switch (npc->npcRole) {
         case NPC_QUEST_GIVER: {
-            int ready = Quests_ReadyToTurnInIndex();
-            int offer = Quests_OfferableIndex();
+            // Each giver only deals in their own quest book - Osric's
+            // work stays in Ashford, Grast's on the Piken frontier.
+            int ready = Quests_ReadyToTurnInIndexFor(npc->name);
+            int offer = Quests_OfferableIndexFor(npc->name);
             if (ready >= 0) {
-                UIText("You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
-                char label[96];
-                snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg)",
-                         g_quests[ready].name, g_quests[ready].rewardXP, g_quests[ready].rewardGold);
-                if (DialogButton(btn, label, font, true)) {
+                Quest *q = &g_quests[ready];
+                bool bagFull = q->rewardItem && g_inventoryCount >= MAX_INVENTORY;
+                UIText(bagFull ? "Your bags are full - make room for your reward."
+                               : "You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
+                char label[112];
+                if (q->rewardItem) {
+                    snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg, %s)",
+                             q->name, q->rewardXP, q->rewardGold, q->rewardItem->name);
+                } else {
+                    snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg)",
+                             q->name, q->rewardXP, q->rewardGold);
+                }
+                if (DialogButton(btn, label, font, !bagFull)) {
                     Quests_TurnIn(player, ready);
                 }
             } else if (offer >= 0) {
-                UIText(offer == 0 ? "The Charr prowl our plains. Will you thin them out?"
-                                  : "With the Charr culled, we need eyes on the eastern ridge.",
-                       x, y, font, LIGHTGRAY);
-                char label[96];
-                snprintf(label, sizeof(label), "Accept: %s (%d XP, %dg)",
-                         g_quests[offer].name, g_quests[offer].rewardXP, g_quests[offer].rewardGold);
+                Quest *q = &g_quests[offer];
+                UIText(q->offerText, x, y, font, LIGHTGRAY);
+                char label[112];
+                snprintf(label, sizeof(label), "Accept: %s (%d XP, %dg%s%s)",
+                         q->name, q->rewardXP, q->rewardGold,
+                         q->rewardItem ? ", " : "", q->rewardItem ? q->rewardItem->name : "");
                 if (DialogButton(btn, label, font, true)) {
                     Quests_Accept(offer);
                 }
             } else {
                 bool anyActive = false;
                 for (int i = 0; i < QUEST_COUNT; i++) {
-                    if (g_quests[i].state == QUEST_ACTIVE) anyActive = true;
+                    if (g_quests[i].state == QUEST_ACTIVE &&
+                        strcmp(g_quests[i].giverName, npc->name) == 0) anyActive = true;
                 }
-                UIText(anyActive ? "Your task awaits in the plains. Good hunting."
-                                 : "Ashford is safer for your work, friend.", x, y, font, LIGHTGRAY);
+                UIText(anyActive ? "Your task awaits. Good hunting."
+                                 : "Nothing more for now, friend.", x, y, font, LIGHTGRAY);
             }
             break;
         }

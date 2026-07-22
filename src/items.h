@@ -93,8 +93,9 @@ void Items_EquipArmor(struct Entity *player, int inventoryIndex);
 
 // Rolls GW1-style loot for a killed monster: always some gold, a decent
 // chance of a weapon or a crafting material. Armor never drops - like
-// GW1, armor is only crafted (see the Armorer NPC).
-void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel);
+// GW1, armor is only crafted (see the Armorer NPC). Hides only come off
+// creatures that have them - Charr, not Devourers.
+void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, bool dropsHide);
 
 // Walk-over pickup: anything within reach of the player is collected.
 void Items_UpdatePickup(struct Entity *player);

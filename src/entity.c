@@ -147,7 +147,7 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
             // GW1 XP is party-wide: the player levels no matter whether
             // they or the hero landed the killing blow.
             Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
-            Items_SpawnMonsterDrops(e->pos, e->level);
+            Items_SpawnMonsterDrops(e->pos, e->level, e->species == SPECIES_CHARR);
             Quests_NotifyMonsterKill(e);
         }
     }
