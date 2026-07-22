@@ -3,6 +3,7 @@
 #include "world.h"
 #include "ui_compass.h"
 #include "ui_hit.h"
+#include "ui_theme.h"
 #include "raylib.h"
 #include "ui_font.h"
 #include <stdio.h>
@@ -54,9 +55,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
     UIHit_Claim(g_panelRect);
 
-    DrawRectangle(x, y, panelW, panelH, (Color){ 20, 22, 30, 210 });
-    DrawRectangleLines(x, y, panelW, panelH, (Color){ 120, 120, 140, 255 });
-    UIText("Party", x + pad, y - font - 4, font, LIGHTGRAY);
+    UI_ThemePanel(g_panelRect, scale, 0);
+    UIText("Party", x + pad, y - font - 4, font, UI_GOLD);
 
     bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     Vector2 mouse = GetMousePosition();
@@ -118,11 +118,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         int barY = rowY + font + 2;
         int barW = panelW - 2 * pad - arrow - 6; // leave room for status arrows
         float pct = (e->maxHp > 0) ? (float)e->hp / (float)e->maxHp : 0.0f;
-        DrawRectangle(x + pad, barY, barW, barH, (Color){ 40, 40, 40, 255 });
-        if (e->alive) {
-            DrawRectangle(x + pad, barY, (int)(barW * pct), barH, (Color){ 190, 40, 40, 255 });
-        }
-        DrawRectangleLines(x + pad, barY, barW, barH, BLACK);
+        UI_ThemeBar((Rectangle){ (float)(x + pad), (float)barY, (float)barW, (float)barH },
+                    e->alive ? pct : 0.0f, (Color){ 190, 40, 40, 255 }, NULL, font);
 
         // Thin energy strip under each member's health, like GW1's party
         // window gives heroes.
@@ -130,11 +127,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         float smoothEn = (float)e->energy + e->energyRegenAccum / ENERGY_REGEN_INTERVAL;
         float enPct = (e->maxEnergy > 0) ? smoothEn / (float)e->maxEnergy : 0.0f;
         if (enPct > 1.0f) enPct = 1.0f;
-        DrawRectangle(x + pad, enY, barW, energyH, (Color){ 40, 40, 40, 255 });
-        if (e->alive) {
-            DrawRectangle(x + pad, enY, (int)(barW * enPct), energyH, (Color){ 60, 130, 220, 255 });
-        }
-        DrawRectangleLines(x + pad, enY, barW, energyH, BLACK);
+        UI_ThemeBar((Rectangle){ (float)(x + pad), (float)enY, (float)barW, (float)energyH },
+                    e->alive ? enPct : 0.0f, (Color){ 60, 130, 220, 255 }, NULL, font);
 
         bool hasCondition = false, hasHex = false;
         for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) {

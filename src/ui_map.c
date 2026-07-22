@@ -4,6 +4,7 @@
 #include "quests.h"
 #include "ui_font.h"
 #include "ui_hit.h"
+#include "ui_theme.h"
 #include "raylib.h"
 
 #define PLAYER_INDEX 0
@@ -62,11 +63,17 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
     UIHit_Claim((Rectangle){ 0, 0, (float)screenWidth, (float)screenHeight });
     DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 150 });
     DrawRectangleRec(m.panel, (Color){ 22, 26, 22, 245 });
-    DrawRectangleLinesEx(m.panel, 2, (Color){ 120, 120, 140, 255 });
 
     // The instance boundary (the panel edge IS the boundary, but the
     // wall color ties it to what you see in the world and compass).
     DrawRectangleLinesEx(m.panel, 4, (Color){ 150, 70, 55, 220 });
+
+    // Gilt frame around the boundary wall, matching every other window.
+    DrawRectangleLinesEx((Rectangle){ m.panel.x - 3, m.panel.y - 3,
+                                      m.panel.width + 6, m.panel.height + 6 }, 2,
+                         (Color){ 8, 8, 12, 255 });
+    DrawRectangleLinesEx((Rectangle){ m.panel.x - 5, m.panel.y - 5,
+                                      m.panel.width + 10, m.panel.height + 10 }, 1, UI_GOLD_DIM);
 
     // Terrain props, faint - enough to recognize the lay of the land.
     int propCount = 0;

@@ -1,5 +1,6 @@
 #include "ui_menu.h"
 #include "ui_font.h"
+#include "ui_theme.h"
 #include "raylib.h"
 #include <math.h>
 
@@ -48,9 +49,9 @@ static bool MenuButton(Rectangle r, const char *label, int font, bool selected) 
 
     Color bg = (hovered || selected) ? (Color){ 80, 90, 120, 255 }
                                      : (Color){ 45, 50, 70, 255 };
-    DrawRectangleRec(r, bg);
-    DrawRectangleLinesEx(r, 2, selected ? (Color){ 210, 195, 150, 255 }
-                                        : (Color){ 130, 130, 150, 255 });
+    DrawRectangleGradientV((int)r.x, (int)r.y, (int)r.width, (int)r.height,
+                           bg, (Color){ bg.r / 2, bg.g / 2, bg.b / 2, 255 });
+    DrawRectangleLinesEx(r, 2, selected ? UI_GOLD : UI_GOLD_DIM);
 
     int tw = UITextWidth(label, font);
     UIText(label, (int)(r.x + (r.width - tw) / 2),

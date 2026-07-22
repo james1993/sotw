@@ -5,6 +5,7 @@
 #include "world.h"
 #include "ui_font.h"
 #include "ui_hit.h"
+#include "ui_theme.h"
 #include "raylib.h"
 #include <stdio.h>
 
@@ -58,13 +59,32 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
         Rectangle slotRect = { (float)x, (float)L.y, (float)L.slotSize, (float)L.slotSize };
 
         int skillIdx = player->skillBar[i];
-        Color base = (skillIdx >= 0) ? (Color){ 45, 45, 60, 255 } : (Color){ 25, 25, 25, 255 };
-        DrawRectangleRec(slotRect, base);
-        DrawRectangleLinesEx(slotRect, 2, (Color){ 180, 180, 180, 255 });
+        if (skillIdx >= 0) {
+            // GW1 shows icons, not names, in the bar; the name appears
+            // as a hover tooltip instead.
+            UI_DrawSkillIcon(skillIdx, slotRect);
+        } else {
+            DrawRectangleRec(slotRect, (Color){ 22, 22, 27, 255 });
+            DrawRectangleLinesEx(slotRect, 2, (Color){ 10, 10, 14, 255 });
+            DrawRectangleLinesEx((Rectangle){ slotRect.x + 2, slotRect.y + 2,
+                                              slotRect.width - 4, slotRect.height - 4 },
+                                 1, (Color){ 60, 58, 52, 255 });
+        }
 
         if (skillIdx >= 0) {
             Skill *s = &g_skillDB[skillIdx];
-            UIText(s->name, x + 4, L.y + 4, L.font, s->isElite ? GOLD : RAYWHITE);
+            if (s->isElite) {
+                // Elite skills get GW1's gold frame.
+                DrawRectangleLinesEx(slotRect, 2, UI_GOLD);
+            }
+            if (CheckCollisionPointRec(GetMousePosition(), slotRect)) {
+                int tw = UITextWidth(s->name, L.font);
+                int tx = x + (L.slotSize - tw) / 2;
+                int ty = L.y - L.font - (int)(8 * L.scale);
+                DrawRectangle(tx - 4, ty - 2, tw + 8, L.font + 5, (Color){ 12, 12, 16, 230 });
+                DrawRectangleLines(tx - 4, ty - 2, tw + 8, L.font + 5, UI_GOLD_DIM);
+                UIText(s->name, tx, ty, L.font, s->isElite ? GOLD : RAYWHITE);
+            }
 
             if (player->skillRecharge[i] > 0.0f) {
                 float pct = player->skillRecharge[i] / s->recharge;
@@ -113,9 +133,8 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
             int need = Progression_XPToNext(player->level);
             xpPct = (need > 0) ? (float)player->xp / (float)need : 0.0f;
         }
-        DrawRectangle(L.startX, xpY, L.totalWidth, xpH, (Color){ 30, 30, 30, 255 });
-        DrawRectangle(L.startX, xpY, (int)(L.totalWidth * xpPct), xpH, (Color){ 160, 140, 60, 255 });
-        DrawRectangleLines(L.startX, xpY, L.totalWidth, xpH, BLACK);
+        UI_ThemeBar((Rectangle){ (float)L.startX, (float)xpY, (float)L.totalWidth, (float)xpH },
+                    xpPct, (Color){ 160, 140, 60, 255 }, NULL, L.font);
 
         char lvl[32];
         snprintf(lvl, sizeof(lvl), "Level: %d", player->level);
@@ -124,18 +143,12 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
     }
 }
 
-// Flat bar with the current value centered inside - our styling; only
+// Beveled bar with the current value centered inside - themed chrome;
 // the placement convention (current value, centered) follows GW1.
 static void DrawResourceBar(int x, int y, int w, int h, int font, float pct, Color fillColor, int value) {
-    if (pct < 0.0f) pct = 0.0f;
-    if (pct > 1.0f) pct = 1.0f;
-    DrawRectangle(x, y, w, h, (Color){ 30, 30, 30, 255 });
-    DrawRectangle(x, y, (int)(w * pct), h, fillColor);
-    DrawRectangleLines(x, y, w, h, BLACK);
     char label[16];
     snprintf(label, sizeof(label), "%d", value);
-    int lw = UITextWidth(label, font);
-    UIText(label, x + (w - lw) / 2, y + (h - font) / 2, font, RAYWHITE);
+    UI_ThemeBar((Rectangle){ (float)x, (float)y, (float)w, (float)h }, pct, fillColor, label, font);
 }
 
 void UI_DrawResourceBars(int screenWidth, int screenHeight) {

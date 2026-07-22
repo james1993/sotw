@@ -7,6 +7,7 @@
 #include "ui_compass.h"
 #include "ui_hit.h"
 #include "ui_font.h"
+#include "ui_theme.h"
 #include "save.h"
 #include <math.h>
 #include <stdio.h>
@@ -143,8 +144,7 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
 
         int h = pad * 2 + font * 2 + 6;
         UIHit_Claim((Rectangle){ (float)x, (float)y, (float)w, (float)h });
-        DrawRectangle(x, y, w, h, (Color){ 20, 22, 30, 210 });
-        DrawRectangleLines(x, y, w, h, (Color){ 120, 120, 140, 255 });
+        UI_ThemePanel((Rectangle){ (float)x, (float)y, (float)w, (float)h }, scale, 0);
         UIText(q->name, x + pad, y + pad, font, GOLD);
         UIText(line2, x + pad, y + pad + font + 4, font,
                q->state == QUEST_READY_TO_TURN_IN ? (Color){ 130, 220, 130, 255 } : LIGHTGRAY);

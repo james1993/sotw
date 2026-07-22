@@ -39,6 +39,15 @@ confirm the architecture actually compiles and works: skill activation,
 resource costs, recharge timers, cast bars, and AI-driven combat were
 all exercised and visually verified.
 
+Presentation is procedural, no image assets: characters are layered-
+shape sprites with movement-driven walk cycles, swing and cast
+animations, and in-hand weapons matching what's equipped (robe color
+tracks armor tier); combat plays slash arcs, school-colored bursts,
+heal sparkles, AoE rings, and knockdown stars (`sprite.c`, `fx.c`).
+The UI shares one GW1-flavored chrome — slate panels with gold trim
+and corner ticks, beveled resource bars, and per-skill vector icons in
+the bar with hover tooltips (`ui_theme.c`).
+
 ### Build
 
 Requires a C compiler and CMake 3.15+. raylib is fetched automatically

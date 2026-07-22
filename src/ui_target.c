@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "ui_font.h"
 #include "ui_hit.h"
+#include "ui_theme.h"
 #include <stdio.h>
 
 #define PLAYER_INDEX 0
@@ -34,12 +35,11 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     y += font + pad;
 
     float hpPct = (target->maxHp > 0) ? (float)target->hp / (float)target->maxHp : 0.0f;
-    DrawRectangle(x, y, panelW, barH, (Color){ 30, 30, 30, 255 });
-    DrawRectangle(x, y, (int)(panelW * hpPct), barH, (target->team == 0) ? GREEN : RED);
-    DrawRectangleLines(x, y, panelW, barH, BLACK);
     char hpLabel[32];
     snprintf(hpLabel, sizeof(hpLabel), "%d / %d", target->hp, target->maxHp);
-    UIText(hpLabel, x + pad, y + 2, smallFont, RAYWHITE);
+    UI_ThemeBar((Rectangle){ (float)x, (float)y, (float)panelW, (float)barH }, hpPct,
+                (target->team == 0) ? (Color){ 70, 170, 90, 255 } : (Color){ 185, 45, 45, 255 },
+                hpLabel, smallFont);
     y += barH + pad;
 
     // Only ever show the skill the target is *currently* using, or the
@@ -76,17 +76,14 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
                 fillColor = (Color){ 80, 170, 90, 255 };
             }
 
-            DrawRectangle(x, y, panelW, castBarH, (Color){ 30, 30, 30, 255 });
-            DrawRectangle(x, y, (int)(panelW * pct), castBarH, fillColor);
-            DrawRectangleLines(x, y, panelW, castBarH, BLACK);
-
             char label[48];
             if (!isLive && target->lastCastInterrupted) {
                 snprintf(label, sizeof(label), "%s (interrupted)", s->name);
             } else {
                 snprintf(label, sizeof(label), "%s", s->name);
             }
-            UIText(label, x + pad, y + 2, smallFont, s->isElite ? GOLD : RAYWHITE);
+            UI_ThemeBar((Rectangle){ (float)x, (float)y, (float)panelW, (float)castBarH },
+                        pct, fillColor, label, smallFont);
             y += castBarH + pad;
         }
     }

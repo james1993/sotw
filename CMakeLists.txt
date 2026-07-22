@@ -56,6 +56,7 @@ add_executable(sotw_demake
     src/ui_hit.c
     src/ui_panels.c
     src/ui_font.c
+    src/ui_theme.c
     src/sprite.c
     src/fx.c
     src/render.c

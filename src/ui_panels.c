@@ -8,6 +8,7 @@
 #include "quests.h"
 #include "world.h"
 #include "ui_font.h"
+#include "ui_theme.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -102,8 +103,7 @@ static void DrawInventory(Entity *player, int screenHeight) {
     // Below the party window, which now owns the upper-left.
     g_invRect = (Rectangle){ (float)(20 * scale), (float)(310 * scale), (float)w, (float)h };
     UIHit_Claim(g_invRect);
-    DrawRectangleRec(g_invRect, (Color){ 20, 22, 30, 235 });
-    DrawRectangleLinesEx(g_invRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_invRect, scale, pad + font + pad / 2);
 
     int x = (int)g_invRect.x + pad;
     int y = (int)g_invRect.y + pad;
@@ -191,8 +191,7 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
 
     g_attrRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(140 * scale), (float)w, (float)h };
     UIHit_Claim(g_attrRect);
-    DrawRectangleRec(g_attrRect, (Color){ 20, 22, 30, 235 });
-    DrawRectangleLinesEx(g_attrRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_attrRect, scale, pad + font + pad / 2);
 
     int x = (int)g_attrRect.x + pad;
     int y = (int)g_attrRect.y + pad;
@@ -264,7 +263,7 @@ static bool DialogButton(Rectangle rect, const char *label, int font, bool enabl
     bool hovered = enabled && CheckCollisionPointRec(mouse, rect);
     DrawRectangleRec(rect, !enabled ? (Color){ 40, 40, 40, 255 }
                      : hovered ? (Color){ 80, 90, 120, 255 } : (Color){ 55, 60, 80, 255 });
-    DrawRectangleLinesEx(rect, 1, LIGHTGRAY);
+    DrawRectangleLinesEx(rect, 1, enabled ? UI_GOLD_DIM : (Color){ 70, 70, 70, 255 });
     UIText(label, (int)rect.x + 8, (int)rect.y + ((int)rect.height - font) / 2, font,
            enabled ? RAYWHITE : GRAY);
     if (enabled && GamepadDialogConfirm()) return true;
@@ -288,8 +287,7 @@ static void DrawShop(int screenWidth, int screenHeight) {
 
     g_shopRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale), (float)w, (float)h };
     UIHit_Claim(g_shopRect);
-    DrawRectangleRec(g_shopRect, (Color){ 20, 22, 30, 240 });
-    DrawRectangleLinesEx(g_shopRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_shopRect, scale, pad + font + pad / 2);
 
     int x = (int)g_shopRect.x + pad;
     int y = (int)g_shopRect.y + pad;
@@ -311,11 +309,10 @@ static void DrawShop(int screenWidth, int screenHeight) {
             bool hovered = CheckCollisionPointRec(mouse, tab);
             DrawRectangleRec(tab, active ? (Color){ 60, 66, 90, 255 }
                             : hovered ? (Color){ 45, 50, 70, 255 } : (Color){ 32, 35, 48, 255 });
-            DrawRectangleLinesEx(tab, 1, (Color){ 120, 120, 140, 255 });
+            DrawRectangleLinesEx(tab, 1, UI_GOLD_DIM);
             if (active) {
                 // Gold underline marks the live tab.
-                DrawRectangle((int)tab.x, (int)(tab.y + tab.height - 3), (int)tab.width, 3,
-                              (Color){ 200, 170, 90, 255 });
+                DrawRectangle((int)tab.x, (int)(tab.y + tab.height - 3), (int)tab.width, 3, UI_GOLD);
             }
             int tw = UITextWidth(names[t], font);
             UIText(names[t], (int)(tab.x + (tab.width - tw) / 2),
@@ -425,8 +422,7 @@ static void DrawEquipment(Entity *player, int screenHeight) {
     // Above the inventory, left side.
     g_equipRect = (Rectangle){ (float)(20 * scale), (float)(140 * scale), (float)w, (float)h };
     UIHit_Claim(g_equipRect);
-    DrawRectangleRec(g_equipRect, (Color){ 20, 22, 30, 235 });
-    DrawRectangleLinesEx(g_equipRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_equipRect, scale, pad + font + pad / 2);
 
     int x = (int)g_equipRect.x + pad;
     int y = (int)g_equipRect.y + pad;
@@ -485,8 +481,7 @@ static void DrawCraft(int screenWidth, int screenHeight) {
 
     g_craftRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale), (float)w, (float)h };
     UIHit_Claim(g_craftRect);
-    DrawRectangleRec(g_craftRect, (Color){ 20, 22, 30, 240 });
-    DrawRectangleLinesEx(g_craftRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_craftRect, scale, pad + font + pad / 2);
 
     int x = (int)g_craftRect.x + pad;
     int y = (int)g_craftRect.y + pad;
@@ -549,8 +544,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     g_dialogRect = (Rectangle){ (float)(screenWidth - w) / 2.0f,
                                 (float)screenHeight - (float)(220 * scale), (float)w, (float)h };
     UIHit_Claim(g_dialogRect);
-    DrawRectangleRec(g_dialogRect, (Color){ 20, 22, 30, 240 });
-    DrawRectangleLinesEx(g_dialogRect, 2, (Color){ 120, 120, 140, 255 });
+    UI_ThemePanel(g_dialogRect, scale, pad + font + 6);
 
     int x = (int)g_dialogRect.x + pad;
     int y = (int)g_dialogRect.y + pad;
