@@ -5,6 +5,8 @@
 #include "world.h"
 #include "quests.h"
 #include "ui_font.h"
+#include "sprite.h"
+#include "fx.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -21,12 +23,14 @@ static void DrawDrops(void) {
             DrawCircleV(d->pos, 5.0f, GOLD);
             DrawCircleLines((int)d->pos.x, (int)d->pos.y, 5.0f, (Color){ 120, 90, 20, 255 });
         } else {
-            Color c = (d->item.kind == ITEM_WEAPON) ? SKYBLUE : (Color){ 120, 220, 130, 255 };
-            DrawPoly(d->pos, 4, 7.0f, 45.0f, c);
-            DrawPolyLines(d->pos, 4, 7.0f, 45.0f, BLACK);
+            Color c = (d->item.kind == ITEM_WEAPON)
+                      ? (d->item.unidentified ? (Color){ 190, 150, 220, 255 } : SKYBLUE)
+                      : (d->item.kind == ITEM_MATERIAL) ? (Color){ 200, 170, 130, 255 }
+                                                        : (Color){ 120, 220, 130, 255 };
+            Sprite_DrawItemDrop(&d->item, d->pos);
             const char *label = Items_DisplayName(&d->item);
             int tw = UITextWidth(label, 10);
-            UIText(label, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 10), 10, c);
+            UIText(label, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 12), 10, c);
         }
     }
 }
@@ -205,12 +209,12 @@ void Render_World(Camera2D camera) {
         DrawCircleLines((int)currentTarget->pos.x, (int)currentTarget->pos.y, currentTarget->radius + 7.5f, GOLD);
     }
 
+    double now = GetTime();
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (!e->alive) continue;
 
-        DrawCircleV(e->pos, e->radius, e->color);
-        DrawCircleLines((int)e->pos.x, (int)e->pos.y, e->radius, BLACK);
+        Sprite_DrawEntity(e, now);
         DrawHealthBar(e);
         DrawCastBar(e);
 
@@ -239,6 +243,7 @@ void Render_World(Camera2D camera) {
     }
 
     Projectile_Draw();
+    Fx_Draw();
 
     EndMode2D();
 }

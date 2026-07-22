@@ -1,5 +1,6 @@
 #include "projectile.h"
 #include "entity.h"
+#include "fx.h"
 #include <math.h>
 #include <string.h>
 
@@ -50,6 +51,7 @@ static void Impact(Projectile *p) {
     }
 
     Entity_ApplyDamage(target, p->damage, shooter);
+    Fx_Burst(target->pos, p->color);
     if (shooter && shooter->alive) {
         shooter->adrenaline += 4; // landed hits build adrenaline, as in melee
         if (shooter->adrenaline > 100) shooter->adrenaline = 100;

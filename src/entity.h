@@ -24,6 +24,13 @@ typedef enum {
     ENT_NPC      // outpost service NPCs: quest giver, merchant, henchman
 } EntityKind;
 
+// What the sprite renderer draws for this entity (sprite.c).
+typedef enum {
+    SPECIES_HUMAN = 0,
+    SPECIES_CHARR,
+    SPECIES_DEVOURER
+} Species;
+
 typedef enum {
     NPC_NONE = 0,
     NPC_QUEST_GIVER,
@@ -148,6 +155,14 @@ typedef struct Entity {
     // aggro as one - pull any member and the whole group joins, like a
     // GW1 mob group. 0 = ungrouped (patrols hunt alone).
     int groupId;
+
+    // --- Sprite animation state (sprite.c) ---
+    Species species;
+    Vector2 prevPos;        // last frame's position - drives the walk cycle
+    Vector2 facing;         // unit vector of last movement direction
+    float animTime;         // advances with distance walked
+    float moveBlend;        // 0..1, eases the walk cycle in and out
+    float attackAnimTimer;  // > 0 during the swing animation
 
     // Patrol route: monsters with hasPatrol ping-pong between patrolA
     // and patrolB while idle, scanning for foes the whole way - the

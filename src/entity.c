@@ -50,6 +50,10 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->spawnPos = pos;
     e->aggroed = false;
 
+    e->species = SPECIES_HUMAN;
+    e->prevPos = pos;
+    e->facing = (Vector2){ 0.0f, 1.0f }; // face the camera (south)
+
     for (int i = 0; i < SKILL_BAR_SIZE; i++) e->skillBar[i] = -1;
 
     return idx;

@@ -6,6 +6,7 @@
 #include "input.h"
 #include "items.h"
 #include "projectile.h"
+#include "fx.h"
 #include "world.h"
 #include "quests.h"
 #include "save.h"
@@ -144,6 +145,7 @@ int main(void) {
             AI_Update(dt);
             Combat_TickTimers(dt);
             Projectile_Update(dt);
+            Fx_Update(dt);
 
             playerNow = Entity_Get(PLAYER_INDEX);
             World_Update(playerNow, dt);

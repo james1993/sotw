@@ -1,4 +1,5 @@
 #include "effect.h"
+#include "fx.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -14,6 +15,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
         case FX_DAMAGE: {
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
             Entity_ApplyDamage(target, dmg, caster);
+            Fx_Burst(target->pos, Fx_AttrColor(skill->attribute));
             Entity_MarkInCombat(caster);
             if (target->kind == ENT_MONSTER && !target->aggroed) {
                 // A ranged pull: damaging a sleeping monster wakes it up
@@ -31,6 +33,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // that heals - the whole reason a primary Monk out-heals a
             // secondary one with identical Healing Prayers.
             amount += 3 * caster->attributeRank[ATTR_DIVINE_FAVOR];
+            Fx_Heal(target->pos);
             target->hp += amount;
             if (target->hp > target->maxHp) target->hp = target->maxHp;
             break;
@@ -78,6 +81,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // driven by step->duration.
             target->castingSlot = -1;
             target->hasMoveTarget = false;
+            Fx_Stars(target->pos);
             break;
         }
         case FX_INTERRUPT: {
@@ -113,6 +117,7 @@ void Effect_Execute(Entity *caster, const Skill *skill, Entity *target) {
 
         if (skill->targeting == TARGET_AOE_FOES) {
             Vector2 origin = target ? target->pos : caster->pos;
+            if (i == 0) Fx_Ring(origin, skill->aoeRadius, Fx_AttrColor(skill->attribute));
             for (int j = 0; j < g_entityCount; j++) {
                 Entity *other = &g_entities[j];
                 if (!other->alive || other->team == caster->team) continue;

@@ -3,6 +3,7 @@
 #include "effect.h"
 #include "world.h"
 #include "projectile.h"
+#include "fx.h"
 #include "raylib.h"
 #include <math.h>
 #include <stddef.h>
@@ -150,6 +151,11 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         if (e->postCastDisplayTimer < 0.0f) e->postCastDisplayTimer = 0.0f;
     }
 
+    if (e->attackAnimTimer > 0.0f) {
+        e->attackAnimTimer -= dt;
+        if (e->attackAnimTimer < 0.0f) e->attackAnimTimer = 0.0f;
+    }
+
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
         if (e->skillRecharge[i] > 0.0f) {
             e->skillRecharge[i] -= dt;
@@ -213,6 +219,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
                 Entity_MarkInCombat(e);
+                e->attackAnimTimer = 0.3f; // the visible swing (sprite.c)
                 if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
                     // Ranged: a visible bolt flies to where the target is
                     // standing NOW; adrenaline/aggro/damage resolve on
@@ -220,6 +227,8 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     Projectile_Spawn((int)(e - g_entities), Entity_RefIndex(e->targetRef), dmg);
                 } else {
                     Entity_ApplyDamage(target, dmg, e);
+                    Fx_Slash(target->pos, atan2f(target->pos.y - e->pos.y,
+                                                 target->pos.x - e->pos.x));
                     if (target->kind == ENT_MONSTER && !target->aggroed) {
                         // Landing a hit wakes a sleeping monster up regardless
                         // of its aggro range - pulling with melee still works,
@@ -241,6 +250,23 @@ void Combat_UpdateEntity(Entity *e, float dt) {
 
 void Combat_TickTimers(float dt) {
     for (int i = 0; i < g_entityCount; i++) {
-        Combat_UpdateEntity(&g_entities[i], dt);
+        Entity *e = &g_entities[i];
+        Combat_UpdateEntity(e, dt);
+
+        // Sprite animation bookkeeping, from actual movement this frame
+        // (covers click-pathing, AI chasing, and stick movement alike).
+        float mdx = e->pos.x - e->prevPos.x;
+        float mdy = e->pos.y - e->prevPos.y;
+        float md = sqrtf(mdx * mdx + mdy * mdy);
+        if (md > 0.01f) {
+            e->facing = (Vector2){ mdx / md, mdy / md };
+            e->animTime += md * 0.055f; // stride frequency tied to speed
+            e->moveBlend += dt * 8.0f;
+        } else {
+            e->moveBlend -= dt * 8.0f;
+        }
+        if (e->moveBlend < 0.0f) e->moveBlend = 0.0f;
+        if (e->moveBlend > 1.0f) e->moveBlend = 1.0f;
+        e->prevPos = e->pos;
     }
 }

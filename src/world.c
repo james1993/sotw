@@ -4,6 +4,7 @@
 #include "attributes.h"
 #include "skill.h"
 #include "projectile.h"
+#include "fx.h"
 #include "save.h"
 #include <math.h>
 #include <string.h>
@@ -352,6 +353,8 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->leashRange = def->aggro * 2.5f;
     m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
     m->groupId = def->group;
+    m->species = SPECIES_CHARR; // every current monster is a Charr; new
+                                // species arrive with the foothills data
     if (def->withHowl) {
         m->skillBar[0] = SK_FERAL_HOWL; // self-heal - interrupt it!
         m->skillBar[1] = SK_CLAW_SWIPE;
@@ -395,6 +398,7 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     g_entityCount = 0;
     memset(g_drops, 0, sizeof(g_drops)); // ground loot doesn't survive rezoning, like GW1
     Projectile_ClearAll();               // and neither do shots in flight
+    Fx_Clear();
 
     g_entities[g_entityCount++] = saved;
     Entity *player = Entity_Get(PLAYER_INDEX);
