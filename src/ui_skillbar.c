@@ -54,6 +54,23 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
     UIHit_Claim((Rectangle){ (float)L.startX, (float)L.y,
                              (float)L.totalWidth, (float)(screenHeight - L.y) });
 
+    // A backing rail behind the slots and the resource bars above them,
+    // so the bottom HUD reads as one mounted assembly instead of loose
+    // tiles floating over the world.
+    {
+        int railPad = (int)(9 * L.scale);
+        int railTop = L.y - (int)(52 * L.scale);
+        Rectangle rail = { (float)(L.startX - railPad), (float)railTop,
+                           (float)(L.totalWidth + railPad * 2),
+                           (float)(screenHeight - railTop) };
+        DrawRectangleGradientV((int)rail.x, (int)rail.y, (int)rail.width, (int)rail.height,
+                               (Color){ 20, 21, 28, 150 }, (Color){ 12, 12, 16, 225 });
+        DrawRectangle((int)rail.x, (int)rail.y, (int)rail.width, 1, UI_GOLD_DIM);
+        // Short gold uprights at either end frame the assembly.
+        DrawRectangle((int)rail.x, (int)rail.y, 1, (int)rail.height, UI_GOLD_DIM);
+        DrawRectangle((int)(rail.x + rail.width) - 1, (int)rail.y, 1, (int)rail.height, UI_GOLD_DIM);
+    }
+
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
         int x = L.startX + i * (L.slotSize + L.gap);
         Rectangle slotRect = { (float)x, (float)L.y, (float)L.slotSize, (float)L.slotSize };

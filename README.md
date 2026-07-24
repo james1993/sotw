@@ -46,7 +46,16 @@ tracks armor tier); combat plays slash arcs, school-colored bursts,
 heal sparkles, AoE rings, and knockdown stars (`sprite.c`, `fx.c`).
 The UI shares one GW1-flavored chrome — slate panels with gold trim
 and corner ticks, beveled resource bars, and per-skill vector icons in
-the bar with hover tooltips (`ui_theme.c`).
+the bar with hover tooltips (`ui_theme.c`), a gilt compass bezel, and a
+mounted rail behind the skill bar.
+
+Everything that floats over an entity — nameplates, health and cast
+bars, quest markers, loot labels, the interact prompt — is drawn in a
+separate screen-space pass (`ui_world.c`) rather than inside the camera
+transform, so text stays crisp and plates stay the same size at any
+zoom. That pass also decides *what* deserves a label: idle monsters stay
+anonymous until they're targeted, hovered, awake, or hurt, which keeps a
+quiet field from becoming a wall of floating text.
 
 ### Build
 
@@ -68,13 +77,20 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Left-click** empty ground to move there.
 - **Left-click** an enemy to target it (auto-walks into range and
   auto-attacks). **C** targets the nearest foe, **Tab** cycles foes —
-  GW1's classic keys. **Escape** clears your target.
+  GW1's classic keys. **Escape** clears your target. Target cycling only
+  ever walks *hostile* foes: friendly NPCs are never in the rotation.
+  Whatever is targeted gets a ground reticle with rotating ticks, a gold
+  nameplate, and a gold outline on its floating health bar.
 - **Left-click a party member** (in the world or their bar in the party
   window) to select them, so ally spells like Orison of Healing land on
   them; with no ally selected, ally spells fall back to casting on
   yourself, like GW1.
-- **Left-click an NPC** in the outpost to talk: accept Captain Osric's
-  quest, hire Little Thom, or trade with the Merchant.
+- **Walk up to an NPC and press F** to talk: accept a quest, hire Little
+  Thom, or trade. Standing in range lights that NPC with a green ground
+  reticle and a floating **Talk to \<name\>** prompt showing the button,
+  so there's never a question about who you're about to speak to — and
+  the prompt marks the exact NPC the key acts on. **Left-clicking** an
+  NPC works too (and walks you over if you're out of range).
 - **1–5** activate your equipped skills (Monk bar: Orison of Healing,
   Banish, Smite, Bane Signet, plus Fire Bolt from the Elementalist
   secondary). Vekk, the hero companion, fights automatically the same
@@ -91,12 +107,12 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
   **L1/R1** cycle backward/forward through visible enemies (nearest
-  first). **D-pad up/down** selects party members and **left/right**
-  also cycles enemies, matching GW1's official gamepad scheme; bare
-  **B** clears the target. Bare **X** (Xbox) / **Square** (PlayStation)
-  talks: it walks you to the nearest NPC, opens their dialog in reach,
-  and advances the conversation (accept quest, hire, browse) once a
-  dialog is up. While a dialog or the merchant window is open, a
+  first, hostiles only). **D-pad up/down** selects party members and
+  **left/right** also cycles enemies, matching GW1's official gamepad
+  scheme; bare **B** clears the target. Bare **X** (Xbox) / **Square**
+  (PlayStation) talks to the NPC you're standing next to — the one the
+  floating prompt is pointing at — and advances the conversation
+  (accept quest, hire, browse) once a dialog is up. While a dialog or the merchant window is open, a
   GW1-style **menu cursor** appears: the **left stick** steers it, **A**
   clicks whatever it hovers (individual shop rows included), and **B**
   backs out of the conversation; touching the mouse hands the pointer
@@ -105,6 +121,10 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   the pause menu. The main menu and pause menu are fully pad-navigable:
   **D-pad** or **left stick** moves the highlight, **A** confirms
   (Up/Down + Enter on keyboard).
+- You don't have to memorise any of this: a **control legend** sits
+  along the bottom of the screen listing every binding, and it swaps to
+  pad glyphs the moment a controller is detected. Each panel also carries
+  its own hotkey badge in its title bar and a close box.
 
 ### Zones
 

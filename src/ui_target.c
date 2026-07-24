@@ -17,22 +17,44 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
 
     float scale = UI_Scale(screenHeight);
     int panelW = (int)(340 * scale);
-    int barH = (int)(20 * scale);
+    int barH = (int)(18 * scale);
     int font = (int)(14 * scale);
     int smallFont = (int)(10 * scale);
-    int pad = (int)(4 * scale);
+    int pad = (int)(8 * scale);
 
     int x = (screenWidth - panelW) / 2;
     int y = startY;
 
-    // Claim the panel's maximum footprint (name + HP bar + cast bar) so
-    // clicks near the top-center HUD never leak into the world.
-    UIHit_Claim((Rectangle){ (float)x, (float)y,
-                             (float)panelW, (float)(font + barH + (int)(18 * scale) + pad * 3) });
+    // Height depends on whether a cast bar is showing, so the frame
+    // always hugs its contents instead of leaving a dead strip.
+    bool showCast = Entity_IsCasting(target) ||
+                    (target->postCastDisplayTimer > 0.0f && target->lastCastSkillSlot >= 0);
+    int castBarH = (int)(16 * scale);
+    int panelH = pad * 2 + font + (int)(4 * scale) + barH +
+                 (showCast ? castBarH + (int)(4 * scale) : 0);
 
-    Color teamColor = (target->team == 0) ? SKYBLUE : (Color){ 255, 140, 140, 255 };
+    Rectangle frame = { (float)x, (float)y, (float)panelW, (float)panelH };
+    UIHit_Claim(frame);
+    UI_ThemePanel(frame, scale, 0);
+
+    x += pad;
+    y += pad;
+    int innerW = panelW - pad * 2;
+
+    // Name on the left, level on the right - the two things you check
+    // before committing to a fight.
+    Color teamColor = (target->team == 0) ? (Color){ 158, 206, 255, 255 }
+                                          : (Color){ 246, 138, 128, 255 };
     UIText(target->name, x, y, font, teamColor);
-    y += font + pad;
+    if (target->kind == ENT_MONSTER && target->level > 0) {
+        char lvl[24];
+        snprintf(lvl, sizeof(lvl), "Level %d", target->level);
+        int lw = UITextWidth(lvl, smallFont);
+        UIText(lvl, x + innerW - lw, y + (font - smallFont) / 2, smallFont,
+               (Color){ 206, 174, 130, 255 });
+    }
+    y += font + (int)(4 * scale);
+    panelW = innerW;
 
     float hpPct = (target->maxHp > 0) ? (float)target->hp / (float)target->maxHp : 0.0f;
     char hpLabel[32];
@@ -40,7 +62,7 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     UI_ThemeBar((Rectangle){ (float)x, (float)y, (float)panelW, (float)barH }, hpPct,
                 (target->team == 0) ? (Color){ 70, 170, 90, 255 } : (Color){ 185, 45, 45, 255 },
                 hpLabel, smallFont);
-    y += barH + pad;
+    y += barH + (int)(4 * scale);
 
     // Only ever show the skill the target is *currently* using, or the
     // one they *just* used (for a few seconds after) - never their whole
@@ -60,7 +82,6 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
         int skillIdx = target->skillBar[displaySlot];
         if (skillIdx >= 0 && skillIdx < g_skillCount) {
             Skill *s = &g_skillDB[skillIdx];
-            int castBarH = (int)(18 * scale);
 
             float pct;
             Color fillColor;

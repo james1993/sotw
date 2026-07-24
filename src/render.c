@@ -47,18 +47,33 @@ static void DrawDrops(double now) {
 // since the prototype has no sprite assets yet. WHAT to draw and WHERE
 // comes from the current zone's prop table (world.c) - render.c only
 // knows how each prop type looks.
+// Props all sit on a soft contact shadow and are lit from the upper
+// left, so they feel planted on the ground rather than pasted over it -
+// the same trick the character sprites already use.
+static void DrawPropShadow(Vector2 pos, float rx, float ry) {
+    DrawEllipse((int)pos.x, (int)(pos.y + ry * 0.5f), rx, ry, (Color){ 0, 0, 0, 70 });
+}
+
 static void DrawTree(Vector2 pos, float scale) {
+    DrawPropShadow((Vector2){ pos.x, pos.y + 10 * scale }, 15 * scale, 5 * scale);
     DrawRectangle((int)(pos.x - 3 * scale), (int)(pos.y - 2 * scale), (int)(6 * scale), (int)(14 * scale),
-        (Color){ 90, 60, 40, 255 });
-    DrawCircleV((Vector2){ pos.x - 8 * scale, pos.y - 12 * scale }, 11 * scale, (Color){ 42, 95, 52, 255 });
-    DrawCircleV((Vector2){ pos.x + 9 * scale, pos.y - 14 * scale }, 12 * scale, (Color){ 36, 82, 46, 255 });
+        (Color){ 78, 52, 34, 255 });
+    DrawRectangle((int)(pos.x - 3 * scale), (int)(pos.y - 2 * scale), (int)(2 * scale), (int)(14 * scale),
+        (Color){ 104, 72, 46, 255 }); // lit side of the trunk
+    // Canopy: shaded lobes first, then a lit crown and a highlight.
+    DrawCircleV((Vector2){ pos.x - 8 * scale, pos.y - 12 * scale }, 11 * scale, (Color){ 34, 76, 42, 255 });
+    DrawCircleV((Vector2){ pos.x + 9 * scale, pos.y - 14 * scale }, 12 * scale, (Color){ 30, 68, 38, 255 });
     DrawCircleV((Vector2){ pos.x, pos.y - 20 * scale }, 15 * scale, (Color){ 46, 100, 56, 255 });
+    DrawCircleV((Vector2){ pos.x - 5 * scale, pos.y - 24 * scale }, 6 * scale, (Color){ 62, 122, 68, 255 });
 }
 
 static void DrawRock(Vector2 pos, float scale) {
-    DrawCircleV((Vector2){ pos.x + 5 * scale, pos.y + 3 * scale }, 7 * scale, (Color){ 62, 62, 67, 255 });
-    DrawCircleV(pos, 10 * scale, (Color){ 82, 82, 88, 255 });
-    DrawCircleLines((int)pos.x, (int)pos.y, 10 * scale, (Color){ 40, 40, 45, 255 });
+    DrawPropShadow(pos, 12 * scale, 4.5f * scale);
+    DrawCircleV((Vector2){ pos.x + 5 * scale, pos.y + 3 * scale }, 7 * scale, (Color){ 56, 56, 61, 255 });
+    DrawCircleV(pos, 10 * scale, (Color){ 76, 76, 83, 255 });
+    // A crescent highlight on the upper left reads as a lit facet.
+    DrawCircleV((Vector2){ pos.x - 3 * scale, pos.y - 3 * scale }, 5 * scale, (Color){ 104, 104, 112, 255 });
+    DrawCircleLines((int)pos.x, (int)pos.y, 10 * scale, (Color){ 34, 34, 39, 255 });
 }
 
 static void DrawGrassTuft(Vector2 pos, float scale) {
@@ -73,19 +88,51 @@ static void DrawTent(Vector2 pos, float scale) {
     Vector2 top = { pos.x, pos.y - 26 * scale };
     Vector2 left = { pos.x - 22 * scale, pos.y + 8 * scale };
     Vector2 right = { pos.x + 22 * scale, pos.y + 8 * scale };
-    DrawTriangle(top, left, right, (Color){ 150, 120, 80, 255 });
-    DrawTriangleLines(top, left, right, (Color){ 90, 70, 45, 255 });
-    // Entrance flap
+    DrawPropShadow((Vector2){ pos.x, pos.y + 8 * scale }, 24 * scale, 6 * scale);
+
+    // Two canvas panels at different values give the tent a ridge and a
+    // shaded side instead of reading as one flat triangle.
+    DrawTriangle(top, left, (Vector2){ pos.x, pos.y + 8 * scale }, (Color){ 162, 131, 88, 255 });
+    DrawTriangle(top, (Vector2){ pos.x, pos.y + 8 * scale }, right, (Color){ 124, 98, 64, 255 });
+    DrawTriangleLines(top, left, right, (Color){ 78, 60, 38, 255 });
+
+    // Guy lines and pegs.
+    DrawLineEx(top, (Vector2){ pos.x - 30 * scale, pos.y + 9 * scale }, 1.2f, (Color){ 92, 74, 50, 200 });
+    DrawLineEx(top, (Vector2){ pos.x + 30 * scale, pos.y + 9 * scale }, 1.2f, (Color){ 92, 74, 50, 200 });
+
+    // Entrance flap, darker at the bottom where it falls into shadow.
     DrawTriangle((Vector2){ pos.x, pos.y - 8 * scale },
                  (Vector2){ pos.x - 7 * scale, pos.y + 8 * scale },
                  (Vector2){ pos.x + 7 * scale, pos.y + 8 * scale },
-                 (Color){ 60, 48, 32, 255 });
+                 (Color){ 44, 34, 24, 255 });
 }
 
 static void DrawCampfire(Vector2 pos, float scale) {
-    DrawCircleV(pos, 10 * scale, (Color){ 60, 50, 45, 255 });
-    DrawCircleV(pos, 6 * scale, (Color){ 230, 130, 40, 255 });
-    DrawCircleV((Vector2){ pos.x, pos.y - 3 * scale }, 3 * scale, (Color){ 255, 210, 90, 255 });
+    // Firelight pooling on the ground, animated so camps feel alive.
+    float flicker = 0.85f + 0.15f * sinf((float)GetTime() * 7.3f + pos.x);
+    DrawCircleGradient((int)pos.x, (int)pos.y, 46 * scale * flicker,
+                       (Color){ 255, 150, 60, 46 }, (Color){ 255, 120, 40, 0 });
+
+    // Stone ring.
+    for (int i = 0; i < 7; i++) {
+        float a = i * (2.0f * PI / 7.0f);
+        DrawCircleV((Vector2){ pos.x + cosf(a) * 11 * scale, pos.y + sinf(a) * 6 * scale },
+                    3.2f * scale, (Color){ 74, 70, 66, 255 });
+    }
+    // Logs, then flame.
+    DrawLineEx((Vector2){ pos.x - 7 * scale, pos.y + 2 * scale },
+               (Vector2){ pos.x + 7 * scale, pos.y - 2 * scale }, 3.0f * scale, (Color){ 78, 54, 36, 255 });
+    DrawLineEx((Vector2){ pos.x - 6 * scale, pos.y - 2 * scale },
+               (Vector2){ pos.x + 6 * scale, pos.y + 2 * scale }, 3.0f * scale, (Color){ 64, 44, 30, 255 });
+    float h = (9.0f + 2.5f * sinf((float)GetTime() * 9.1f + pos.y)) * scale;
+    DrawTriangle((Vector2){ pos.x, pos.y - h - 5 * scale },
+                 (Vector2){ pos.x - 6 * scale, pos.y + 2 * scale },
+                 (Vector2){ pos.x + 6 * scale, pos.y + 2 * scale },
+                 (Color){ 232, 128, 42, 255 });
+    DrawTriangle((Vector2){ pos.x, pos.y - h * 0.55f - 3 * scale },
+                 (Vector2){ pos.x - 3 * scale, pos.y + 1 * scale },
+                 (Vector2){ pos.x + 3 * scale, pos.y + 1 * scale },
+                 (Color){ 255, 214, 96, 255 });
 }
 
 static void DrawProps(const EnvProp *props, int count) {

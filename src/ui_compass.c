@@ -4,6 +4,7 @@
 #include "quests.h"
 #include "ui_font.h"
 #include "ui_hit.h"
+#include "ui_theme.h"
 #include <math.h>
 
 #define PLAYER_INDEX 0
@@ -44,13 +45,37 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
     float radius;
     Geometry(screenWidth, screenHeight, &center, &radius);
     float k = radius / COMPASS_WORLD_RANGE;
+    float scale = UI_Scale(screenHeight);
 
     // Clicks on the compass are UI, not click-to-move.
     UIHit_Claim((Rectangle){ center.x - radius, center.y - radius, radius * 2.0f, radius * 2.0f });
 
-    DrawCircleV(center, radius, (Color){ 14, 17, 23, 215 });
-    DrawCircleLines((int)center.x, (int)center.y, radius, (Color){ 130, 130, 150, 255 });
-    DrawCircleLines((int)center.x, (int)center.y, radius - 1.0f, (Color){ 80, 80, 95, 255 });
+    // Dished glass under a gilt bezel. A flat disc with a hairline
+    // outline read as a placeholder; the falloff and ring give the
+    // compass the weight of an actual instrument, matching the gold
+    // trim the panels use.
+    DrawCircleV(center, radius, (Color){ 10, 12, 17, 225 });
+    DrawCircleGradient((int)center.x, (int)center.y, radius,
+                       (Color){ 40, 48, 62, 90 }, (Color){ 6, 8, 12, 30 });
+
+    // Faint bearing lines, so movement across the disc has a reference.
+    DrawLine((int)(center.x - radius + 6), (int)center.y,
+             (int)(center.x + radius - 6), (int)center.y, (Color){ 90, 96, 112, 45 });
+    DrawLine((int)center.x, (int)(center.y - radius + 6),
+             (int)center.x, (int)(center.y + radius - 6), (Color){ 90, 96, 112, 45 });
+
+    DrawRing(center, radius, radius + 4.0f * scale, 0, 360, 64, (Color){ 26, 24, 20, 240 });
+    DrawCircleLines((int)center.x, (int)center.y, radius, UI_GOLD);
+    DrawCircleLines((int)center.x, (int)center.y, radius + 4.0f * scale, UI_GOLD_DIM);
+
+    // Four cardinal ticks on the bezel.
+    for (int i = 0; i < 4; i++) {
+        float a = i * (PI / 2.0f);
+        Vector2 in = { center.x + cosf(a) * radius, center.y + sinf(a) * radius };
+        Vector2 out = { center.x + cosf(a) * (radius + 4.0f * scale),
+                        center.y + sinf(a) * (radius + 4.0f * scale) };
+        DrawLineEx(in, out, 2.0f, UI_GOLD);
+    }
 
     // The aggro bubble, on the compass where GW1 keeps it.
     if (World_GetMode() == MODE_EXPLORABLE) {
