@@ -93,6 +93,44 @@ void UI_ClosePanels(void) {
     g_armedKit = -1;
 }
 
+// Shared window header: the title in gold, the key that toggles this
+// window as a badge beside it, and a close box on the right. Every
+// panel used to be a bare rectangle with a title string, which left the
+// player guessing both how it opened and how to get rid of it. Returns
+// true when the close box was clicked this frame.
+static bool PanelHeader(Rectangle rect, const char *title, const char *hotkey,
+                        const char *padkey, int font, int pad, float scale) {
+    int x = (int)rect.x + pad;
+    int y = (int)rect.y + pad;
+    UIText(title, x, y, font, UI_GOLD);
+
+    // Binding badge: pad glyph when a controller is present, key otherwise.
+    const char *badge = (IsGamepadAvailable(0) && padkey) ? padkey : hotkey;
+    if (badge) {
+        int tw = UITextWidth(title, font);
+        UI_KeyBadge(badge, x + tw + (int)(8 * scale), y - (int)(3 * scale),
+                    (int)(font * 0.85f), true);
+    }
+
+    int box = (int)(16 * scale);
+    Rectangle close = { rect.x + rect.width - pad - box, rect.y + pad - (int)(2 * scale),
+                        (float)box, (float)box };
+    bool hovered = CheckCollisionPointRec(UI_PointerPos(), close);
+    DrawRectangleRounded(close, 0.3f, 6,
+                         hovered ? (Color){ 132, 58, 58, 255 } : (Color){ 52, 44, 48, 235 });
+    DrawRectangleRoundedLines(close, 0.3f, 6, hovered ? (Color){ 235, 180, 180, 255 } : UI_GOLD_DIM);
+    // A drawn X, not a glyph - the bundled font's lowercase x sat
+    // off-center in the box at small sizes.
+    float inset = box * 0.3f;
+    Color mark = hovered ? RAYWHITE : (Color){ 208, 200, 186, 255 };
+    DrawLineEx((Vector2){ close.x + inset, close.y + inset },
+               (Vector2){ close.x + box - inset, close.y + box - inset }, 1.8f, mark);
+    DrawLineEx((Vector2){ close.x + box - inset, close.y + inset },
+               (Vector2){ close.x + inset, close.y + box - inset }, 1.8f, mark);
+
+    return hovered && UI_PointerClicked();
+}
+
 static void DrawInventory(Entity *player, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(24 * scale);
@@ -109,13 +147,18 @@ static void DrawInventory(Entity *player, int screenHeight) {
     int x = (int)g_invRect.x + pad;
     int y = (int)g_invRect.y + pad;
     char title[64];
-    if (g_armedKit >= 0 && g_armedKit < g_inventoryCount) {
-        snprintf(title, sizeof(title), "%s: click a target item",
+    bool armed = (g_armedKit >= 0 && g_armedKit < g_inventoryCount);
+    if (armed) {
+        snprintf(title, sizeof(title), "%s - pick a target item",
                  g_inventory[g_armedKit].kind == ITEM_KIT_ID ? "Identify" : "Salvage");
     } else {
-        snprintf(title, sizeof(title), "Inventory        %d gold", g_gold);
+        snprintf(title, sizeof(title), "Inventory   %d gold", g_gold);
     }
-    UIText(title, x, y, font, GOLD);
+    if (PanelHeader(g_invRect, title, "I", "Y", font, pad, scale)) {
+        g_invOpen = false;
+        g_armedKit = -1;
+        return;
+    }
     y += font + pad;
 
     if (g_armedKit >= g_inventoryCount) g_armedKit = -1; // kit vanished
@@ -197,8 +240,11 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
     int x = (int)g_attrRect.x + pad;
     int y = (int)g_attrRect.y + pad;
     char title[64];
-    snprintf(title, sizeof(title), "Attributes      %d points free", player->attributePoints);
-    UIText(title, x, y, font, GOLD);
+    snprintf(title, sizeof(title), "Attributes   %d free", player->attributePoints);
+    if (PanelHeader(g_attrRect, title, "K", NULL, font, pad, scale)) {
+        g_attrOpen = false;
+        return;
+    }
     y += font + pad;
 
     bool click = UI_PointerClicked();
@@ -293,8 +339,11 @@ static void DrawShop(int screenWidth, int screenHeight) {
     int x = (int)g_shopRect.x + pad;
     int y = (int)g_shopRect.y + pad;
     char title[48];
-    snprintf(title, sizeof(title), "Merchant        you have %d gold", g_gold);
-    UIText(title, x, y, font, GOLD);
+    snprintf(title, sizeof(title), "Merchant   %d gold", g_gold);
+    if (PanelHeader(g_shopRect, title, NULL, NULL, font, pad, scale)) {
+        g_shopOpen = false;
+        return;
+    }
     y += font + pad;
 
     bool click = UI_PointerClicked();
@@ -427,7 +476,10 @@ static void DrawEquipment(Entity *player, int screenHeight) {
 
     int x = (int)g_equipRect.x + pad;
     int y = (int)g_equipRect.y + pad;
-    UIText("Equipment", x, y, font, GOLD);
+    if (PanelHeader(g_equipRect, "Equipment", "E", "Y", font, pad, scale)) {
+        g_equipOpen = false;
+        return;
+    }
     y += font + pad;
 
     bool click = UI_PointerClicked();
@@ -487,9 +539,12 @@ static void DrawCraft(int screenWidth, int screenHeight) {
     int x = (int)g_craftRect.x + pad;
     int y = (int)g_craftRect.y + pad;
     char title[80];
-    snprintf(title, sizeof(title), "Armor Crafting     %dg, %d %s", g_gold,
+    snprintf(title, sizeof(title), "Armor Crafting   %dg, %d %s", g_gold,
              Items_CountMaterial(CRAFT_MATERIAL), CRAFT_MATERIAL);
-    UIText(title, x, y, font, GOLD);
+    if (PanelHeader(g_craftRect, title, NULL, NULL, font, pad, scale)) {
+        g_craftOpen = false;
+        return;
+    }
     y += font + pad;
 
     bool click = UI_PointerClicked();

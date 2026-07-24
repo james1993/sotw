@@ -34,7 +34,32 @@ static bool g_manualGamepadTarget = false;
 
 static bool g_userAdjustedZoom = false;
 
+// The NPC the interact button would talk to right now: the nearest one
+// inside NPC_TALK_DISTANCE, or -1. Resolved once per frame and shared
+// with the renderer so the highlighted NPC and the one you actually
+// talk to can never disagree - that mismatch was the whole reason
+// "which NPC am I about to talk to?" was a question.
+static int g_interactNpc = -1;
+// The entity under the mouse this frame, or -1. Drives hover feedback.
+static int g_hoverEntity = -1;
+
 bool Input_UserAdjustedZoom(void) { return g_userAdjustedZoom; }
+int Input_InteractNpcIndex(void) { return g_interactNpc; }
+int Input_HoverEntityIndex(void) { return g_hoverEntity; }
+
+// Nearest living NPC within talk range of the player, or -1.
+static int FindInteractableNpc(const Entity *player) {
+    int best = -1;
+    float bestDist = NPC_TALK_DISTANCE;
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (!e->alive || e->kind != ENT_NPC) continue;
+        float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
+        float d = sqrtf(dx * dx + dy * dy);
+        if (d <= bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+}
 
 static bool TriggerDown(int axisId, int buttonId) {
     if (IsGamepadButtonDown(GAMEPAD_ID, buttonId)) return true;
@@ -72,14 +97,16 @@ static bool OnScreen(const Entity *e, const Camera2D *camera) {
 }
 
 // L1/R1 (and D-pad left/right, and C/Tab): cycle living, VISIBLE foes,
-// nearest first.
+// nearest first. HOSTILE MONSTERS ONLY - friendly NPCs are never part of
+// the cycle. You reach them by walking up and pressing interact, which
+// keeps "cycle" meaning one thing: pick something to fight.
 static void CycleFoeTarget(Entity *player, int direction, const Camera2D *camera) {
     int foes[MAX_ENTITIES];
     float dists[MAX_ENTITIES];
     int count = 0;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
-        if (!e->alive || e->team == player->team) continue;
+        if (!e->alive || e->kind != ENT_MONSTER || e->team == player->team) continue;
         if (!OnScreen(e, camera)) continue;
         float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
         foes[count] = i;
@@ -165,30 +192,16 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             }
             g_gamepadMode = true;
         } else if (face == 2) {
-            // Bare X (Xbox) / Square (PS): talk to the nearest NPC - the
-            // controller equivalent of clicking one. In range the dialog
-            // opens; farther away the press walks you over (press again
-            // on arrival), the same two-step as the mouse. While a
+            // Bare X (Xbox) / Square (PS): talk to the NPC you're
+            // standing next to - the one the world overlay is already
+            // highlighting with a "Talk" prompt. Deliberately does
+            // nothing when nobody is in range rather than walking you
+            // toward some distant NPC you didn't pick: interact means
+            // "the one I can see is highlighted", never a guess. While a
             // dialog is already open this is a no-op here: ui_panels.c
             // treats the same button as "advance the conversation".
-            if (!UI_IsNpcDialogOpen()) {
-                int best = -1;
-                float bestDist = 1e9f;
-                for (int i = 0; i < g_entityCount; i++) {
-                    Entity *e = &g_entities[i];
-                    if (!e->alive || e->kind != ENT_NPC) continue;
-                    float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
-                    float d = sqrtf(dx * dx + dy * dy);
-                    if (d < bestDist) { bestDist = d; best = i; }
-                }
-                if (best >= 0) {
-                    if (bestDist <= NPC_TALK_DISTANCE) {
-                        UI_OpenNpcDialog(best);
-                    } else {
-                        player->moveTarget = g_entities[best].pos;
-                        player->hasMoveTarget = true;
-                    }
-                }
+            if (!UI_IsNpcDialogOpen() && g_interactNpc >= 0) {
+                UI_OpenNpcDialog(g_interactNpc);
             }
             g_gamepadMode = true;
         } else if (face == 3) {
@@ -253,7 +266,7 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
         float bestDist = 1e9f;
         for (int i = 0; i < g_entityCount; i++) {
             Entity *e = &g_entities[i];
-            if (!e->alive || e->team == player->team) continue;
+            if (!e->alive || e->kind != ENT_MONSTER || e->team == player->team) continue;
             float dx = e->pos.x - player->pos.x, dy = e->pos.y - player->pos.y;
             float d = sqrtf(dx * dx + dy * dy);
             if (d <= player->attackRange && d < bestDist) {
@@ -284,7 +297,37 @@ void Input_Update(Camera2D *camera, float dt) {
                         UI_IsAttributesOpen() || UI_IsEquipmentOpen());
 
     Entity *player = Entity_Get(PLAYER_INDEX);
-    if (!player || !player->alive) return;
+    if (!player || !player->alive) {
+        g_interactNpc = -1;
+        g_hoverEntity = -1;
+        return;
+    }
+
+    // Resolve, once per frame, who the interact button would talk to and
+    // what the mouse is over. The world overlay draws both, so what's
+    // highlighted is exactly what a press or click will act on.
+    g_interactNpc = UI_IsNpcDialogOpen() ? -1 : FindInteractableNpc(player);
+    g_hoverEntity = -1;
+    {
+        Vector2 mouseScreen = GetMousePosition();
+        if (!UIHit_Contains(mouseScreen)) {
+            Vector2 world = GetScreenToWorld2D(mouseScreen, *camera);
+            for (int i = 0; i < g_entityCount; i++) {
+                Entity *e = &g_entities[i];
+                if (!e->alive || i == PLAYER_INDEX) continue;
+                if (CheckCollisionPointCircle(world, e->pos, e->radius + 4.0f)) {
+                    g_hoverEntity = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Keyboard interact: same proximity rule as the pad's X/Square, so
+    // the on-screen prompt means the same thing on both.
+    if (IsKeyPressed(KEY_F) && !UI_IsNpcDialogOpen() && g_interactNpc >= 0) {
+        UI_OpenNpcDialog(g_interactNpc);
+    }
 
     // Explicit manual override: always clears the current target/chase
     // order, regardless of what a click resolves to. A guaranteed way to

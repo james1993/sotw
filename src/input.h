@@ -23,4 +23,14 @@ void Input_Update(Camera2D *camera, float dt);
 // ends up with the right default view.
 bool Input_UserAdjustedZoom(void);
 
+// The NPC the interact button would talk to right now (nearest one in
+// range), or -1. The world overlay highlights exactly this entity and
+// draws its "Talk" prompt, so the thing you see lit up is always the
+// thing a press acts on.
+int Input_InteractNpcIndex(void);
+
+// The entity under the mouse pointer this frame, or -1 - drives hover
+// highlighting in the world overlay.
+int Input_HoverEntityIndex(void);
+
 #endif

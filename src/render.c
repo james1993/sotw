@@ -1,10 +1,12 @@
 #include "render.h"
 #include "entity.h"
 #include "items.h"
+#include "input.h"
 #include "projectile.h"
 #include "world.h"
 #include "quests.h"
 #include "ui_font.h"
+#include "ui_theme.h"
 #include "sprite.h"
 #include "fx.h"
 #include <math.h>
@@ -12,25 +14,31 @@
 
 #define PLAYER_INDEX 0
 
-// Ground loot: gold piles as coins, weapon/armor drops as diamonds with
-// a small name label so you can tell whether walking over is worth it.
-static void DrawDrops(void) {
+// Ground loot. Only the world-space art lives here - the name labels
+// are drawn by the screen-space overlay (ui_world.c) so they stay crisp
+// and consistently sized at any zoom.
+static void DrawDrops(double now) {
     for (int i = 0; i < MAX_DROPS; i++) {
         const GroundDrop *d = &g_drops[i];
         if (!d->active) continue;
 
+        // A soft pool of light under every drop: loot should catch the
+        // eye across a field, the way GW1's sparkle does.
+        float pulse = 0.75f + 0.25f * sinf((float)now * 2.4f + i);
+        Color glow = (d->gold > 0) ? (Color){ 255, 205, 90, 70 }
+                                   : (Color){ 150, 205, 255, 60 };
+        DrawCircleGradient((int)d->pos.x, (int)d->pos.y, 16.0f * pulse,
+                           glow, (Color){ 0, 0, 0, 0 });
+
         if (d->gold > 0) {
-            DrawCircleV(d->pos, 5.0f, GOLD);
-            DrawCircleLines((int)d->pos.x, (int)d->pos.y, 5.0f, (Color){ 120, 90, 20, 255 });
+            // A little stack of coins rather than one flat dot.
+            for (int c = 0; c < 3; c++) {
+                Vector2 p = { d->pos.x + (c - 1) * 3.5f, d->pos.y - c * 1.6f };
+                DrawEllipse((int)p.x, (int)p.y, 5.0f, 3.0f, (Color){ 214, 168, 52, 255 });
+                DrawEllipse((int)p.x, (int)(p.y - 1.2f), 4.0f, 2.2f, (Color){ 255, 216, 110, 255 });
+            }
         } else {
-            Color c = (d->item.kind == ITEM_WEAPON)
-                      ? (d->item.unidentified ? (Color){ 190, 150, 220, 255 } : SKYBLUE)
-                      : (d->item.kind == ITEM_MATERIAL) ? (Color){ 200, 170, 130, 255 }
-                                                        : (Color){ 120, 220, 130, 255 };
             Sprite_DrawItemDrop(&d->item, d->pos);
-            const char *label = Items_DisplayName(&d->item);
-            int tw = UITextWidth(label, 10);
-            UIText(label, (int)(d->pos.x - tw / 2), (int)(d->pos.y + 12), 10, c);
         }
     }
 }
@@ -136,23 +144,36 @@ static void DrawEnvironment(void) {
     }
 }
 
-static void DrawHealthBar(const Entity *e) {
-    float w = 30.0f, h = 4.0f;
-    Vector2 pos = { e->pos.x - w / 2, e->pos.y - e->radius - 14.0f };
-    float pct = (e->maxHp > 0) ? (float)e->hp / (float)e->maxHp : 0.0f;
-    DrawRectangle((int)pos.x, (int)pos.y, (int)w, (int)h, DARKGRAY);
-    DrawRectangle((int)pos.x, (int)pos.y, (int)(w * pct), (int)h, (e->team == 0) ? GREEN : RED);
-    DrawRectangleLines((int)pos.x, (int)pos.y, (int)w, (int)h, BLACK);
+// Selection reticle: a flat ring on the ground under the target plus
+// four corner ticks, GW1's way of saying "this one". Drawn as an
+// ellipse rather than a circle so it reads as lying on the ground
+// instead of hovering vertically in front of the sprite.
+static void DrawTargetReticle(const Entity *e, Color color, double now) {
+    float rx = e->radius + 9.0f;
+    float ry = rx * 0.45f;
+    Vector2 c = { e->pos.x, e->pos.y + e->radius * 0.35f };
+
+    DrawEllipseLines(c.x, c.y, rx, ry, Fade(color, 0.85f));
+    DrawEllipseLines(c.x, c.y, rx - 1.5f, ry - 0.7f, Fade(color, 0.35f));
+
+    // Ticks rotate slowly - just enough motion to catch the eye in a
+    // busy fight without becoming a distraction.
+    float spin = (float)now * 0.8f;
+    for (int i = 0; i < 4; i++) {
+        float a = spin + i * (PI / 2.0f);
+        float ox = cosf(a), oy = sinf(a) * 0.45f;
+        Vector2 inner = { c.x + ox * (rx - 3.0f), c.y + oy * (rx - 3.0f) };
+        Vector2 outer = { c.x + ox * (rx + 4.0f), c.y + oy * (rx + 4.0f) };
+        DrawLineEx(inner, outer, 2.0f, color);
+    }
 }
 
-static void DrawCastBar(const Entity *e) {
-    if (!Entity_IsCasting(e)) return;
-    float w = 30.0f, h = 4.0f;
-    Vector2 pos = { e->pos.x - w / 2, e->pos.y - e->radius - 20.0f };
-    float pct = (e->castTimeTotal > 0.0f) ? 1.0f - (e->castTimeRemaining / e->castTimeTotal) : 0.0f;
-    DrawRectangle((int)pos.x, (int)pos.y, (int)w, (int)h, DARKGRAY);
-    DrawRectangle((int)pos.x, (int)pos.y, (int)(w * pct), (int)h, SKYBLUE);
-    DrawRectangleLines((int)pos.x, (int)pos.y, (int)w, (int)h, BLACK);
+// A softer version of the same ring for whatever the mouse is over:
+// hover should hint, not shout.
+static void DrawHoverRing(const Entity *e, Color color) {
+    float rx = e->radius + 7.0f;
+    Vector2 c = { e->pos.x, e->pos.y + e->radius * 0.35f };
+    DrawEllipseLines(c.x, c.y, rx, rx * 0.45f, Fade(color, 0.5f));
 }
 
 void Render_World(Camera2D camera) {
@@ -176,22 +197,65 @@ void Render_World(Camera2D camera) {
 
     // Ground tint sells the zone: packed dirt in the camp, green grass
     // out in the plains. Per-zone data (world.c).
+    //
+    // The grid is deliberately faint and every fourth line is a touch
+    // stronger. A uniform bright lattice read as a debug overlay; at
+    // this weight it's ground texture you stop noticing, which is the
+    // point - it should suggest terrain, not label it.
     Color gridColor = World_GetGridColor();
+    Color minor = { gridColor.r, gridColor.g, gridColor.b, 70 };
+    Color major = { gridColor.r, gridColor.g, gridColor.b, 130 };
     for (int x = startX; x <= endX; x += gridSpacing) {
-        DrawLine(x, startY, x, endY, gridColor);
+        bool isMajor = (((x / gridSpacing) % 4) == 0);
+        DrawLine(x, startY, x, endY, isMajor ? major : minor);
     }
     for (int y = startY; y <= endY; y += gridSpacing) {
-        DrawLine(startX, y, endX, y, gridColor);
+        bool isMajor = (((y / gridSpacing) % 4) == 0);
+        DrawLine(startX, y, endX, y, isMajor ? major : minor);
     }
 
-    // The instance boundary: a visible wall line at the playable edge.
+    // Mottled ground patches: a scattering of large, barely-there
+    // blotches keyed to a fixed lattice, so the floor has some variation
+    // instead of reading as graph paper. Deterministic from position, so
+    // they don't crawl as the camera moves.
     {
+        const int blotchSpacing = 160;
+        int bx0 = ((int)floorf(topLeft.x / blotchSpacing) - 1) * blotchSpacing;
+        int bx1 = ((int)ceilf(bottomRight.x / blotchSpacing) + 1) * blotchSpacing;
+        int by0 = ((int)floorf(topLeft.y / blotchSpacing) - 1) * blotchSpacing;
+        int by1 = ((int)ceilf(bottomRight.y / blotchSpacing) + 1) * blotchSpacing;
+        for (int x = bx0; x <= bx1; x += blotchSpacing) {
+            for (int y = by0; y <= by1; y += blotchSpacing) {
+                unsigned h = (unsigned)(x * 73856093) ^ (unsigned)(y * 19349663);
+                float ox = (float)(h % 97) - 48.0f;
+                float oy = (float)((h >> 8) % 97) - 48.0f;
+                float r = 60.0f + (float)((h >> 16) % 60);
+                unsigned char a = (unsigned char)(10 + (h >> 24) % 9);
+                // Gradient, not a flat disc: a hard-edged circle reads as
+                // a bubble sitting on the floor, a falloff reads as the
+                // floor itself being uneven.
+                DrawCircleGradient((int)(x + ox), (int)(y + oy), r,
+                                   (Color){ gridColor.r, gridColor.g, gridColor.b, a },
+                                   (Color){ gridColor.r, gridColor.g, gridColor.b, 0 });
+            }
+        }
+    }
+
+    // The instance boundary: a visible wall line at the playable edge,
+    // with a soft inner falloff so it reads as the edge of the world
+    // rather than a stray rectangle someone left on screen.
+    {
+        // One crisp edge line with a single soft band just inside it.
+        // Stacking several thin outlines instead produced visible
+        // stripes that read as a rendering artifact rather than a wall.
         Rectangle b = World_GetBounds();
-        DrawRectangleLinesEx(b, 5.0f, (Color){ 150, 70, 55, 200 });
+        DrawRectangleLinesEx((Rectangle){ b.x + 11, b.y + 11, b.width - 22, b.height - 22 },
+                             22.0f, (Color){ 150, 70, 55, 28 });
+        DrawRectangleLinesEx(b, 4.0f, (Color){ 172, 86, 64, 225 });
     }
 
     DrawEnvironment();
-    DrawDrops();
+    DrawDrops(GetTime());
 
     // Faint "danger bubble" around the player, like the aggro circle on
     // GW1's compass. Only meaningful (and only drawn) in combat zones -
@@ -201,49 +265,79 @@ void Render_World(Camera2D camera) {
         DrawCircleLines((int)player->pos.x, (int)player->pos.y, AGGRO_RING_RADIUS, (Color){ 220, 170, 60, 60 });
     }
 
-    // Ring under the player's current target, so it's obvious at a glance
-    // which entity the target panel/skill-bar actions apply to.
-    Entity *currentTarget = player ? Entity_Resolve(player->targetRef) : NULL;
-    if (currentTarget && currentTarget->alive) {
-        DrawCircleLines((int)currentTarget->pos.x, (int)currentTarget->pos.y, currentTarget->radius + 6.0f, GOLD);
-        DrawCircleLines((int)currentTarget->pos.x, (int)currentTarget->pos.y, currentTarget->radius + 7.5f, GOLD);
+    double now = GetTime();
+
+    // Ground markers under entities, drawn before any sprite so nobody
+    // stands "behind" their own reticle.
+    int targetIdx = player ? Entity_RefIndex(player->targetRef) : -1;
+    int hoverIdx = Input_HoverEntityIndex();
+    int interactIdx = Input_InteractNpcIndex();
+
+    if (hoverIdx >= 0 && hoverIdx != targetIdx) {
+        Entity *h = Entity_Get(hoverIdx);
+        if (h && h->alive) {
+            DrawHoverRing(h, h->kind == ENT_MONSTER ? (Color){ 240, 130, 120, 255 }
+                                                    : (Color){ 170, 215, 255, 255 });
+        }
+    }
+    if (interactIdx >= 0) {
+        // The NPC the interact button is aimed at gets the same ring
+        // treatment as a combat target - in green, and only ever one at
+        // a time, so "who am I talking to" is answered before you press
+        // anything.
+        Entity *n = Entity_Get(interactIdx);
+        if (n && n->alive) DrawTargetReticle(n, (Color){ 120, 226, 130, 255 }, now);
+    }
+    if (targetIdx >= 0) {
+        Entity *t = Entity_Get(targetIdx);
+        if (t && t->alive) {
+            DrawTargetReticle(t, t->kind == ENT_MONSTER ? (Color){ 248, 168, 96, 255 }
+                                                        : (Color){ 150, 210, 255, 255 }, now);
+        }
     }
 
-    double now = GetTime();
+    // Depth sort: entities lower on the screen are nearer the camera, so
+    // they draw last and overlap the ones behind them. Without this,
+    // characters standing on the same ground pop in front of each other
+    // by array order, which reads as a bug the moment two sprites touch.
+    int order[MAX_ENTITIES];
+    int drawCount = 0;
     for (int i = 0; i < g_entityCount; i++) {
-        Entity *e = &g_entities[i];
-        if (!e->alive) continue;
-
-        Sprite_DrawEntity(e, now);
-        DrawHealthBar(e);
-        DrawCastBar(e);
-
-        if (e->interruptFlashTimer > 0.0f) {
-            const char *label = "INTERRUPTED";
-            int tw = UITextWidth(label, 10);
-            UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, GOLD);
+        if (g_entities[i].alive) order[drawCount++] = i;
+    }
+    for (int i = 1; i < drawCount; i++) {
+        int v = order[i];
+        float vy = g_entities[v].pos.y;
+        int j = i - 1;
+        while (j >= 0 && g_entities[order[j]].pos.y > vy) {
+            order[j + 1] = order[j];
+            j--;
         }
-
-        if (e->dodgeFlashTimer > 0.0f) {
-            const char *label = "DODGED";
-            int tw = UITextWidth(label, 10);
-            UIText(label, (int)(e->pos.x - tw / 2), (int)(e->pos.y - e->radius - 34.0f), 10, (Color){ 200, 200, 210, 255 });
-        }
-
-        // GW1's green exclamation point over quest givers with something
-        // to offer (or a reward to hand out).
-        if (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER && Quests_GiverHasAttentionFor(e->name)) {
-            int mw = UITextWidth("!", 16);
-            UIText("!", (int)(e->pos.x - mw / 2), (int)(e->pos.y - e->radius - 32.0f), 16, (Color){ 90, 230, 90, 255 });
-        }
-
-        Color nameColor = (e->kind == ENT_NPC) ? (Color){ 150, 230, 150, 255 } : RAYWHITE;
-        int textWidth = UITextWidth(e->name, 10);
-        UIText(e->name, (int)(e->pos.x - textWidth / 2), (int)(e->pos.y + e->radius + 4), 10, nameColor);
+        order[j + 1] = v;
+    }
+    for (int i = 0; i < drawCount; i++) {
+        Sprite_DrawEntity(&g_entities[order[i]], now);
     }
 
     Projectile_Draw();
     Fx_Draw();
 
     EndMode2D();
+
+    // Screen-space vignette: darkens the corners a little so the eye
+    // settles on the middle of the field where the party is, and the
+    // HUD panels sitting in those corners have something to sit against
+    // instead of floating on flat background.
+    {
+        int steps = 6;
+        for (int i = 0; i < steps; i++) {
+            int inset = i * (screenHeight / 26);
+            unsigned char a = (unsigned char)(22 - i * 3);
+            if (a == 0) break;
+            DrawRectangleLinesEx((Rectangle){ (float)inset, (float)inset,
+                                              (float)(screenWidth - inset * 2),
+                                              (float)(screenHeight - inset * 2) },
+                                 (float)(screenHeight / 26), (Color){ 0, 0, 0, a });
+        }
+    }
 }

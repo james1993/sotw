@@ -25,4 +25,17 @@ void UI_ThemeBar(Rectangle r, float pct, Color fill, const char *label, int font
 // glyph per SkillId, filling the given rect (the skill bar's slots).
 void UI_DrawSkillIcon(int skillId, Rectangle r);
 
+// Text with a soft dark drop shadow. Floating world text sits on top of
+// grass, dirt, sprites and effects, and a flat color washes out against
+// half of them; the shadow makes every label legible on any background.
+void UI_TextShadow(const char *text, int x, int y, int size, Color color);
+
+// Same, horizontally centered on x.
+void UI_TextShadowCentered(const char *text, int cx, int y, int size, Color color);
+
+// A small key/button badge - "F", "X", "Esc" - in a rounded dark chip
+// with gold trim. Returns the width drawn, so callers can lay out text
+// after it. Pass draw=false to measure without drawing.
+int UI_KeyBadge(const char *label, int x, int y, int size, bool draw);
+
 #endif

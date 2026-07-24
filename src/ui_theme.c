@@ -61,6 +61,31 @@ void UI_ThemeBar(Rectangle r, float pct, Color fill, const char *label, int font
     }
 }
 
+void UI_TextShadow(const char *text, int x, int y, int size, Color color) {
+    Color shadow = { 0, 0, 0, (unsigned char)(color.a * 0.72f) };
+    UIText(text, x + 1, y + 1, size, shadow);
+    UIText(text, x, y, size, color);
+}
+
+void UI_TextShadowCentered(const char *text, int cx, int y, int size, Color color) {
+    UI_TextShadow(text, cx - UITextWidth(text, size) / 2, y, size, color);
+}
+
+int UI_KeyBadge(const char *label, int x, int y, int size, bool draw) {
+    int textW = UITextWidth(label, size);
+    int padX = size / 2;
+    int w = textW + padX * 2;
+    int h = size + size / 2;
+    if (w < h) w = h; // single letters stay square-ish, not slivers
+    if (draw) {
+        Rectangle r = { (float)x, (float)y, (float)w, (float)h };
+        DrawRectangleRounded(r, 0.3f, 6, (Color){ 18, 18, 24, 235 });
+        DrawRectangleRoundedLines(r, 0.3f, 6, UI_GOLD);
+        UIText(label, x + (w - textW) / 2, y + (h - size) / 2, size, (Color){ 245, 235, 205, 255 });
+    }
+    return w;
+}
+
 // ---------------------------------------------------------------------
 // Procedural skill icons. GW1 gives every skill a painted icon; here
 // each gets a school-colored tile and a small vector glyph that hints

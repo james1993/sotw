@@ -20,6 +20,8 @@
 #include "ui_map.h"
 #include "ui_menu.h"
 #include "ui_font.h"
+#include "ui_world.h"
+#include "ui_hints.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -42,6 +44,7 @@ static void StartGame(bool loadSave, Camera2D *camera) {
     World_Init();
     if (loadSave) Save_LoadAndApply();
     Save_Enable();
+    UI_ResetZoneTitle(); // a new game announces its starting zone again
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (player) camera->target = player->pos;
@@ -162,19 +165,21 @@ int main(void) {
 
         Render_World(camera);
 
+        // Nameplates, floating bars and the interact prompt: projected
+        // from world positions but drawn at UI scale, so they stay crisp
+        // and same-sized however far the camera is zoomed in.
+        UIWorld_Draw(camera, screenWidth, screenHeight);
+
         // Screen-space UI from here down; every widget claims its rect
         // with UIHit so next frame's clicks stop at the UI instead of
         // falling through into the world.
         UIHit_NewFrame();
 
-        // Zone name, top center - how GW1 tells you where you are.
-        {
-            const char *zone = World_GetZoneName();
-            int font = UI_ScaledFontSize(screenHeight, 18);
-            int tw = UITextWidth(zone, font);
-            UIText(zone, (screenWidth - tw) / 2, 14, font, (Color){ 220, 210, 180, 255 });
-        }
+        // Zone name, top center - how GW1 tells you where you are - plus
+        // the arrival card that announces a new area.
+        UI_DrawZoneTitle(screenWidth, screenHeight, paused ? 0.0f : dt);
 
+        UI_DrawControlHints(screenWidth, screenHeight);
         UI_DrawSkillBar(screenWidth, screenHeight);
         UI_DrawResourceBars(screenWidth, screenHeight);
         UI_DrawCompass(screenWidth, screenHeight);
