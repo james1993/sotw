@@ -2,7 +2,12 @@
 #include "items.h"
 #include "progression.h"
 #include "quests.h"
+#include "skill.h"
+#include "skillbook.h"
+#include "save.h"
+#include "ui_hints.h"
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #define PLAYER_INDEX 0
@@ -51,6 +56,7 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->aggroed = false;
 
     e->species = SPECIES_HUMAN;
+    e->capturedSkill = -1;
     e->prevPos = pos;
     e->facing = (Vector2){ 0.0f, 1.0f }; // face the camera (south)
 
@@ -149,6 +155,18 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
             Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
             Items_SpawnMonsterDrops(e->pos, e->level, e->species == SPECIES_CHARR);
             Quests_NotifyMonsterKill(e);
+
+            // Elite capture: killing a boss teaches the elite it was
+            // using. This is the only way an elite ever reaches your
+            // bar - trainers refuse to sell them - so bosses are the
+            // build-crafting destination, not just tougher monsters.
+            if (e->capturedSkill >= 0 && Skillbook_Unlock(e->capturedSkill)) {
+                char msg[96];
+                snprintf(msg, sizeof(msg), "Elite captured:  %s",
+                         g_skillDB[e->capturedSkill].name);
+                UI_Notify(msg);
+                Save_Write();
+            }
         }
     }
 }

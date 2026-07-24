@@ -8,6 +8,9 @@
 #include "ui_hit.h"
 #include "ui_font.h"
 #include "ui_theme.h"
+#include "ui_hints.h"
+#include "skill.h"
+#include "skillbook.h"
 #include "save.h"
 #include <math.h>
 #include <stdio.h>
@@ -30,6 +33,7 @@ Quest g_quests[QUEST_COUNT] = {
         .targetName = "Charr", // only Charr kills advance this quest
         .rewardXP = 250,
         .rewardGold = 100,
+        .rewardSkill = SK_SMITE,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -44,6 +48,7 @@ Quest g_quests[QUEST_COUNT] = {
         .targetZone = ZONE_ASHFORD_PLAINS,
         .rewardXP = 300,
         .rewardGold = 150,
+        .rewardSkill = SK_BANE_SIGNET,
         .state = QUEST_AVAILABLE,
         .prereq = 0, // opens up after Charr at the Gate, GW1 chain-style
     },
@@ -60,6 +65,7 @@ Quest g_quests[QUEST_COUNT] = {
         .rewardXP = 400,
         .rewardGold = 150,
         .rewardItem = &g_rewardWarhammer,
+        .rewardSkill = SK_BANISH,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -74,6 +80,7 @@ Quest g_quests[QUEST_COUNT] = {
         .rewardXP = 350,
         .rewardGold = 120,
         .rewardItem = &g_rewardIdKit,
+        .rewardSkill = SK_FIRE_BOLT,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -87,6 +94,7 @@ Quest g_quests[QUEST_COUNT] = {
         .collectMaterial = "Charr Hide",
         .rewardXP = 300,
         .rewardGold = 200,
+        .rewardSkill = -1,
         .state = QUEST_AVAILABLE,
         .prereq = 2, // the warmaster trusts you after the shaman work
     },
@@ -155,6 +163,15 @@ bool Quests_TurnIn(Entity *player, int index) {
 
     if (q->rewardItem) Items_AddToInventory(*q->rewardItem);
     q->state = QUEST_DONE;
+
+    // The skill is the headline reward - announce it, because a new
+    // skill changes what builds are open to you far more than the gold.
+    if (q->rewardSkill >= 0 && Skillbook_Unlock(q->rewardSkill)) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "Skill learned:  %s", g_skillDB[q->rewardSkill].name);
+        UI_Notify(msg);
+    }
+
     Progression_AwardXP(player, q->rewardXP);
     g_gold += q->rewardGold;
     Save_Write();

@@ -7,8 +7,11 @@
 #include "attributes.h"
 #include "quests.h"
 #include "world.h"
+#include "skill.h"
+#include "skillbook.h"
 #include "ui_font.h"
 #include "ui_theme.h"
+#include "ui_hints.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,11 +22,19 @@
 static bool g_invOpen = false;
 static bool g_attrOpen = false;
 static bool g_equipOpen = false;
+static bool g_skillsOpen = false;
 static int g_dialogNpc = -1;   // entity index, -1 = closed
 static bool g_shopOpen = false;
 static bool g_craftOpen = false;
+static bool g_trainerOpen = false;
 
-static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect, g_craftRect;
+static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
+                 g_craftRect, g_skillsRect, g_trainerRect;
+
+// Which bar slot the skills panel is editing, -1 = none. Click a slot to
+// arm it, then click a known skill to drop it in - two clicks, works
+// identically with the mouse and with the pad's menu cursor.
+static int g_armedBarSlot = -1;
 
 // The merchant's stock: fixed-power items at fixed prices, in GW1's
 // spirit where the merchant sells the basics and rarity is cosmetic.
@@ -72,11 +83,20 @@ void UI_CloseNpcDialog(void) {
     g_dialogNpc = -1;
     g_shopOpen = false;
     g_craftOpen = false;
+    g_trainerOpen = false;
 }
 
 bool UI_IsInventoryOpen(void) { return g_invOpen; }
 bool UI_IsAttributesOpen(void) { return g_attrOpen; }
 bool UI_IsEquipmentOpen(void) { return g_equipOpen; }
+bool UI_IsSkillsOpen(void) { return g_skillsOpen; }
+
+// The pad's route to the build editor - see UI_ToggleBags for the same
+// idea applied to inventory and gear.
+void UI_ToggleSkills(void) {
+    g_skillsOpen = !g_skillsOpen;
+    g_armedBarSlot = -1;
+}
 
 // The pad's Y button opens "the bags": inventory + equipment together,
 // since on a controller you almost always want both at once.
@@ -90,7 +110,9 @@ void UI_ClosePanels(void) {
     g_invOpen = false;
     g_attrOpen = false;
     g_equipOpen = false;
+    g_skillsOpen = false;
     g_armedKit = -1;
+    g_armedBarSlot = -1;
 }
 
 // Shared window header: the title in gold, the key that toggles this
@@ -220,6 +242,264 @@ static void DrawInventory(Entity *player, int screenHeight) {
     }
 }
 
+// ---------------------------------------------------------------------
+// The skills panel: your eight-slot bar on top, everything you've
+// learned underneath. This is where a build actually gets made, so it's
+// a first-class window rather than a corner of the attributes screen.
+//
+// GW1 only lets you rearrange skills in an outpost - you commit to a
+// build before you leave town and live with it out in the field. That
+// rule is what gives build-crafting its weight, so it's enforced here
+// with a visible explanation rather than a silently dead click.
+static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int slot = (int)(46 * scale);
+    int gap = (int)(5 * scale);
+    int rowH = (int)(26 * scale);
+    int w = SKILL_BAR_SIZE * slot + (SKILL_BAR_SIZE - 1) * gap + pad * 2;
+
+    bool canEdit = (World_GetMode() == MODE_OUTPOST);
+
+    // Count what the character owns so the window hugs the list.
+    int known = 0;
+    for (int i = 0; i < g_skillCount; i++) {
+        if (Skillbook_IsUnlocked(i) &&
+            Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) known++;
+    }
+    if (known == 0) known = 1; // room for the "nothing yet" line
+
+    int h = pad * 3 + font + slot + (int)(14 * scale) + small + known * rowH + pad;
+
+    g_skillsRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(110 * scale),
+                                (float)w, (float)h };
+    UIHit_Claim(g_skillsRect);
+    UI_ThemePanel(g_skillsRect, scale, pad + font + pad / 2);
+
+    char title[80];
+    snprintf(title, sizeof(title), "Skills   %d known   %d skill point%s",
+             Skillbook_UnlockedCount(), g_skillPoints, g_skillPoints == 1 ? "" : "s");
+    if (PanelHeader(g_skillsRect, title, "L", NULL, font, pad, scale)) {
+        g_skillsOpen = false;
+        g_armedBarSlot = -1;
+        return;
+    }
+
+    int x = (int)g_skillsRect.x + pad;
+    int y = (int)g_skillsRect.y + pad + font + pad;
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    // --- The bar itself: eight slots, empty ones plainly empty ---
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        Rectangle r = { (float)(x + i * (slot + gap)), (float)y, (float)slot, (float)slot };
+        int id = player->skillBar[i];
+        bool hovered = canEdit && CheckCollisionPointRec(mouse, r);
+
+        if (id >= 0) {
+            UI_DrawSkillIcon(id, r);
+        } else {
+            DrawRectangleRec(r, (Color){ 20, 20, 25, 255 });
+            DrawRectangleLinesEx(r, 2, (Color){ 10, 10, 14, 255 });
+            DrawRectangleLinesEx((Rectangle){ r.x + 2, r.y + 2, r.width - 4, r.height - 4 },
+                                 1, (Color){ 62, 60, 54, 255 });
+            UI_TextShadowCentered("+", (int)(r.x + r.width / 2),
+                                  (int)(r.y + r.height / 2 - small), small,
+                                  (Color){ 110, 106, 96, 255 });
+        }
+
+        if (i == g_armedBarSlot) {
+            DrawRectangleLinesEx((Rectangle){ r.x - 2, r.y - 2, r.width + 4, r.height + 4 },
+                                 2, UI_GOLD);
+        } else if (hovered) {
+            DrawRectangleLinesEx(r, 2, (Color){ 200, 190, 160, 180 });
+        }
+
+        char num[4];
+        snprintf(num, sizeof(num), "%d", i + 1);
+        UI_TextShadow(num, (int)r.x + 3, (int)(r.y + r.height) - small - 2, small,
+                      (Color){ 190, 184, 168, 220 });
+
+        if (hovered && click) {
+            // Clicking the armed slot again empties it; otherwise arm it.
+            if (g_armedBarSlot == i) {
+                player->skillBar[i] = -1;
+                player->skillRecharge[i] = 0.0f;
+                g_armedBarSlot = -1;
+                Save_Write();
+            } else {
+                g_armedBarSlot = i;
+            }
+        }
+    }
+    y += slot + (int)(8 * scale);
+
+    const char *hint;
+    Color hintColor;
+    if (!canEdit) {
+        hint = "Skills can only be changed in an outpost.";
+        hintColor = (Color){ 214, 150, 128, 255 };
+    } else if (g_armedBarSlot >= 0) {
+        hint = "Pick a skill below, or click the slot again to clear it.";
+        hintColor = UI_GOLD;
+    } else {
+        hint = "Click a slot, then a skill, to build your bar.";
+        hintColor = (Color){ 150, 146, 134, 255 };
+    }
+    UIText(hint, x, y, small, hintColor);
+    y += small + (int)(6 * scale);
+
+    // --- Everything you've learned ---
+    if (Skillbook_UnlockedCount() == 0) {
+        UIText("(no skills yet - try a quest giver or a trainer)", x, y, font, GRAY);
+        return;
+    }
+
+    for (int i = 0; i < g_skillCount; i++) {
+        if (!Skillbook_IsUnlocked(i)) continue;
+        if (!Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) continue;
+
+        const Skill *s = &g_skillDB[i];
+
+        // Already on the bar? Show it as such rather than letting the
+        // player silently slot the same skill twice.
+        int onBar = -1;
+        for (int b = 0; b < SKILL_BAR_SIZE; b++) {
+            if (player->skillBar[b] == i) onBar = b;
+        }
+
+        Rectangle row = { g_skillsRect.x + 4, (float)y - 2, g_skillsRect.width - 8, (float)rowH };
+        bool selectable = canEdit && g_armedBarSlot >= 0 && onBar < 0;
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        if (hovered && selectable) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+
+        // A small icon makes the list scan the same way the bar does.
+        Rectangle icon = { (float)x, (float)y - 1, (float)(rowH - 4), (float)(rowH - 4) };
+        UI_DrawSkillIcon(i, icon);
+
+        char label[96];
+        if (s->energyCost > 0) {
+            snprintf(label, sizeof(label), "%.31s   %dE   %.0fs recharge",
+                     s->name, s->energyCost, (double)s->recharge);
+        } else if (s->adrenalineCost > 0) {
+            snprintf(label, sizeof(label), "%.31s   %d adrenaline", s->name, s->adrenalineCost);
+        } else {
+            snprintf(label, sizeof(label), "%.31s   free   %.0fs recharge", s->name, (double)s->recharge);
+        }
+        Color c = s->isElite ? UI_GOLD : (onBar >= 0 ? SKYBLUE : RAYWHITE);
+        int textX = x + (int)icon.width + (int)(8 * scale);
+        UIText(label, textX, y, font, c);
+
+        // Right-aligned status: which slot it occupies, or its line.
+        char right[40];
+        if (onBar >= 0) snprintf(right, sizeof(right), "slot %d", onBar + 1);
+        else snprintf(right, sizeof(right), "%.31s", g_attributeNames[s->attribute]);
+        int rw = UITextWidth(right, small);
+        UIText(right, (int)(g_skillsRect.x + g_skillsRect.width) - pad - rw,
+               y + (font - small) / 2, small,
+               onBar >= 0 ? SKYBLUE : (Color){ 150, 146, 134, 255 });
+
+        if (hovered && click && selectable) {
+            player->skillBar[g_armedBarSlot] = i;
+            player->skillRecharge[g_armedBarSlot] = 0.0f;
+            g_armedBarSlot = -1;
+            Save_Write();
+        }
+        y += rowH;
+    }
+}
+
+// The skill trainer's stock: every non-elite skill your professions can
+// use that you don't already know. Elites are absent by design - those
+// come off bosses.
+static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int rowH = (int)(30 * scale);
+    int w = (int)(440 * scale);
+
+    int forSale = 0;
+    for (int i = 0; i < g_skillCount; i++) {
+        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
+        if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
+    }
+    int rows = forSale > 0 ? forSale : 1;
+    int h = pad * 3 + font + small + (int)(6 * scale) + rows * rowH + pad;
+
+    g_trainerRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale),
+                                 (float)w, (float)h };
+    UIHit_Claim(g_trainerRect);
+    UI_ThemePanel(g_trainerRect, scale, pad + font + pad / 2);
+
+    char title[96];
+    snprintf(title, sizeof(title), "Skill Trainer   %d skill point%s   %dg",
+             g_skillPoints, g_skillPoints == 1 ? "" : "s", g_gold);
+    if (PanelHeader(g_trainerRect, title, NULL, NULL, font, pad, scale)) {
+        g_trainerOpen = false;
+        return;
+    }
+
+    int x = (int)g_trainerRect.x + pad;
+    int y = (int)g_trainerRect.y + pad + font + pad;
+
+    char sub[96];
+    snprintf(sub, sizeof(sub), "Each skill costs 1 skill point and %d gold. Elites must be captured.",
+             Skillbook_TrainerGoldCost());
+    UIText(sub, x, y, small, (Color){ 150, 146, 134, 255 });
+    y += small + (int)(6 * scale);
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    if (forSale == 0) {
+        UIText("You've learned everything I can teach.", x, y, font, GRAY);
+        return;
+    }
+
+    for (int i = 0; i < g_skillCount; i++) {
+        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
+        if (!Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) continue;
+
+        const Skill *s = &g_skillDB[i];
+        bool affordable = Skillbook_CanBuy(i, player->primaryProfession, player->secondaryProfession);
+
+        Rectangle row = { g_trainerRect.x + 4, (float)y - 2, g_trainerRect.width - 8, (float)rowH };
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        if (hovered && affordable) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+
+        Rectangle icon = { (float)x, (float)y - 1, (float)(rowH - 6), (float)(rowH - 6) };
+        UI_DrawSkillIcon(i, icon);
+
+        char label[112];
+        snprintf(label, sizeof(label), "%.31s   %.31s", s->name, g_attributeNames[s->attribute]);
+        UIText(label, x + (int)icon.width + (int)(8 * scale), y, font,
+               affordable ? RAYWHITE : GRAY);
+
+        const char *why = affordable ? "buy"
+                        : (g_skillPoints < 1) ? "needs a skill point" : "not enough gold";
+        int rw = UITextWidth(why, small);
+        UIText(why, (int)(g_trainerRect.x + g_trainerRect.width) - pad - rw,
+               y + (font - small) / 2, small,
+               affordable ? (Color){ 140, 220, 150, 255 } : (Color){ 170, 120, 110, 255 });
+
+        if (hovered && click && affordable) {
+            if (Skillbook_Buy(i, player->primaryProfession, player->secondaryProfession)) {
+                char msg[96];
+                snprintf(msg, sizeof(msg), "Skill learned:  %.31s", s->name);
+                UI_Notify(msg);
+                Save_Write();
+            }
+            break; // the list just changed - relayout next frame
+        }
+        y += rowH;
+    }
+}
+
 static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(28 * scale);
@@ -292,6 +572,22 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
             player->attributePoints += refund;
         }
         y += rowH;
+    }
+}
+
+// "300 XP, 150g, Bane Signet" - the full payout on one line. The skill
+// especially has to be named up front: it's the reward that changes what
+// your character can do, and a player deciding whether a quest is worth
+// the trip needs to see it before they commit, not after.
+static void QuestRewardSummary(const Quest *q, char *out, int outSize) {
+    int n = snprintf(out, outSize, "%d XP, %dg", q->rewardXP, q->rewardGold);
+    if (n < 0 || n >= outSize) return;
+    if (q->rewardItem) {
+        n += snprintf(out + n, outSize - n, ", %.31s", q->rewardItem->name);
+        if (n < 0 || n >= outSize) return;
+    }
+    if (q->rewardSkill >= 0 && q->rewardSkill < g_skillCount) {
+        snprintf(out + n, outSize - n, ", %.31s", g_skillDB[q->rewardSkill].name);
     }
 }
 
@@ -620,24 +916,20 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 bool bagFull = q->rewardItem && g_inventoryCount >= MAX_INVENTORY;
                 UIText(bagFull ? "Your bags are full - make room for your reward."
                                : "You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
-                char label[112];
-                if (q->rewardItem) {
-                    snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg, %s)",
-                             q->name, q->rewardXP, q->rewardGold, q->rewardItem->name);
-                } else {
-                    snprintf(label, sizeof(label), "Turn in: %s (%d XP, %dg)",
-                             q->name, q->rewardXP, q->rewardGold);
-                }
+                char rewards[96];
+                QuestRewardSummary(q, rewards, sizeof(rewards));
+                char label[224];
+                snprintf(label, sizeof(label), "Turn in: %.63s (%.95s)", q->name, rewards);
                 if (DialogButton(btn, label, font, !bagFull)) {
                     Quests_TurnIn(player, ready);
                 }
             } else if (offer >= 0) {
                 Quest *q = &g_quests[offer];
                 UIText(q->offerText, x, y, font, LIGHTGRAY);
-                char label[112];
-                snprintf(label, sizeof(label), "Accept: %s (%d XP, %dg%s%s)",
-                         q->name, q->rewardXP, q->rewardGold,
-                         q->rewardItem ? ", " : "", q->rewardItem ? q->rewardItem->name : "");
+                char rewards[96];
+                QuestRewardSummary(q, rewards, sizeof(rewards));
+                char label[224];
+                snprintf(label, sizeof(label), "Accept: %.63s (%.95s)", q->name, rewards);
                 if (DialogButton(btn, label, font, true)) {
                     Quests_Accept(offer);
                 }
@@ -663,6 +955,14 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             UIText("Bring me Charr hides and coin - I'll fit you properly.", x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_craftOpen ? "Close crafting" : "Craft armor", font, true)) {
                 g_craftOpen = !g_craftOpen;
+            }
+            break;
+        }
+        case NPC_SKILL_TRAINER: {
+            UIText("Skills are earned, not given. Points and coin, and I'll teach.",
+                   x, y, font, LIGHTGRAY);
+            if (DialogButton(btn, g_trainerOpen ? "Close training" : "Learn skills", font, true)) {
+                g_trainerOpen = !g_trainerOpen;
             }
             break;
         }
@@ -693,14 +993,20 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (IsKeyPressed(KEY_I)) g_invOpen = !g_invOpen;
     if (IsKeyPressed(KEY_K)) g_attrOpen = !g_attrOpen;
     if (IsKeyPressed(KEY_E)) g_equipOpen = !g_equipOpen;
+    if (IsKeyPressed(KEY_L)) {
+        g_skillsOpen = !g_skillsOpen;
+        g_armedBarSlot = -1;
+    }
     if (IsKeyPressed(KEY_ESCAPE)) UI_CloseNpcDialog();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
     if (g_equipOpen) DrawEquipment(player, screenHeight);
     if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);
+    if (g_skillsOpen) DrawSkillsPanel(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
     if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(screenWidth, screenHeight);
+    if (g_trainerOpen && g_dialogNpc >= 0) DrawTrainer(player, screenWidth, screenHeight);
 
     // The open-frame guard only needs to cover the frame the dialog
     // appeared; from the next frame on the pad button confirms.

@@ -184,7 +184,8 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                 UI_CloseMapOverlay();
             } else if (UI_IsNpcDialogOpen()) {
                 UI_CloseNpcDialog();
-            } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen() || UI_IsEquipmentOpen()) {
+            } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen() ||
+                       UI_IsEquipmentOpen() || UI_IsSkillsOpen()) {
                 UI_ClosePanels();
             } else {
                 player->targetRef = Entity_NoRef();
@@ -212,6 +213,15 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             UI_ToggleBags();
             g_gamepadMode = true;
         }
+    }
+
+    // R3 (right stick click): the build editor. The face buttons are all
+    // spoken for by skills and the bags, and the D-pad by targeting, so
+    // the stick clicks are the only free buttons left - the on-screen
+    // control legend names it so nobody has to guess.
+    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_THUMB)) {
+        UI_ToggleSkills();
+        g_gamepadMode = true;
     }
 
     // --- Shoulder buttons: cycle visible enemies, L1 backward and R1
@@ -294,7 +304,8 @@ void Input_Update(Camera2D *camera, float dt) {
     // movement suppression) and A clicks. Updated here in the input
     // phase so the same frame's menu drawing sees fresh pointer state.
     UICursor_Update(dt, UI_IsNpcDialogOpen() || UI_IsInventoryOpen() ||
-                        UI_IsAttributesOpen() || UI_IsEquipmentOpen());
+                        UI_IsAttributesOpen() || UI_IsEquipmentOpen() ||
+                        UI_IsSkillsOpen());
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player || !player->alive) {

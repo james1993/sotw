@@ -36,7 +36,8 @@ typedef enum {
     NPC_QUEST_GIVER,
     NPC_MERCHANT,
     NPC_HENCHMAN,
-    NPC_CRAFTER // armorer: crafts armor for gold + materials (GW1: armor is craft-only)
+    NPC_CRAFTER, // armorer: crafts armor for gold + materials (GW1: armor is craft-only)
+    NPC_SKILL_TRAINER // sells non-elite skills for a skill point + gold
 } NpcRole;
 
 typedef enum {
@@ -155,6 +156,12 @@ typedef struct Entity {
     // aggro as one - pull any member and the whole group joins, like a
     // GW1 mob group. 0 = ungrouped (patrols hunt alone).
     int groupId;
+
+    // Boss (monsters): tougher, visually marked, and the only source of
+    // elite skills. capturedSkill is the SkillId this boss teaches when
+    // killed (-1 = nothing), standing in for GW1's Signet of Capture.
+    bool isBoss;
+    int capturedSkill;
 
     // --- Sprite animation state (sprite.c) ---
     Species species;

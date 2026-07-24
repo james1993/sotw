@@ -91,10 +91,13 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   so there's never a question about who you're about to speak to — and
   the prompt marks the exact NPC the key acts on. **Left-clicking** an
   NPC works too (and walks you over if you're out of range).
-- **1–5** activate your equipped skills (Monk bar: Orison of Healing,
-  Banish, Smite, Bane Signet, plus Fire Bolt from the Elementalist
-  secondary). Vekk, the hero companion, fights automatically the same
-  way a GW1 hero does.
+- **1–8** activate whatever you've slotted on your skill bar. Vekk, the
+  hero companion, fights automatically the same way a GW1 hero does.
+- **L** opens the **skills panel** — your eight-slot bar on top, every
+  skill you've learned underneath. Click a slot to arm it, then click a
+  skill to place it (click the armed slot again to empty it). Like GW1,
+  the bar can only be rearranged **in an outpost**: you commit to a
+  build before you head out and live with it in the field.
 - **I** toggles the inventory (walk over drops to pick them up; click an
   item to equip it). **E** toggles the equipment screen - both slots
   with their numbers, plus a character summary; click a slot to cycle
@@ -130,7 +133,7 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
 
 The world is a four-zone chain. The game starts in **Ashford Camp**, a
 GW1-style outpost: no combat, service NPCs (quest giver, merchant,
-armorer, hireable henchman), and a portal to **Ashford Plains** — a
+armorer, skill trainer, hireable henchman), and a portal to **Ashford Plains** — a
 combat instance that reloads fresh on every entry, exactly like GW1's
 per-party explorable areas. Past the plains' eastern ridge lie the
 **Charr Foothills**, a harder explorable where warbands field **Charr
@@ -162,11 +165,37 @@ aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
 spell — and the whole camp answers. Patrols hunt alone; their threat is
 walking into your fight at the wrong moment.
 
+### Skills and build-crafting
+
+A new character knows **one skill** and has seven empty slots. Filling
+them is the game — in GW1 the eight-slot bar is the *output* of a
+collection loop, not something handed to you at creation, so the demake
+starts you nearly empty and makes every skill something you went and
+got:
+
+- **Quests** are the main early source. Each one names its skill reward
+  up front (*"Accept: Charr at the Gate (250 XP, 100g, Smite)"*), and
+  learning it throws a banner across the screen.
+- **Skill trainers** (Master Ilsa in Ashford Camp, Adept Kerra at Piken
+  Watch) sell skills for **1 skill point plus gold**, with the gold
+  price climbing on every purchase. You earn a skill point per level.
+  Their stock is filtered to what your two professions can actually
+  use — a Mo/E is offered Monk and Fire Magic skills, but never Energy
+  Storage, which is the Elementalist *primary* attribute.
+- **Elites are never sold.** The only way one reaches your bar is
+  killing the boss that uses it: **Kruul the Emberfang** in Ashford
+  Plains teaches Meteor, **Vharn the Bonesmith** in the foothills
+  teaches Healing Light. Bosses are bigger, hit harder, and are worth
+  hunting specifically — GW1's Signet of Capture, condensed.
+
+Everything you own is saved with the character, and a skill can't sit on
+your bar unless the book backs it.
+
 Quests are per-giver, GW1-style: Captain Osric's chain in Ashford
 (finish *Charr at the Gate* and he offers *Scout the Eastern Ridge*,
 whose marker points at the foothills gate), and Warmaster Grast's book
-at Piken Watch — *Silence the Shamans* (rewards the Warmaster's
-Hammer), *Clear the Gullies* (rewards an Identification Kit), and the
+at Piken Watch — *Silence the Shamans* (Warmaster's Hammer plus
+Banish), *Clear the Gullies* (an Identification Kit plus Fire Bolt), and the
 collect quest *Hides for the Watch*, which consumes 4 Charr Hides on
 turn-in and tracks your bag live. Item rewards need a free bag slot,
 and each giver's green "!" only lights for their own work.

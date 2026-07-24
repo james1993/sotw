@@ -1,5 +1,8 @@
 #include "progression.h"
 #include "entity.h"
+#include "skillbook.h"
+#include "ui_hints.h"
+#include <stdio.h>
 
 int Progression_XPToNext(int level) {
     return 1400 + 600 * level;
@@ -23,6 +26,14 @@ void Progression_AwardXP(Entity *player, int amount) {
         player->hp += 20;
         if (player->hp > player->maxHp) player->hp = player->maxHp;
         player->attributePoints += AttrPointsForLevel(player->level);
+        // Every level is also a skill point, the currency trainers take.
+        // Levelling therefore buys build options, not just bigger
+        // numbers - GW1's reason to keep gaining levels.
+        g_skillPoints++;
+
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Level %d  -  +1 skill point", player->level);
+        UI_Notify(msg);
     }
     if (player->level >= MAX_LEVEL) player->xp = 0;
 }

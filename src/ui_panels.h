@@ -28,6 +28,10 @@ void UI_CloseNpcDialog(void);
 bool UI_IsInventoryOpen(void);
 bool UI_IsAttributesOpen(void);
 bool UI_IsEquipmentOpen(void);
+bool UI_IsSkillsOpen(void);
+
+// Opens/closes the build editor (L on the keyboard, D-pad up on a pad).
+void UI_ToggleSkills(void);
 void UI_ToggleBags(void); // inventory + equipment together (pad Y)
 void UI_ClosePanels(void);
 

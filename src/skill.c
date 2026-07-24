@@ -158,4 +158,14 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_DAMAGE, 20, 2.0f, 0, 0);
     AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
     RegisterAs(SK_BANE_SIGNET, s);
+
+    // The Monk elite. Elites can't be bought at any price - the only way
+    // onto your bar is capturing one off a boss that uses it, which is
+    // what makes hunting bosses worth the risk (GW1's Signet of Capture,
+    // condensed into "kill the boss, learn the skill").
+    s = MakeSkill("Healing Light", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
+                  10, 0, 1.0f, 4.0f, 220.0f, true, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_HEAL, 45, 5.0f, 0, 0);
+    AddStep(&s, FX_ENERGY_DELTA, 3, 0.5f, 0, 0);
+    RegisterAs(SK_HEALING_LIGHT, s);
 }

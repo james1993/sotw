@@ -3,6 +3,7 @@
 #include "items.h"
 #include "attributes.h"
 #include "skill.h"
+#include "skillbook.h"
 #include "projectile.h"
 #include "fx.h"
 #include "save.h"
@@ -35,6 +36,10 @@ typedef struct {
     int strengthRank;
     bool withHowl;    // monsters: carry Feral Howl, the interruptible self-heal
     bool caster;      // monsters: ranged Fire Magic loadout instead of claws
+    bool boss;        // monsters: tougher, marked, and teaches capSkill
+    int capSkill;     // boss: SkillId captured on death. 0 is a real
+                      // SkillId, so bosses must set this explicitly and
+                      // non-bosses are filtered by the .boss flag.
     Species species;  // monsters: which body sprite.c draws (and whether
                       // the corpse leaves a Charr Hide - only Charr do)
     int group;        // monsters: spawn group id, 0 = ungrouped. Groups
@@ -87,6 +92,8 @@ static const SpawnDef g_campSpawns[] = {
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Armorer Dunda", .pos = { -200, 60 },
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Master Ilsa", .pos = { 230, 120 },
+      .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 // --- Ashford Plains: three static camps spaced beyond each other's
@@ -169,6 +176,14 @@ static const SpawnDef g_plainsSpawns[] = {
     { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Patrol",
       .pos = { 560, -320 }, .posB = { 560, 320 },
       .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
+    // Kruul the Emberfang: the plains boss, alone in the far northeast so
+    // finding him is its own small expedition. He casts the Meteor elite
+    // and teaches it when he falls - the first elite most players will
+    // own, and the reason to come back here once you can handle him.
+    { .kind = SPAWN_MONSTER, .name = "Kruul the Emberfang", .pos = { 1320, -380 },
+      .level = 8, .hp = 420, .armor = 70, .aggro = 140.0f, .strengthRank = 10,
+      .caster = true, .boss = true, .capSkill = SK_METEOR, .species = SPECIES_CHARR, .group = 4 },
+
     { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Prowler",
       .pos = { 700, 40 }, .posB = { 1240, 40 },
       .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
@@ -227,6 +242,18 @@ static const SpawnDef g_foothillsSpawns[] = {
     { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 940, -40 },
       .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9, .species = SPECIES_CHARR, .group = 3 },
 
+    // Vharn the Bonesmith: the foothills boss, keeping his warband alive
+    // with the Healing Light elite. Kill him and the elite is yours -
+    // the Monk capture, and a genuinely hard fight because he heals
+    // himself unless you interrupt or burst him down.
+    { .kind = SPAWN_MONSTER, .name = "Vharn the Bonesmith", .pos = { 1180, 300 },
+      .level = 9, .hp = 460, .armor = 70, .aggro = 140.0f, .strengthRank = 10,
+      .caster = true, .boss = true, .capSkill = SK_HEALING_LIGHT,
+      .species = SPECIES_CHARR, .group = 4 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 1080, 350 },
+      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9,
+      .species = SPECIES_CHARR, .group = 4 },
+
     // A lone Devourer prowls the middle ground - no group, pure ambush.
     { .kind = SPAWN_MONSTER_PATROL, .name = "Lurking Devourer",
       .pos = { 400, -280 }, .posB = { 820, 160 },
@@ -255,6 +282,8 @@ static const SpawnDef g_pikenSpawns[] = {
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Trader Hurm", .pos = { 100, -80 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Adept Kerra", .pos = { 210, 90 },
+      .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
@@ -473,6 +502,15 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
     m->groupId = def->group;
     m->species = def->species;
+    m->isBoss = def->boss;
+    m->capturedSkill = def->boss ? def->capSkill : -1;
+    if (def->boss) {
+        // Bosses read as bigger on the field and hit harder, so a
+        // capture run is a real fight rather than a detour.
+        m->radius *= 1.35f;
+        m->attackDamageMin = (int)(m->attackDamageMin * 1.4f);
+        m->attackDamageMax = (int)(m->attackDamageMax * 1.4f);
+    }
     if (def->caster) {
         // Shaman loadout: hangs back and casts Fire Magic - the ranged
         // threat that makes the party pick targets instead of piling on.
@@ -607,11 +645,17 @@ void World_Init(void) {
     player->attributeRank[ATTR_SMITING_PRAYERS] = 3;
     player->attributeRank[ATTR_DIVINE_FAVOR] = 1;
     player->attributePoints = 3;
+
+    // A new character knows exactly one skill. The other seven slots are
+    // empty on purpose: filling them is the game. Skills come from quest
+    // rewards, from trainers (a skill point plus gold), and - for elites
+    // - only from killing the boss that uses them. Handing out a full
+    // bar at creation would skip the entire build-crafting loop, which
+    // is the part of GW1 worth demaking.
+    Skillbook_Reset();
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) player->skillBar[i] = -1;
     player->skillBar[0] = SK_ORISON_OF_HEALING;
-    player->skillBar[1] = SK_BANISH;
-    player->skillBar[2] = SK_SMITE;
-    player->skillBar[3] = SK_BANE_SIGNET;
-    player->skillBar[4] = SK_FIRE_BOLT; // Elementalist secondary
+    g_skillPoints = 1; // one to spend at the trainer straight away
 
     // Starting equipment, GW1-style fixed-power items.
     Item startRod = { ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };

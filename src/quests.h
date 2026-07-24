@@ -45,6 +45,9 @@ typedef struct {
     int rewardXP;
     int rewardGold;
     const Item *rewardItem; // optional extra reward, NULL = none
+    int rewardSkill;        // SkillId taught on turn-in, -1 = none. Quests
+                            // are the main early source of skills, so the
+                            // bar fills as the story does.
     QuestState state;
     int prereq; // index of a quest that must be DONE first, -1 = none
 } Quest;

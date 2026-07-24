@@ -4,6 +4,7 @@
 #include "quests.h"
 #include "world.h"
 #include "skill.h"
+#include "skillbook.h"
 #include "attributes.h"
 #include "progression.h"
 #include "raylib.h"
@@ -91,6 +92,15 @@ bool Save_Write(void) {
         fprintf(f, "skill%d=%d\n", i, p->skillBar[i]);
     }
     fprintf(f, "gold=%d\n", g_gold);
+    // Which skills the character owns - the collection is the character,
+    // as much as their level or their gear.
+    {
+        char mask[MAX_SKILLS + 1];
+        Skillbook_WriteMask(mask, sizeof(mask));
+        fprintf(f, "skillsKnown=%s\n", mask);
+    }
+    fprintf(f, "skillPoints=%d\n", g_skillPoints);
+    fprintf(f, "skillsBought=%d\n", g_skillsPurchased);
     fprintf(f, "thomHired=%d\n", World_IsThomHired() ? 1 : 0);
     for (int i = 0; i < QUEST_COUNT; i++) {
         fprintf(f, "quest%d=%d,%d\n", i, (int)g_quests[i].state, g_quests[i].kills);
@@ -138,6 +148,10 @@ bool Save_LoadAndApply(void) {
     int outpost = (int)ZONE_ASHFORD_CAMP;
     bool thomHired = false;
     int equipWeapon = -1, equipArmor = -1;
+    bool sawSkillbook = false;
+
+    // Start from a clean book; the file fills it in below.
+    Skillbook_Reset();
 
     char line[512];
     while (fgets(line, sizeof(line), f)) {
@@ -164,6 +178,13 @@ bool Save_LoadAndApply(void) {
             p->skillBar[idx] = (s >= -1 && s < g_skillCount) ? s : -1;
         } else if (strcmp(key, "gold") == 0) {
             g_gold = ClampInt(atoi(val), 0, 1000000000);
+        } else if (strcmp(key, "skillsKnown") == 0) {
+            Skillbook_ReadMask(val);
+            sawSkillbook = true;
+        } else if (strcmp(key, "skillPoints") == 0) {
+            g_skillPoints = ClampInt(atoi(val), 0, 999);
+        } else if (strcmp(key, "skillsBought") == 0) {
+            g_skillsPurchased = ClampInt(atoi(val), 0, 999);
         } else if (strcmp(key, "thomHired") == 0) {
             thomHired = atoi(val) != 0;
         } else if (sscanf(key, "quest%d", &idx) == 1 && idx >= 0 && idx < QUEST_COUNT) {
@@ -213,6 +234,24 @@ bool Save_LoadAndApply(void) {
     Entity_RecomputePenalizedStats(p);
     p->hp = p->maxHp;
     p->energy = p->maxEnergy;
+
+    // Saves written before skills had to be earned have no skillsKnown
+    // line. Rather than stripping those characters back to one skill,
+    // grant whatever their bar was already carrying - the bar IS the
+    // evidence of what they owned.
+    if (!sawSkillbook) {
+        for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+            if (p->skillBar[i] >= 0) Skillbook_Unlock(p->skillBar[i]);
+        }
+    } else {
+        // Never leave a skill on the bar the book doesn't back - a hand
+        // edited or truncated mask would otherwise hand out free skills.
+        for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+            if (p->skillBar[i] >= 0 && !Skillbook_IsUnlocked(p->skillBar[i])) {
+                p->skillBar[i] = -1;
+            }
+        }
+    }
 
     World_SetThomHired(thomHired);
     if (equipWeapon >= 0) Items_EquipWeapon(p, equipWeapon);

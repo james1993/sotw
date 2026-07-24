@@ -27,6 +27,7 @@ typedef enum {
     SK_BANISH,
     SK_SMITE,
     SK_BANE_SIGNET,
+    SK_HEALING_LIGHT,
     SK_COUNT
 } SkillId;
 

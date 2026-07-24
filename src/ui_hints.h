@@ -15,4 +15,16 @@ void UI_DrawZoneTitle(int screenWidth, int screenHeight, float dt);
 // Restarts the zone-title animation - called on a zone change.
 void UI_ResetZoneTitle(void);
 
+// A transient banner for things the player must not miss: a skill
+// learned, an elite captured, a level gained. Earning a skill is the
+// core progression beat now, so it gets an announcement rather than
+// quietly appearing in a list.
+void UI_Notify(const char *message);
+
+// Draws and ages the notification stack. Call once per frame.
+void UI_DrawNotifications(int screenWidth, int screenHeight, float dt);
+
+// Clears pending banners (new game / load).
+void UI_ClearNotifications(void);
+
 #endif

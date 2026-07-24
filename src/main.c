@@ -45,6 +45,7 @@ static void StartGame(bool loadSave, Camera2D *camera) {
     if (loadSave) Save_LoadAndApply();
     Save_Enable();
     UI_ResetZoneTitle(); // a new game announces its starting zone again
+    UI_ClearNotifications();
 
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (player) camera->target = player->pos;
@@ -180,6 +181,7 @@ int main(void) {
         UI_DrawZoneTitle(screenWidth, screenHeight, paused ? 0.0f : dt);
 
         UI_DrawControlHints(screenWidth, screenHeight);
+        UI_DrawNotifications(screenWidth, screenHeight, paused ? 0.0f : dt);
         UI_DrawSkillBar(screenWidth, screenHeight);
         UI_DrawResourceBars(screenWidth, screenHeight);
         UI_DrawCompass(screenWidth, screenHeight);

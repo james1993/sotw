@@ -5,6 +5,7 @@
 #include "ui_hit.h"
 #include "raylib.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 // One row of the legend. Keyboard and pad labels are separate strings
@@ -16,6 +17,7 @@ typedef struct {
 } HintEntry;
 
 static const HintEntry g_hints[] = {
+    { "L",   "R3",     "Skills" },
     { "I",   "Y",      "Bags" },
     { "E",   "Y",      "Gear" },
     { "K",   NULL,     "Attributes" },
@@ -127,4 +129,56 @@ void UI_DrawZoneTitle(int screenWidth, int screenHeight, float dt) {
     int subFont = (int)(13 * scale);
     UI_TextShadowCentered(sub, cx, y + bigFont + (int)(6 * scale), subFont,
                           Fade((Color){ 186, 176, 150, 255 }, alpha * 0.9f));
+}
+
+// ---------------------------------------------------------------------
+// Notification banners
+
+#define MAX_NOTIFICATIONS 4
+#define NOTIFY_LIFE 4.5f
+#define NOTIFY_FADE 1.2f
+
+typedef struct {
+    char text[96];
+    float life;
+} Notification;
+
+static Notification g_notes[MAX_NOTIFICATIONS];
+
+void UI_ClearNotifications(void) {
+    for (int i = 0; i < MAX_NOTIFICATIONS; i++) g_notes[i].life = 0.0f;
+}
+
+void UI_Notify(const char *message) {
+    if (!message) return;
+    // Newest at the top of the stack; the oldest falls off when full.
+    for (int i = MAX_NOTIFICATIONS - 1; i > 0; i--) g_notes[i] = g_notes[i - 1];
+    snprintf(g_notes[0].text, sizeof(g_notes[0].text), "%s", message);
+    g_notes[0].life = NOTIFY_LIFE;
+}
+
+void UI_DrawNotifications(int screenWidth, int screenHeight, float dt) {
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(17 * scale);
+    int padX = (int)(16 * scale);
+    int rowH = (int)(font * 1.5f) + (int)(12 * scale);
+    int y = (int)(screenHeight * 0.30f);
+
+    for (int i = 0; i < MAX_NOTIFICATIONS; i++) {
+        if (g_notes[i].life <= 0.0f) continue;
+        g_notes[i].life -= dt;
+
+        float alpha = 1.0f;
+        if (g_notes[i].life < NOTIFY_FADE) alpha = g_notes[i].life / NOTIFY_FADE;
+        if (alpha < 0.0f) alpha = 0.0f;
+
+        int tw = UITextWidth(g_notes[i].text, font);
+        int w = tw + padX * 2;
+        Rectangle box = { (screenWidth - w) / 2.0f, (float)y, (float)w, (float)rowH };
+        DrawRectangleRounded(box, 0.3f, 8, Fade((Color){ 18, 19, 26, 240 }, alpha));
+        DrawRectangleRoundedLines(box, 0.3f, 8, Fade(UI_GOLD, alpha));
+        UI_TextShadowCentered(g_notes[i].text, screenWidth / 2, y + (rowH - font) / 2, font,
+                              Fade((Color){ 244, 232, 198, 255 }, alpha));
+        y += rowH + (int)(6 * scale);
+    }
 }
