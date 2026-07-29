@@ -16,4 +16,8 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight);
 bool UI_IsMapOpen(void);
 void UI_CloseMapOverlay(void);
 
+// Opens the map directly - the pause hub's route to it, so the map is
+// reachable without knowing the M / Select binding.
+void UI_OpenMapOverlay(void);
+
 #endif

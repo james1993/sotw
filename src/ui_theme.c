@@ -1,5 +1,6 @@
 #include "ui_theme.h"
 #include "ui_font.h"
+#include "ui_cursor.h"
 #include "skill.h"
 #include <math.h>
 #include <stddef.h>
@@ -59,6 +60,74 @@ void UI_ThemeBar(Rectangle r, float pct, Color fill, const char *label, int font
         int lw = UITextWidth(label, font);
         UIText(label, x + (w - lw) / 2, y + (h - font) / 2, font, RAYWHITE);
     }
+}
+
+int UI_FontSize(float scale, UITextSize size) {
+    static const int base[] = { 10, 12, 14, 17, 24 };
+    int n = (int)size;
+    if (n < 0) n = 0;
+    if (n > UI_TEXT_XL) n = UI_TEXT_XL;
+    int px = (int)(base[n] * scale);
+    return px < 8 ? 8 : px;
+}
+
+bool UI_Row(Rectangle rect, UIRowState state, bool hovered) {
+    if (state == UI_ROW_SELECTED) {
+        DrawRectangleRec(rect, (Color){ 46, 50, 66, 220 });
+        // A gold spine on the leading edge: reads as "this one" without
+        // washing the whole row in accent color.
+        DrawRectangle((int)rect.x, (int)rect.y, (int)(3 * (rect.height / 24.0f) + 1),
+                      (int)rect.height, UI_GOLD);
+    } else if (hovered && state == UI_ROW_NORMAL) {
+        DrawRectangleRec(rect, UI_SURFACE_HOVER);
+    }
+    return hovered && state != UI_ROW_DISABLED && UI_PointerClicked();
+}
+
+bool UI_Button(Rectangle rect, const char *label, int font, bool enabled, bool highlighted) {
+    bool hovered = enabled && CheckCollisionPointRec(UI_PointerPos(), rect);
+    Color top = !enabled ? (Color){ 38, 38, 44, 255 }
+              : (hovered || highlighted) ? (Color){ 78, 86, 114, 255 }
+                                         : (Color){ 48, 52, 70, 255 };
+    DrawRectangleGradientV((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height,
+                           top, (Color){ (unsigned char)(top.r * 0.55f),
+                                         (unsigned char)(top.g * 0.55f),
+                                         (unsigned char)(top.b * 0.55f), 255 });
+    DrawRectangleLinesEx(rect, highlighted ? 2.0f : 1.0f,
+                         !enabled ? (Color){ 62, 60, 58, 255 }
+                                  : (highlighted ? UI_GOLD : UI_GOLD_DIM));
+    int tw = UITextWidth(label, font);
+    UI_TextShadow(label, (int)(rect.x + (rect.width - tw) / 2),
+                  (int)(rect.y + (rect.height - font) / 2), font,
+                  enabled ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
+    return hovered && UI_PointerClicked();
+}
+
+int UI_Tabs(Rectangle rect, const char **labels, int count, int active, int font) {
+    if (count <= 0) return -1;
+    int clicked = -1;
+    float tabW = rect.width / (float)count;
+    for (int i = 0; i < count; i++) {
+        Rectangle t = { rect.x + i * tabW, rect.y, tabW, rect.height };
+        bool isActive = (i == active);
+        bool hovered = CheckCollisionPointRec(UI_PointerPos(), t);
+
+        DrawRectangleRec(t, isActive ? UI_SURFACE_RAISE
+                        : hovered ? (Color){ 34, 36, 48, 255 } : (Color){ 22, 23, 31, 255 });
+        // Only the active tab gets the gold underline; inactive tabs get
+        // a hairline so the strip still reads as one control.
+        if (isActive) {
+            DrawRectangle((int)t.x, (int)(t.y + t.height - 3), (int)t.width, 3, UI_GOLD);
+        } else {
+            DrawRectangle((int)t.x, (int)(t.y + t.height - 1), (int)t.width, 1, UI_GOLD_DIM);
+        }
+        int tw = UITextWidth(labels[i], font);
+        UI_TextShadow(labels[i], (int)(t.x + (t.width - tw) / 2),
+                      (int)(t.y + (t.height - font) / 2), font,
+                      isActive ? UI_TEXT_PRIMARY : UI_TEXT_SECOND);
+        if (hovered && UI_PointerClicked()) clicked = i;
+    }
+    return clicked;
 }
 
 void UI_TextShadow(const char *text, int x, int y, int size, Color color) {

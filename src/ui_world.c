@@ -123,6 +123,17 @@ static void DrawDropLabels(Camera2D camera, int screenWidth, int screenHeight, f
     }
 }
 
+// Plate layout for one entity, resolved before anything is drawn.
+typedef struct {
+    int entity;
+    Vector2 head;   // screen anchor
+    float top;      // y of the topmost element in the stack
+    float height;   // total stack height
+    float halfWidth;
+    bool showPlate, showBar, showCast, showQuest;
+    const char *role;
+} PlateLayout;
+
 void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     double now = GetTime();
@@ -139,6 +150,14 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
     float barW = 44.0f * scale;
     float barH = 5.0f * scale;
 
+    // --- Pass 1: decide what each entity shows and how tall its stack
+    // is, without drawing. Overlapping plates were the last thing making
+    // a melee unreadable - three names and three bars stacked on the
+    // same pixels - so layout has to be resolved for everybody before
+    // any of it is committed to the screen.
+    PlateLayout plates[MAX_ENTITIES];
+    int plateCount = 0;
+
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
         if (!e->alive) continue;
@@ -149,27 +168,108 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
         bool isParty = (e->kind == ENT_PLAYER || e->kind == ENT_HERO);
         bool hurt = (e->maxHp > 0 && e->hp < e->maxHp);
 
-        // Head anchor in screen space - everything stacks upward from
-        // here, so plates never overlap the sprite itself.
         Vector2 head = GetWorldToScreen2D(
             (Vector2){ e->pos.x, e->pos.y - e->radius }, camera);
 
-        // Cull offscreen entities cheaply; the margin covers a plate
-        // whose anchor is just past the edge.
         float margin = 140.0f * scale;
         if (head.x < -margin || head.x > screenWidth + margin ||
             head.y < -margin || head.y > screenHeight + margin) continue;
 
-        // --- What deserves a plate? ---
         // A quiet field shouldn't be a wall of floating text, so a
         // sleeping monster stays anonymous until it matters. Everything
         // you can act on - party, NPCs, whatever you've targeted or are
         // pointing at - always reads.
-        bool showPlate = isParty || e->kind == ENT_NPC || isTarget || isHover ||
-                         (isFoe && (e->aggroed || hurt));
-        bool showBar = isParty || isTarget || isHover ||
+        PlateLayout pl = { 0 };
+        pl.entity = i;
+        pl.head = head;
+        pl.showPlate = isParty || e->kind == ENT_NPC || isTarget || isHover ||
                        (isFoe && (e->aggroed || hurt));
-        if (e->kind == ENT_NPC) showBar = false; // service NPCs never fight
+        pl.showBar = isParty || isTarget || isHover ||
+                     (isFoe && (e->aggroed || hurt));
+        if (e->kind == ENT_NPC) pl.showBar = false; // service NPCs never fight
+        pl.showCast = Entity_IsCasting(e);
+        pl.showQuest = (e->kind == ENT_NPC && e->npcRole == NPC_QUEST_GIVER &&
+                        Quests_GiverHasAttentionFor(e->name));
+        pl.role = (e->kind == ENT_NPC) ? NpcRoleLabel(e->npcRole) : NULL;
+
+        float h = 10.0f * scale;
+        if (pl.showCast) h += barH + 3.0f * scale;
+        if (pl.showBar) h += barH + 3.0f * scale;
+        if (pl.showPlate) {
+            h += nameFont + 3.0f * scale;
+            if (pl.role) h += smallFont + 2.0f * scale;
+        }
+        if (pl.showQuest) h += 20.0f * scale;
+
+        pl.height = h;
+        pl.top = head.y - h;
+        float nameW = pl.showPlate ? (float)UITextWidth(e->name, nameFont) : 0.0f;
+        // Foe plates carry a trailing "lv N", so reserve for it too or
+        // the level tag of one monster lands on its neighbour's name.
+        if (pl.showPlate && isFoe && e->level > 0) nameW += 34.0f * scale;
+        pl.halfWidth = (nameW > barW ? nameW : barW) * 0.5f + 4.0f * scale;
+        plates[plateCount++] = pl;
+    }
+
+    // --- Pass 2: stack colliding plates instead of overlapping them.
+    //
+    // Placement order is nearest-to-camera first (largest screen y), so
+    // the character in front keeps its natural position and the ones
+    // behind step up above it - the same depth order the sprites draw
+    // in. Each plate is nudged only as far as it takes to clear what's
+    // already placed, and never past a cap, so a crowded fight lifts a
+    // plate a little rather than flinging it off the top of the screen.
+    int order[MAX_ENTITIES];
+    for (int i = 0; i < plateCount; i++) order[i] = i;
+    for (int i = 1; i < plateCount; i++) {
+        int v = order[i];
+        float vy = plates[v].head.y;
+        int j = i - 1;
+        while (j >= 0 && plates[order[j]].head.y < vy) {
+            order[j + 1] = order[j];
+            j--;
+        }
+        order[j + 1] = v;
+    }
+
+    float maxLift = 90.0f * scale;
+    for (int oi = 1; oi < plateCount; oi++) {
+        PlateLayout *me = &plates[order[oi]];
+        float lifted = 0.0f;
+        // Re-check against everything already placed after each nudge:
+        // clearing one neighbour can slide us into another.
+        for (int pass = 0; pass < plateCount && lifted < maxLift; pass++) {
+            bool moved = false;
+            for (int oj = 0; oj < oi; oj++) {
+                PlateLayout *other = &plates[order[oj]];
+                float dx = me->head.x - other->head.x;
+                if (dx < 0) dx = -dx;
+                if (dx > me->halfWidth + other->halfWidth) continue;
+                float gap = me->head.y - other->top; // >0 means we overlap them
+                if (gap <= 0.0f) continue;
+                float lift = gap + 2.0f * scale;
+                if (lifted + lift > maxLift) lift = maxLift - lifted;
+                me->head.y -= lift;
+                me->top -= lift;
+                lifted += lift;
+                moved = true;
+                break;
+            }
+            if (!moved) break;
+        }
+    }
+
+    // --- Pass 3: draw ---
+    for (int pi = 0; pi < plateCount; pi++) {
+        PlateLayout *pl = &plates[pi];
+        int i = pl->entity;
+        Entity *e = &g_entities[i];
+
+        bool isTarget = (i == targetIdx);
+        bool isFoe = (e->kind == ENT_MONSTER);
+        bool showPlate = pl->showPlate;
+        bool showBar = pl->showBar;
+        Vector2 head = pl->head;
 
         float stackY = head.y - (int)(10 * scale);
 

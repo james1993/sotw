@@ -196,15 +196,45 @@ int main(void) {
             UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
         } else {
             PauseAction pa = UI_DrawPauseMenu(screenWidth, screenHeight);
-            if (pa == PAUSE_RESUME) {
-                paused = false;
-            } else if (pa == PAUSE_QUIT_TO_MENU) {
-                Save_Write();
-                paused = false;
-                app = APP_MENU;
-            } else if (pa == PAUSE_QUIT_GAME) {
-                paused = false;
-                quitRequested = true; // final autosave runs after the loop
+            // Every screen-opening entry unpauses on the way out: the
+            // panel you asked for is only usable in the live game, so
+            // the menu hands you straight to it instead of leaving you
+            // to dismiss an overlay first.
+            switch (pa) {
+                case PAUSE_RESUME:
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_SKILLS:
+                    UI_OpenPanel(PANEL_SKILLS);
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_EQUIPMENT:
+                    UI_OpenPanel(PANEL_EQUIPMENT);
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_INVENTORY:
+                    UI_OpenPanel(PANEL_INVENTORY);
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_ATTRIBUTES:
+                    UI_OpenPanel(PANEL_ATTRIBUTES);
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_MAP:
+                    UI_OpenMapOverlay();
+                    paused = false;
+                    break;
+                case PAUSE_QUIT_TO_MENU:
+                    Save_Write();
+                    paused = false;
+                    app = APP_MENU;
+                    break;
+                case PAUSE_QUIT_GAME:
+                    paused = false;
+                    quitRequested = true; // final autosave runs after the loop
+                    break;
+                default:
+                    break;
             }
         }
 

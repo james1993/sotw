@@ -98,6 +98,15 @@ void UI_ToggleSkills(void) {
     g_armedBarSlot = -1;
 }
 
+void UI_OpenPanel(PanelId panel) {
+    switch (panel) {
+        case PANEL_SKILLS:     g_skillsOpen = true; g_armedBarSlot = -1; break;
+        case PANEL_EQUIPMENT:  g_equipOpen = true; break;
+        case PANEL_INVENTORY:  g_invOpen = true; break;
+        case PANEL_ATTRIBUTES: g_attrOpen = true; break;
+    }
+}
+
 // The pad's Y button opens "the bags": inventory + equipment together,
 // since on a controller you almost always want both at once.
 void UI_ToggleBags(void) {

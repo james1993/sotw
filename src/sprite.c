@@ -101,6 +101,38 @@ static void DrawWeapon(WeaponVisual w, Vector2 hand, float angle, float r) {
 }
 
 // ----- Humanoid: robe, head, arms, weapon, walk + swing + cast -----
+// Attack timing curve, shared by every species.
+//
+// A plain sin(t*PI) hump eases in and out symmetrically, which reads as
+// a wobble rather than a blow. Real strikes anticipate: the body pulls
+// BACK, snaps forward much faster than it withdrew, then settles. This
+// returns roughly -0.35 (wound up) through +1.0 (full extension) over
+// the swing, so a limb driven by it has a readable telegraph and a
+// visible impact frame.
+static float AttackSwing(float t) {
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    if (t < 0.32f) {
+        // Wind-up: ease back.
+        float u = t / 0.32f;
+        return -0.35f * sinf(u * 1.5708f);
+    }
+    if (t < 0.52f) {
+        // Strike: snap through, overshooting slightly past full reach.
+        float u = (t - 0.32f) / 0.20f;
+        return -0.35f + 1.42f * (u * u * (3.0f - 2.0f * u));
+    }
+    // Recovery: drift back to rest.
+    float u = (t - 0.52f) / 0.48f;
+    return 1.07f * (1.0f - u) * (1.0f - u);
+}
+
+// Normalized progress through the current swing, or -1 when idle.
+static float SwingPhase(const Entity *e) {
+    if (e->attackAnimTimer <= 0.0f) return -1.0f;
+    return 1.0f - e->attackAnimTimer / ATTACK_ANIM_DURATION;
+}
+
 static void DrawHumanoid(const Entity *e, double now) {
     float r = e->radius;
     Vector2 p = e->pos;
@@ -142,11 +174,10 @@ static void DrawHumanoid(const Entity *e, double now) {
 
     // Casting state feeds the arms and the glow.
     bool casting = Entity_IsCasting(e);
-    float swing = 0.0f;
-    if (e->attackAnimTimer > 0.0f) {
-        float t = 1.0f - e->attackAnimTimer / 0.3f; // 0..1 through the swing
-        swing = sinf(t * 3.14159f) * 1.6f;          // wind up and through
-    }
+    float phase = SwingPhase(e);
+    // Same anticipation curve the beasts use, so a party member's blow
+    // and a Charr's read with the same weight.
+    float swing = (phase >= 0.0f) ? AttackSwing(phase) * 1.55f : 0.0f;
 
     // Weapon arm
     Vector2 shoulder = { p.x + sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
@@ -204,11 +235,12 @@ static void DrawCharr(const Entity *e, double now) {
     Color dark = Darken(fur, 0.6f);
 
     float walk = sinf(e->animTime * 6.0f) * e->moveBlend;
-    float lunge = 0.0f;
-    if (e->attackAnimTimer > 0.0f) {
-        float t = 1.0f - e->attackAnimTimer / 0.3f;
-        lunge = sinf(t * 3.14159f) * r * 0.5f;
-    }
+    float phase = SwingPhase(e);
+    float swing = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+    float lunge = swing * r * 0.62f;
+    // The whole beast rocks into the blow, not just the arm - weight is
+    // what makes a hit look like it landed.
+    float crouch = (swing < 0.0f) ? -swing * r * 0.16f : 0.0f;
 
     DrawEllipse((int)p.x, (int)(p.y + r * 0.85f), r * 1.05f, r * 0.34f, (Color){ 0, 0, 0, 70 });
 
@@ -224,21 +256,30 @@ static void DrawCharr(const Entity *e, double now) {
     DrawLineEx((Vector2){ p.x + r * 0.35f, p.y + r * 0.2f },
                (Vector2){ p.x + r * 0.35f - step * sx, p.y + r * 0.9f }, r * 0.24f, dark);
 
-    // Hunched body
-    DrawEllipse((int)(p.x + lunge * sx * 0.3f), (int)(p.y - r * 0.1f), r * 0.95f, r * 0.72f, fur);
-    // Mane spikes along the back
+    // Hunched body, leaning into the strike and crouching on the wind-up
+    DrawEllipse((int)(p.x + lunge * sx * 0.35f), (int)(p.y - r * 0.1f + crouch),
+                r * 0.95f, r * 0.72f, fur);
+    // Mane spikes along the back - they flare on the wind-up
+    float flare = (swing < 0.0f) ? -swing * 0.5f : 0.0f;
     for (int i = 0; i < 4; i++) {
-        float mx = p.x - sx * r * (0.55f - i * 0.32f);
-        float my = p.y - r * (0.55f + 0.08f * sinf((float)i * 2.1f));
-        DrawTriangle((Vector2){ mx, my - r * 0.38f },
+        float mx = p.x - sx * r * (0.55f - i * 0.32f) + lunge * sx * 0.25f;
+        float my = p.y - r * (0.55f + 0.08f * sinf((float)i * 2.1f)) + crouch;
+        DrawTriangle((Vector2){ mx, my - r * (0.38f + flare * 0.3f) },
                      (Vector2){ mx - r * 0.16f, my },
                      (Vector2){ mx + r * 0.16f, my }, Darken(fur, 0.75f));
     }
 
     // Head with muzzle + horns, thrust forward when attacking
-    Vector2 head = { p.x + sx * (r * 0.75f + lunge), p.y - r * 0.35f };
+    Vector2 head = { p.x + sx * (r * 0.75f + lunge), p.y - r * 0.35f + crouch * 0.6f };
     DrawCircleV(head, r * 0.45f, fur);
-    DrawEllipse((int)(head.x + sx * r * 0.35f), (int)(head.y + r * 0.1f), r * 0.32f, r * 0.2f, Lighten(fur, 0.15f));
+    // Jaw drops open through the strike - a snarl you can actually see.
+    float gape = (swing > 0.2f) ? swing * r * 0.16f : 0.0f;
+    DrawEllipse((int)(head.x + sx * r * 0.35f), (int)(head.y + r * 0.1f + gape),
+                r * 0.32f, r * 0.2f, Lighten(fur, 0.15f));
+    if (gape > 0.02f) {
+        DrawEllipse((int)(head.x + sx * r * 0.38f), (int)(head.y + r * 0.06f),
+                    r * 0.2f, gape, (Color){ 60, 24, 24, 255 });
+    }
     // Horns
     DrawTriangle((Vector2){ head.x - sx * r * 0.1f, head.y - r * 0.35f },
                  (Vector2){ head.x - sx * r * 0.45f, head.y - r * 0.85f },
@@ -248,13 +289,26 @@ static void DrawCharr(const Entity *e, double now) {
     DrawCircleV((Vector2){ head.x + sx * r * 0.12f, head.y - r * 0.08f }, r * 0.08f,
                 e->aggroed ? (Color){ 255, 90, 60, 255 } : (Color){ 240, 200, 90, 255 });
 
-    // Claw arm raking forward on the swing
-    Vector2 sh = { p.x + sx * r * 0.5f, p.y + r * 0.05f };
-    Vector2 paw = { sh.x + sx * (r * 0.55f + lunge), sh.y + r * 0.3f };
+    // Claw arm raking forward on the swing. The paw travels on an arc -
+    // up and back to rear, then down and across on the strike - so the
+    // rake reads as a swipe rather than a piston.
+    Vector2 sh = { p.x + sx * r * 0.5f + lunge * sx * 0.3f, p.y + r * 0.05f + crouch };
+    float armAngle = -0.9f + swing * 1.7f; // radians, negative = raised
+    float reach = r * (0.62f + swing * 0.32f);
+    Vector2 paw = { sh.x + sx * cosf(armAngle) * reach, sh.y + sinf(armAngle) * reach + r * 0.3f };
     DrawLineEx(sh, paw, r * 0.22f, dark);
     for (int c = 0; c < 3; c++) {
         Vector2 tip = { paw.x + sx * r * 0.3f, paw.y - r * 0.12f + c * r * 0.12f };
         DrawLineEx(paw, tip, r * 0.07f, (Color){ 235, 230, 220, 255 });
+    }
+
+    // Motion streak trailing the claws through the fast part of the
+    // strike, so the frame the blow lands is unmistakable.
+    if (swing > 0.45f) {
+        float a = (swing - 0.45f) / 0.55f;
+        Color streak = { 255, 240, 225, (unsigned char)(150 * a) };
+        DrawRing(sh, reach * 0.86f, reach * 1.04f,
+                 sx > 0 ? -70.0f : 110.0f, sx > 0 ? 40.0f : 220.0f, 10, streak);
     }
 }
 
@@ -268,11 +322,11 @@ static void DrawDevourer(const Entity *e, double now) {
     Color dark = Darken(shell, 0.55f);
 
     float skitter = sinf(e->animTime * 10.0f) * e->moveBlend;
-    float snap = 0.0f;
-    if (e->attackAnimTimer > 0.0f) {
-        float t = 1.0f - e->attackAnimTimer / 0.3f;
-        snap = sinf(t * 3.14159f);
-    }
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+    // Rears back on its hind legs, then drives the whole shell forward.
+    float lunge = snap * r * 0.45f;
+    float rear = (snap < 0.0f) ? -snap * r * 0.3f : 0.0f;
 
     DrawEllipse((int)p.x, (int)(p.y + r * 0.7f), r * 1.15f, r * 0.3f, (Color){ 0, 0, 0, 70 });
 
@@ -286,15 +340,18 @@ static void DrawDevourer(const Entity *e, double now) {
                    (Vector2){ p.x + off + r * 0.4f, p.y + r * 0.75f + lift }, r * 0.1f, dark);
     }
 
-    // Segmented body
-    DrawEllipse((int)(p.x - sx * r * 0.45f), (int)p.y, r * 0.75f, r * 0.5f, Darken(shell, 0.8f));
-    DrawEllipse((int)(p.x + sx * r * 0.25f), (int)(p.y - r * 0.05f), r * 0.85f, r * 0.55f, shell);
-    DrawEllipse((int)(p.x + sx * r * 0.25f), (int)(p.y - r * 0.25f), r * 0.6f, r * 0.25f, Lighten(shell, 0.15f));
+    // Segmented body, driven forward and lifted on the rear-back
+    float bx = p.x + lunge * sx;
+    float by = p.y - rear;
+    DrawEllipse((int)(bx - sx * r * 0.45f), (int)by, r * 0.75f, r * 0.5f, Darken(shell, 0.8f));
+    DrawEllipse((int)(bx + sx * r * 0.25f), (int)(by - r * 0.05f), r * 0.85f, r * 0.55f, shell);
+    DrawEllipse((int)(bx + sx * r * 0.25f), (int)(by - r * 0.25f), r * 0.6f, r * 0.25f, Lighten(shell, 0.15f));
 
-    // Stinger tail curling over the back
-    Vector2 t0 = { p.x - sx * r * 1.0f, p.y - r * 0.05f };
-    Vector2 t1 = { p.x - sx * r * 1.3f, p.y - r * 0.75f };
-    Vector2 t2 = { p.x - sx * r * 0.9f, p.y - r * 1.15f };
+    // Stinger tail curling over the back - whips forward with the strike
+    float whip = snap * r * 0.35f;
+    Vector2 t0 = { bx - sx * r * 1.0f, by - r * 0.05f };
+    Vector2 t1 = { bx - sx * (r * 1.3f - whip * 0.5f), by - r * 0.75f };
+    Vector2 t2 = { bx - sx * (r * 0.9f - whip), by - r * 1.15f };
     DrawLineEx(t0, t1, r * 0.16f, dark);
     DrawLineEx(t1, t2, r * 0.13f, dark);
     DrawTriangle(t2,
@@ -302,19 +359,26 @@ static void DrawDevourer(const Entity *e, double now) {
                  (Vector2){ t2.x + sx * r * 0.05f, t2.y + r * 0.3f },
                  (Color){ 230, 190, 90, 255 });
 
-    // Pincers snapping forward on attack
+    // Pincers: gape wide during the wind-up, then clash shut on impact.
     for (int s = -1; s <= 1; s += 2) {
-        Vector2 base = { p.x + sx * r * 0.95f, p.y + s * r * 0.28f };
-        float open = (0.45f - snap * 0.35f) * s;
-        Vector2 tip = { base.x + sx * r * (0.55f + snap * 0.25f), base.y + open * r };
+        Vector2 base = { bx + sx * r * 0.95f, by + s * r * 0.28f };
+        // Negative swing (winding up) spreads them; the strike slams
+        // them together, which is the whole read on a pincer attack.
+        float open = (0.45f - snap * 0.42f) * s;
+        Vector2 tip = { base.x + sx * r * (0.55f + snap * 0.3f), base.y + open * r };
         DrawLineEx(base, tip, r * 0.17f, dark);
         DrawLineEx(tip, (Vector2){ tip.x + sx * r * 0.2f, tip.y - s * r * 0.18f }, r * 0.12f, dark);
     }
+    // A spark where the pincers meet at full closure.
+    if (snap > 0.75f) {
+        Vector2 clash = { bx + sx * r * 1.5f, by };
+        DrawCircleV(clash, r * 0.16f * (snap - 0.75f) * 4.0f, (Color){ 255, 230, 190, 170 });
+    }
 
     // Eyes
-    DrawCircleV((Vector2){ p.x + sx * r * 0.75f, p.y - r * 0.25f }, r * 0.07f,
+    DrawCircleV((Vector2){ bx + sx * r * 0.75f, by - r * 0.25f }, r * 0.07f,
                 (Color){ 255, 120, 70, 255 });
-    DrawCircleV((Vector2){ p.x + sx * r * 0.6f, p.y - r * 0.33f }, r * 0.06f,
+    DrawCircleV((Vector2){ bx + sx * r * 0.6f, by - r * 0.33f }, r * 0.06f,
                 (Color){ 255, 120, 70, 255 });
 }
 

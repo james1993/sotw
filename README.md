@@ -44,6 +44,14 @@ shape sprites with movement-driven walk cycles, swing and cast
 animations, and in-hand weapons matching what's equipped (robe color
 tracks armor tier); combat plays slash arcs, school-colored bursts,
 heal sparkles, AoE rings, and knockdown stars (`sprite.c`, `fx.c`).
+
+Attacks use a shared anticipation curve rather than a symmetric ease —
+the body winds *back*, snaps forward far faster than it withdrew, then
+recovers. Every species is driven by it, so a blow has a readable
+telegraph and a visible impact frame: Charr crouch and flare their
+mane, thrust the head, gape the jaw and rake a clawed arc with a motion
+streak; Devourers rear up, drive the shell forward, whip the stinger
+and clash their pincers shut.
 The UI shares one GW1-flavored chrome — slate panels with gold trim
 and corner ticks, beveled resource bars, and per-skill vector icons in
 the bar with hover tooltips (`ui_theme.c`), a gilt compass bezel, and a
@@ -55,7 +63,19 @@ separate screen-space pass (`ui_world.c`) rather than inside the camera
 transform, so text stays crisp and plates stay the same size at any
 zoom. That pass also decides *what* deserves a label: idle monsters stay
 anonymous until they're targeted, hovered, awake, or hurt, which keeps a
-quiet field from becoming a wall of floating text.
+quiet field from becoming a wall of floating text. Plates are laid out
+before anything is drawn and de-collided — nearest-to-camera keeps its
+place and the ones behind step up above it, capped so a crowded melee
+lifts a plate rather than flinging it off-screen — so four characters
+piled on the same spot still read as four separate nameplates.
+
+The interface is built from shared design tokens rather than per-panel
+magic numbers: a 4px spacing scale, a five-step type scale, and
+semantic colors (`UI_TEXT_PRIMARY`, `UI_POSITIVE`, `UI_SURFACE`…), plus
+common `UI_Row` / `UI_Button` / `UI_Tabs` widgets. One implementation of
+"a list row" means the merchant, the trainer, the bags and the skill
+list all *behave* identically, which is most of what makes an interface
+feel finished.
 
 ### Build
 
@@ -104,9 +124,14 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   through compatible gear. **K** toggles the attributes panel for
   spending earned attribute points at GW1's real rank costs.
 - **Scroll wheel** zooms. **M** opens the full-region map (the whole
-  zone, its boundary, portals, quest markers, and every contact);
-  **P** pauses with an in-game menu (Resume / Quit to Main Menu / Quit
-  Game). The world freezes while paused.
+  zone, its boundary, portals, quest markers, and every contact).
+- **P** (or **Start**) opens the in-game menu, which is the hub for
+  everything: Resume, Skills & Build, Equipment, Inventory, Attributes,
+  Region Map, then Quit to Main Menu / Quit Game behind a divider. Each
+  row shows its own keyboard shortcut, and picking a screen closes the
+  menu and opens it. On a controller the panels have scattered bindings
+  (Y, R3, Select) that nobody should have to memorise — Start leads
+  everywhere. The world freezes while the menu is up.
 - **Controller**: left stick moves (auto-attacks the nearest enemy in
   range), L2 + A/B/X/Y = skills 1–4, R2 + A/B/X/Y = skills 5–8.
   **L1/R1** cycle backward/forward through visible enemies (nearest

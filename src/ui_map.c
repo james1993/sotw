@@ -20,6 +20,10 @@ void UI_CloseMapOverlay(void) {
     g_open = false;
 }
 
+void UI_OpenMapOverlay(void) {
+    g_open = true;
+}
+
 // World -> map-panel transform, shared by everything drawn below.
 typedef struct {
     Rectangle bounds; // world-space playable area

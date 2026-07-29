@@ -30,8 +30,19 @@ bool UI_IsAttributesOpen(void);
 bool UI_IsEquipmentOpen(void);
 bool UI_IsSkillsOpen(void);
 
-// Opens/closes the build editor (L on the keyboard, D-pad up on a pad).
+// Opens/closes the build editor (L on the keyboard, R3 on a pad).
 void UI_ToggleSkills(void);
+
+// The character screens, addressable by name so the pause hub can open
+// any of them directly rather than duplicating each toggle.
+typedef enum {
+    PANEL_SKILLS = 0,
+    PANEL_EQUIPMENT,
+    PANEL_INVENTORY,
+    PANEL_ATTRIBUTES
+} PanelId;
+
+void UI_OpenPanel(PanelId panel);
 void UI_ToggleBags(void); // inventory + equipment together (pad Y)
 void UI_ClosePanels(void);
 

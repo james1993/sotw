@@ -219,7 +219,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
                 Entity_MarkInCombat(e);
-                e->attackAnimTimer = 0.3f; // the visible swing (sprite.c)
+                e->attackAnimTimer = ATTACK_ANIM_DURATION; // the visible swing (sprite.c)
                 if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
                     // Ranged: a visible bolt flies to where the target is
                     // standing NOW; adrenaline/aggro/damage resolve on

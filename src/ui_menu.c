@@ -2,6 +2,7 @@
 #include "ui_font.h"
 #include "ui_theme.h"
 #include "raylib.h"
+#include <stddef.h>
 #include <math.h>
 
 #define GAMEPAD_ID 0
@@ -125,48 +126,115 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     return result;
 }
 
+// One entry in the pause hub. Separators carry a NULL label and group
+// the destructive exits away from the everyday screens, so "Quit Game"
+// is never the neighbour of "Resume".
+typedef struct {
+    const char *label;
+    const char *shortcut; // key that also opens it, NULL for none
+    PauseAction action;
+} PauseEntry;
+
+static const PauseEntry g_pauseEntries[] = {
+    { "Resume",            NULL,  PAUSE_RESUME },
+    { "Skills & Build",    "L",   PAUSE_OPEN_SKILLS },
+    { "Equipment",         "E",   PAUSE_OPEN_EQUIPMENT },
+    { "Inventory",         "I",   PAUSE_OPEN_INVENTORY },
+    { "Attributes",        "K",   PAUSE_OPEN_ATTRIBUTES },
+    { "Region Map",        "M",   PAUSE_OPEN_MAP },
+    { NULL,                NULL,  PAUSE_NONE }, // separator
+    { "Quit to Main Menu", NULL,  PAUSE_QUIT_TO_MENU },
+    { "Quit Game",         NULL,  PAUSE_QUIT_GAME },
+};
+#define PAUSE_ENTRY_COUNT (int)(sizeof(g_pauseEntries) / sizeof(g_pauseEntries[0]))
+
+// Steps the highlight, skipping separators in whichever direction we're
+// heading so navigation never lands on a blank line.
+static int PauseStep(int from, int dir) {
+    int i = from;
+    for (int guard = 0; guard < PAUSE_ENTRY_COUNT; guard++) {
+        i = (i + dir + PAUSE_ENTRY_COUNT) % PAUSE_ENTRY_COUNT;
+        if (g_pauseEntries[i].label) return i;
+    }
+    return from;
+}
+
 PauseAction UI_DrawPauseMenu(int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
 
-    DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 160 });
+    DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 178 });
 
-    {
-        const char *title = "PAUSED";
-        int titleFont = (int)(28 * scale);
-        int tw = UITextWidth(title, titleFont);
-        UIText(title, (screenWidth - tw) / 2, (int)(screenHeight * 0.28f),
-               titleFont, (Color){ 220, 200, 140, 255 });
+    int font = UI_FontSize(scale, UI_TEXT_MD);
+    int titleFont = UI_FontSize(scale, UI_TEXT_XL);
+    int hintFont = UI_FontSize(scale, UI_TEXT_XS);
+
+    int btnW = (int)(320 * scale);
+    int btnH = (int)(40 * scale);
+    int gap = UI_SP(scale, 2);
+    int sepH = UI_SP(scale, 3);
+
+    // Measure the stack so the whole panel can be centered as one block
+    // rather than starting at a guessed fraction of the screen.
+    int listH = 0;
+    for (int i = 0; i < PAUSE_ENTRY_COUNT; i++) {
+        listH += g_pauseEntries[i].label ? btnH + gap : sepH;
     }
+    int padY = UI_SP(scale, 6);
+    int panelH = padY * 2 + titleFont + UI_SP(scale, 4) + listH + hintFont + UI_SP(scale, 3);
+    int panelW = btnW + UI_SP(scale, 10);
+    Rectangle panel = { (screenWidth - panelW) / 2.0f, (screenHeight - panelH) / 2.0f,
+                        (float)panelW, (float)panelH };
+    UI_ThemePanel(panel, scale, 0);
 
-    const char *labels[3] = { "Resume", "Quit to Main Menu", "Quit Game" };
-    PauseAction actions[3] = { PAUSE_RESUME, PAUSE_QUIT_TO_MENU, PAUSE_QUIT_GAME };
-    int count = 3;
+    int y = (int)panel.y + padY;
+    UI_TextShadowCentered("MENU", screenWidth / 2, y, titleFont, UI_GOLD);
+    y += titleFont + UI_SP(scale, 4);
 
     int nav = MenuNavStep();
-    g_pauseSelected = (g_pauseSelected + nav + count) % count;
+    if (nav != 0) g_pauseSelected = PauseStep(g_pauseSelected, nav);
+    if (!g_pauseEntries[g_pauseSelected].label) g_pauseSelected = PauseStep(g_pauseSelected, 1);
 
-    int btnW = (int)(280 * scale);
-    int btnH = (int)(48 * scale);
-    int gap = (int)(16 * scale);
-    int font = (int)(16 * scale);
     int x = (screenWidth - btnW) / 2;
-    int y = (int)(screenHeight * 0.40f);
 
     Vector2 mouse = GetMousePosition();
     bool mouseMoved = (mouse.x != g_lastMouse.x || mouse.y != g_lastMouse.y);
     g_lastMouse = mouse;
 
     PauseAction result = PAUSE_NONE;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < PAUSE_ENTRY_COUNT; i++) {
+        const PauseEntry *entry = &g_pauseEntries[i];
+        if (!entry->label) {
+            // Separator: a hairline rule, inset so it reads as a divider
+            // rather than a border.
+            DrawRectangle(x + btnW / 6, y + sepH / 2, btnW - btnW / 3, 1,
+                          (Color){ 92, 84, 64, 160 });
+            y += sepH;
+            continue;
+        }
+
         Rectangle r = { (float)x, (float)y, (float)btnW, (float)btnH };
         if (mouseMoved && CheckCollisionPointRec(mouse, r)) g_pauseSelected = i;
-        if (MenuButton(r, labels[i], font, i == g_pauseSelected)) result = actions[i];
+        bool selected = (i == g_pauseSelected);
+        if (UI_Button(r, entry->label, font, true, selected)) result = entry->action;
+
+        // The keyboard shortcut sits right-aligned inside the row, so the
+        // menu teaches its own bindings instead of hiding them.
+        if (entry->shortcut) {
+            int bw = UI_KeyBadge(entry->shortcut, 0, 0, hintFont, false);
+            UI_KeyBadge(entry->shortcut, (int)(r.x + r.width) - bw - UI_SP(scale, 3),
+                        (int)(r.y + (r.height - hintFont * 1.5f) / 2), hintFont, true);
+        }
         y += btnH + gap;
     }
 
     if (result == PAUSE_NONE && MenuConfirm()) {
-        result = actions[g_pauseSelected];
+        result = g_pauseEntries[g_pauseSelected].action;
     }
+
+    UI_TextShadowCentered(
+        IsGamepadAvailable(GAMEPAD_ID) ? "D-pad selects  -  (A) confirms  -  (B) resumes"
+                                       : "Up/Down selects  -  Enter confirms  -  Esc resumes",
+        screenWidth / 2, y + UI_SP(scale, 1), hintFont, UI_TEXT_MUTED);
     // P/Start (handled by main.c as the toggle), Escape, and B all resume.
     if (result == PAUSE_NONE &&
         (IsKeyPressed(KEY_ESCAPE) ||

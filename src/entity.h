@@ -75,6 +75,11 @@ typedef struct {
 // regen accumulator to fill smoothly between whole-point ticks.
 #define ENERGY_REGEN_INTERVAL 3.0f
 
+// How long a melee swing animation runs. Long enough that the wind-up
+// reads as a telegraph before the blow lands (sprite.c AttackSwing),
+// short enough to stay inside the fastest weapon's attack interval.
+#define ATTACK_ANIM_DURATION 0.42f
+
 typedef struct Entity {
     bool alive;
     EntityKind kind;
