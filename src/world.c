@@ -1,4 +1,5 @@
 #include "world.h"
+#include "character.h"
 #include "entity.h"
 #include "items.h"
 #include "attributes.h"
@@ -636,42 +637,85 @@ void World_Init(void) {
     g_thomHired = false;
     g_lastOutpostId = ZONE_ASHFORD_CAMP;
 
-    // The persistent player; every zone load carries this entity
-    // across. Monk primary / Elementalist secondary
-    // (docs/research/gw1-mechanics.md #4).
-    int playerIdx = Entity_Spawn(ENT_PLAYER, "Player (Mo/E)", 0, (Vector2){ 0, 0 }, (Color){ 220, 200, 120, 255 });
+    // The persistent player, built from whatever the creator produced
+    // (character.c). Every zone load carries this entity across.
+    char title[64];
+    Character_FormatTitle(&g_character, title, sizeof(title));
+    int playerIdx = Entity_Spawn(ENT_PLAYER, title, 0, (Vector2){ 0, 0 },
+                                 (Color){ 220, 200, 120, 255 });
     Entity *player = Entity_Get(playerIdx);
-    player->primaryProfession = PROF_MONK;
-    player->secondaryProfession = PROF_ELEMENTALIST;
+    player->primaryProfession = g_character.primary;
+    // Until a profession trainer grants a secondary, the character is
+    // single-profession. Attribute_Accessible takes the primary twice,
+    // which correctly opens nothing extra.
+    player->secondaryProfession = (g_character.secondary == PROF_NONE)
+                                  ? g_character.primary
+                                  : (Profession)g_character.secondary;
+    player->sex = g_character.sex;
+    player->skinTone = g_character.skinTone;
+    player->hairColor = g_character.hairColor;
+    player->hairStyle = g_character.hairStyle;
     player->level = 5;
     player->baseMaxHp = 100 + 20 * (player->level - 1); // GW1: +20 HP per level
-    player->baseMaxEnergy = 30;
+
+    // Per-profession starting kit. The choice has to change how the
+    // character actually plays from the first fight, not just which
+    // word appears on the nameplate: a Warrior soaks hits and has
+    // almost no energy, an Elementalist is the reverse, a Monk sits
+    // between them and heals.
+    //
+    // Armour is NOT set here - it comes from the armour piece each
+    // profession is issued below, because Items_EquipArmor is the one
+    // place that owns player->armor. A Warrior is tougher because the
+    // harness is AL 40, not because of a number written twice.
+    Skillbook_Reset();
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) player->skillBar[i] = -1;
+
+    Item startWeapon, startArmor;
+    switch (g_character.primary) {
+        case PROF_WARRIOR:
+            player->baseMaxEnergy = 20;
+            player->attributeRank[ATTR_STRENGTH] = 4;
+            player->attributeRank[ATTR_TACTICS] = 3;
+            player->skillBar[0] = SK_GASH;
+            startWeapon = (Item){ ITEM_WEAPON, "Ascalon Sword", 13, 20, 28.0f, 1.33f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Warrior Harness (AL 40)", 0, 0, 0, 0, 40, 1, false };
+            break;
+        case PROF_ELEMENTALIST:
+            player->baseMaxEnergy = 50;
+            player->attributeRank[ATTR_FIRE_MAGIC] = 4;
+            player->attributeRank[ATTR_ENERGY_STORAGE] = 3;
+            player->skillBar[0] = SK_FIRE_BOLT;
+            startWeapon = (Item){ ITEM_WEAPON, "Kindling Staff", 11, 22, 220.0f, 1.75f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Elementalist Robes (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            break;
+        case PROF_MONK:
+        default:
+            player->baseMaxEnergy = 30;
+            player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
+            player->attributeRank[ATTR_SMITING_PRAYERS] = 3;
+            player->attributeRank[ATTR_DIVINE_FAVOR] = 1;
+            player->skillBar[0] = SK_ORISON_OF_HEALING;
+            startWeapon = (Item){ ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            break;
+    }
+
     Entity_RecomputePenalizedStats(player);
     player->hp = player->maxHp;
     player->energy = player->maxEnergy;
-    // Level 5 grants 20 attribute points; these ranks spend 17 per the
-    // GW1 cost table, leaving 3 free for the attributes panel (K).
-    player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
-    player->attributeRank[ATTR_SMITING_PRAYERS] = 3;
-    player->attributeRank[ATTR_DIVINE_FAVOR] = 1;
+    // Level 5 grants 20 attribute points; the ranks above spend most of
+    // them, leaving a few free for the attributes panel (K).
     player->attributePoints = 3;
 
-    // A new character knows exactly one skill. The other seven slots are
-    // empty on purpose: filling them is the game. Skills come from quest
-    // rewards, from trainers (a skill point plus gold), and - for elites
-    // - only from killing the boss that uses them. Handing out a full
-    // bar at creation would skip the entire build-crafting loop, which
-    // is the part of GW1 worth demaking.
-    Skillbook_Reset();
-    for (int i = 0; i < SKILL_BAR_SIZE; i++) player->skillBar[i] = -1;
-    player->skillBar[0] = SK_ORISON_OF_HEALING;
+    // A new character knows exactly one skill - their profession's
+    // signature. The other seven slots are empty on purpose: filling
+    // them is the game.
     g_skillPoints = 1; // one to spend at the trainer straight away
+    Skillbook_Unlock(player->skillBar[0]);
 
-    // Starting equipment, GW1-style fixed-power items.
-    Item startRod = { ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
-    Item startRaiment = { ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
-    Items_AddToInventory(startRod);
-    Items_AddToInventory(startRaiment);
+    Items_AddToInventory(startWeapon);
+    Items_AddToInventory(startArmor);
     Items_EquipWeapon(player, 0);
     Items_EquipArmor(player, 1);
 

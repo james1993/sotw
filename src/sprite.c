@@ -1,4 +1,5 @@
 #include "sprite.h"
+#include "character.h"
 #include "skill.h"
 #include "raylib.h"
 #include <math.h>
@@ -25,7 +26,13 @@ static WeaponVisual WeaponFor(const Entity *e) {
         return WPNVIS_NONE;
     }
     if (e->kind == ENT_HERO) {
-        return (e->primaryProfession == PROF_ELEMENTALIST) ? WPNVIS_STAFF : WPNVIS_SWORD;
+        // Profession-appropriate gear for anyone without an inventory:
+        // heroes, henchmen, and the character-creation preview.
+        switch (e->primaryProfession) {
+            case PROF_ELEMENTALIST: return WPNVIS_STAFF;
+            case PROF_MONK:         return WPNVIS_ROD;
+            default:                return WPNVIS_SWORD;
+        }
     }
     return WPNVIS_NONE;
 }
@@ -167,7 +174,8 @@ static void DrawHumanoid(const Entity *e, double now) {
     DrawTriangle((Vector2){ p.x, top },
                  (Vector2){ p.x - r * 0.78f, p.y + r * 0.55f },
                  (Vector2){ p.x + r * 0.78f, p.y + r * 0.55f }, robe);
-    DrawCircleV((Vector2){ p.x, top + r * 0.18f }, r * 0.5f, robe);
+    DrawCircleV((Vector2){ p.x, top + r * 0.18f },
+                r * (e->sex == 0 ? 0.45f : 0.5f), robe);
     // Trim line - brighter on higher armor.
     DrawLineEx((Vector2){ p.x - r * 0.6f, p.y + r * 0.42f },
                (Vector2){ p.x + r * 0.6f, p.y + r * 0.42f }, r * 0.12f, Lighten(robe, 0.35f));
@@ -190,7 +198,11 @@ static void DrawHumanoid(const Entity *e, double now) {
     }
     Vector2 hand = { shoulder.x + cosf(armAngle) * r * 0.75f,
                      shoulder.y + sinf(armAngle) * r * 0.75f };
-    Color skin = (Color){ 224, 188, 148, 255 };
+    // Appearance from character creation. Everyone who isn't the player
+    // keeps index 0 defaults, which is why NPCs and heroes still look
+    // the way they always did.
+    Color skin = g_skinTones[(e->skinTone >= 0 && e->skinTone < SKIN_TONE_COUNT)
+                             ? e->skinTone : 1];
     DrawLineEx(shoulder, hand, r * 0.2f, Darken(robe, 0.7f));
     DrawCircleV(hand, r * 0.16f, skin);
     DrawWeapon(WeaponFor(e), hand, casting ? -1.57f : armAngle, r);
@@ -203,10 +215,27 @@ static void DrawHumanoid(const Entity *e, double now) {
     DrawLineEx(shoulder2, hand2, r * 0.2f, Darken(robe, 0.7f));
     DrawCircleV(hand2, r * 0.16f, skin);
 
-    // Head + hair
+    // Head + hair. Hair colour is chosen at creation; the style changes
+    // the silhouette, which is what actually makes two characters
+    // distinguishable at this size.
     Vector2 headC = { p.x, top - r * 0.42f };
     DrawCircleV(headC, r * 0.42f, skin);
-    DrawCircleSector(headC, r * 0.44f, 180.0f, 360.0f, 12, Darken(e->color, 0.5f));
+    Color hair = (e == &g_entities[PLAYER_INDEX] &&
+                  e->hairColor >= 0 && e->hairColor < HAIR_COLOR_COUNT)
+                 ? g_hairColors[e->hairColor] : Darken(e->color, 0.5f);
+    switch (e->hairStyle) {
+        case 1: // long: a cap plus a fall down the back
+            DrawCircleSector(headC, r * 0.46f, 180.0f, 360.0f, 12, hair);
+            DrawEllipse((int)(headC.x - sx * r * 0.16f), (int)(headC.y + r * 0.28f),
+                        r * 0.26f, r * 0.42f, hair);
+            break;
+        case 2: // cropped: a low band, leaving the crown bare
+            DrawCircleSector(headC, r * 0.45f, 200.0f, 340.0f, 12, hair);
+            break;
+        default: // the original cap
+            DrawCircleSector(headC, r * 0.44f, 180.0f, 360.0f, 12, hair);
+            break;
+    }
     // Eyes face the walk direction
     DrawCircleV((Vector2){ headC.x + sx * r * 0.15f, headC.y + r * 0.05f }, r * 0.05f, BLACK);
 

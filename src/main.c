@@ -19,6 +19,8 @@
 #include "ui_cursor.h"
 #include "ui_map.h"
 #include "ui_menu.h"
+#include "ui_create.h"
+#include "character.h"
 #include "ui_font.h"
 #include "ui_world.h"
 #include "ui_hints.h"
@@ -28,6 +30,7 @@
 
 typedef enum {
     APP_MENU,
+    APP_CREATE,   // character creation, between the menu and the world
     APP_PLAYING
 } AppState;
 
@@ -78,6 +81,9 @@ int main(void) {
 
     UIFont_Init();
     SkillDB_Init();
+    // A sane character exists from the first frame, so Continue on a
+    // save written before creation existed still has something valid.
+    g_character = Character_Default();
 
     AppState app = APP_MENU;
 
@@ -125,11 +131,27 @@ int main(void) {
             if (action == MENU_QUIT) {
                 quitRequested = true;
             } else if (action == MENU_NEW_GAME) {
-                StartGame(false, &camera);
-                app = APP_PLAYING;
+                // A new game goes through creation first - the world is
+                // built FROM the character, so it can't exist yet.
+                UI_CreateReset();
+                app = APP_CREATE;
             } else if (action == MENU_CONTINUE) {
                 StartGame(true, &camera);
                 app = APP_PLAYING;
+            }
+            continue;
+        }
+
+        // --- Character creation ---
+        if (app == APP_CREATE) {
+            BeginDrawing();
+            CreateAction ca = UI_DrawCreateScreen(screenWidth, screenHeight, dt);
+            EndDrawing();
+            if (ca == CREATE_CONFIRM) {
+                StartGame(false, &camera);
+                app = APP_PLAYING;
+            } else if (ca == CREATE_CANCEL) {
+                app = APP_MENU;
             }
             continue;
         }

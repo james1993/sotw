@@ -8,20 +8,14 @@ static bool g_unlocked[MAX_SKILLS];
 int g_skillPoints = 0;
 int g_skillsPurchased = 0;
 
-// What a brand-new character walks out of the tutorial knowing. One
-// skill, their profession's signature heal - everything else is earned.
-static const SkillId g_startingSkills[] = {
-    SK_ORISON_OF_HEALING,
-};
-#define STARTING_SKILL_COUNT (int)(sizeof(g_startingSkills) / sizeof(g_startingSkills[0]))
-
 void Skillbook_Reset(void) {
+    // Empty. The one skill a new character starts with is their
+    // profession's signature, so World_Init unlocks it after it has
+    // decided what they are - keeping a starting-skill table here as
+    // well would just be a second place for that to drift.
     memset(g_unlocked, 0, sizeof(g_unlocked));
     g_skillPoints = 0;
     g_skillsPurchased = 0;
-    for (int i = 0; i < STARTING_SKILL_COUNT; i++) {
-        g_unlocked[g_startingSkills[i]] = true;
-    }
 }
 
 bool Skillbook_IsUnlocked(int skillId) {

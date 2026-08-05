@@ -1,0 +1,329 @@
+#include "ui_create.h"
+#include "entity.h"
+#include "sprite.h"
+#include "skill.h"
+#include "attributes.h"
+#include "ui_font.h"
+#include "ui_theme.h"
+#include "raylib.h"
+#include <math.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
+// The character being built. Committed into g_character on confirm, so
+// backing out of the screen can't leave a half-made character behind.
+static CharacterDef g_draft;
+static bool g_nameFocused = false;
+static float g_previewTime = 0.0f;
+
+// A standalone entity used only to render the preview. Building a real
+// Entity rather than a bespoke "draw a person" routine means the
+// preview is literally the sprite the world will draw - it cannot drift
+// out of sync with the game the way a mock-up would.
+static Entity g_previewEntity;
+
+void UI_CreateReset(void) {
+    g_draft = Character_Default();
+    g_nameFocused = false;
+    g_previewTime = 0.0f;
+}
+
+static const Profession g_professions[] = { PROF_WARRIOR, PROF_ELEMENTALIST, PROF_MONK };
+#define PROFESSION_COUNT (int)(sizeof(g_professions) / sizeof(g_professions[0]))
+
+// What each profession starts with, mirroring World_Init's kit. Shown
+// on the screen so the choice is informed rather than a guess at what
+// the words mean.
+static void ProfessionStats(Profession p, int *energy, int *armor, const char **weapon,
+                            const char **skill) {
+    switch (p) {
+        case PROF_WARRIOR:
+            *energy = 20; *armor = 40; *weapon = "Ascalon Sword"; *skill = "Gash"; break;
+        case PROF_ELEMENTALIST:
+            *energy = 50; *armor = 30; *weapon = "Kindling Staff"; *skill = "Fire Bolt"; break;
+        case PROF_MONK:
+        default:
+            *energy = 30; *armor = 30; *weapon = "Smiting Rod"; *skill = "Orison of Healing"; break;
+    }
+}
+
+// Rebuilds the preview entity from the draft. Cheap enough to redo
+// every frame, and that keeps it honest.
+static void SyncPreview(void) {
+    memset(&g_previewEntity, 0, sizeof(g_previewEntity));
+    g_previewEntity.alive = true;
+    g_previewEntity.kind = ENT_HERO; // not the player slot: keeps sprite.c's
+                                     // "is this g_entities[0]" checks false
+    g_previewEntity.species = SPECIES_HUMAN;
+    g_previewEntity.primaryProfession = g_draft.primary;
+    g_previewEntity.secondaryProfession = g_draft.primary;
+    g_previewEntity.sex = g_draft.sex;
+    g_previewEntity.skinTone = g_draft.skinTone;
+    g_previewEntity.hairColor = g_draft.hairColor;
+    g_previewEntity.hairStyle = g_draft.hairStyle;
+    g_previewEntity.facing = (Vector2){ 0.0f, 1.0f };
+    g_previewEntity.castingSlot = -1;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) g_previewEntity.skillBar[i] = -1;
+
+    // Robe colour by profession, matching the starting armour each one
+    // is issued.
+    switch (g_draft.primary) {
+        case PROF_WARRIOR:      g_previewEntity.color = (Color){ 170, 96, 72, 255 }; break;
+        case PROF_ELEMENTALIST: g_previewEntity.color = (Color){ 80, 120, 200, 255 }; break;
+        case PROF_MONK:
+        default:                g_previewEntity.color = (Color){ 205, 190, 150, 255 }; break;
+    }
+}
+
+// A row of small swatches; returns the index clicked, or -1.
+static int SwatchRow(int x, int y, int size, int gap, const Color *colors, int count,
+                     int selected) {
+    int clicked = -1;
+    Vector2 mouse = GetMousePosition();
+    for (int i = 0; i < count; i++) {
+        Rectangle r = { (float)(x + i * (size + gap)), (float)y, (float)size, (float)size };
+        DrawRectangleRec(r, colors[i]);
+        bool hovered = CheckCollisionPointRec(mouse, r);
+        DrawRectangleLinesEx(r, (i == selected) ? 3.0f : 1.0f,
+                             (i == selected) ? UI_GOLD
+                             : hovered ? (Color){ 220, 214, 196, 255 } : (Color){ 20, 20, 26, 255 });
+        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clicked = i;
+    }
+    return clicked;
+}
+
+// A labelled left/right stepper for options that aren't colours.
+static int Stepper(int x, int y, int w, int h, const char *label, const char *value,
+                   int font, int count, int current) {
+    UI_TextShadow(label, x, y + (h - font) / 2, font, UI_TEXT_SECOND);
+    int btn = h;
+    Rectangle left = { (float)(x + w - btn * 2 - 90), (float)y, (float)btn, (float)h };
+    Rectangle right = { (float)(x + w - btn), (float)y, (float)btn, (float)h };
+    int result = current;
+    if (UI_Button(left, "<", font, true, false)) result = (current - 1 + count) % count;
+    if (UI_Button(right, ">", font, true, false)) result = (current + 1) % count;
+    int vw = UITextWidth(value, font);
+    UI_TextShadow(value, (int)(left.x + btn + (90 - vw) / 2), y + (h - font) / 2, font,
+                  UI_TEXT_PRIMARY);
+    return result;
+}
+
+CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
+    float scale = UI_Scale(screenHeight);
+    g_previewTime += dt;
+    SyncPreview();
+
+    ClearBackground((Color){ 14, 14, 19, 255 });
+
+    int titleFont = UI_FontSize(scale, UI_TEXT_XL);
+    int headFont = UI_FontSize(scale, UI_TEXT_LG);
+    int font = UI_FontSize(scale, UI_TEXT_MD);
+    int small = UI_FontSize(scale, UI_TEXT_SM);
+    int tiny = UI_FontSize(scale, UI_TEXT_XS);
+
+    UI_TextShadowCentered("CREATE YOUR CHARACTER", screenWidth / 2,
+                          (int)(screenHeight * 0.05f), titleFont, UI_GOLD);
+
+    // Three columns: choose (left), see (middle), adjust (right). The
+    // preview sits in the centre because it's the thing every other
+    // control is talking about.
+    int colW = (int)(screenWidth * 0.27f);
+    int colY = (int)(screenHeight * 0.14f);
+    int colH = (int)(screenHeight * 0.62f);
+    int margin = (int)(screenWidth * 0.04f);
+
+    Rectangle leftCol = { (float)margin, (float)colY, (float)colW, (float)colH };
+    Rectangle rightCol = { (float)(screenWidth - margin - colW), (float)colY,
+                           (float)colW, (float)colH };
+    UI_ThemePanel(leftCol, scale, 0);
+    UI_ThemePanel(rightCol, scale, 0);
+
+    // ---------------- Left: profession ----------------
+    {
+        int x = (int)leftCol.x + UI_SP(scale, 4);
+        int y = (int)leftCol.y + UI_SP(scale, 4);
+        int innerW = colW - UI_SP(scale, 8);
+        UI_TextShadow("Profession", x, y, headFont, UI_GOLD);
+        y += headFont + UI_SP(scale, 3);
+
+        int btnH = (int)(38 * scale);
+        for (int i = 0; i < PROFESSION_COUNT; i++) {
+            Profession p = g_professions[i];
+            Rectangle r = { (float)x, (float)y, (float)innerW, (float)btnH };
+            if (UI_Button(r, Character_ProfessionName(p), font, true, g_draft.primary == p)) {
+                g_draft.primary = p;
+            }
+            y += btnH + UI_SP(scale, 2);
+        }
+
+        y += UI_SP(scale, 2);
+        // The pitch, then the concrete numbers. A player who doesn't
+        // know GW1 needs both: the sentence to understand the fantasy,
+        // the stats to understand the trade.
+        UI_TextShadow(Character_ProfessionBlurb(g_draft.primary), x, y, tiny, UI_TEXT_SECOND);
+        y += tiny * 2 + UI_SP(scale, 3);
+
+        int energy, armor;
+        const char *weapon, *skill;
+        ProfessionStats(g_draft.primary, &energy, &armor, &weapon, &skill);
+
+        char line[96];
+        snprintf(line, sizeof(line), "Energy    %d", energy);
+        UI_TextShadow(line, x, y, small, UI_TEXT_PRIMARY); y += small + UI_SP(scale, 2);
+        snprintf(line, sizeof(line), "Armour    AL %d", armor);
+        UI_TextShadow(line, x, y, small, UI_TEXT_PRIMARY); y += small + UI_SP(scale, 2);
+        snprintf(line, sizeof(line), "Weapon    %s", weapon);
+        UI_TextShadow(line, x, y, small, UI_TEXT_PRIMARY); y += small + UI_SP(scale, 2);
+        snprintf(line, sizeof(line), "Skill     %s", skill);
+        UI_TextShadow(line, x, y, small, UI_TEXT_LINK); y += small + UI_SP(scale, 3);
+
+        UI_TextShadow("Attributes", x, y, small, UI_GOLD_DIM);
+        y += small + UI_SP(scale, 1);
+        for (int a = 0; a < ATTR_COUNT; a++) {
+            if (!Attribute_Accessible((AttributeKind)a, g_draft.primary, g_draft.primary)) continue;
+            snprintf(line, sizeof(line), "%s%s", g_attributeNames[a],
+                     g_attributeIsPrimary[a] ? "   (primary)" : "");
+            UI_TextShadow(line, x + UI_SP(scale, 2), y, tiny,
+                          g_attributeIsPrimary[a] ? UI_GOLD : UI_TEXT_SECOND);
+            y += tiny + UI_SP(scale, 1);
+        }
+    }
+
+    // ---------------- Middle: live preview ----------------
+    {
+        float cx = screenWidth / 2.0f;
+        float cy = colY + colH * 0.52f;
+
+        // A plinth so the figure isn't floating in a void.
+        DrawEllipse((int)cx, (int)(cy + 62 * scale), 74 * scale, 20 * scale,
+                    (Color){ 22, 23, 30, 255 });
+        DrawEllipse((int)cx, (int)(cy + 60 * scale), 70 * scale, 18 * scale,
+                    (Color){ 34, 36, 46, 255 });
+
+        // Draw the real sprite, scaled up. radius drives every
+        // proportion in sprite.c, so this is a straight zoom of what the
+        // world renders.
+        g_previewEntity.radius = 42.0f * scale;
+        g_previewEntity.pos = (Vector2){ cx, cy };
+        // A slow idle sway, so the preview reads as a character rather
+        // than a paper doll.
+        g_previewEntity.animTime = g_previewTime * 1.2f;
+        g_previewEntity.moveBlend = 0.18f;
+        Sprite_DrawEntity(&g_previewEntity, g_previewTime);
+
+        char title[64];
+        Character_FormatTitle(&g_draft, title, sizeof(title));
+        UI_TextShadowCentered(title, (int)cx, (int)(cy + 92 * scale), headFont,
+                              UI_TEXT_PRIMARY);
+        UI_TextShadowCentered("Your second profession is earned in Ascalon.",
+                              (int)cx, (int)(cy + 92 * scale) + headFont + UI_SP(scale, 2),
+                              tiny, UI_TEXT_MUTED);
+    }
+
+    // ---------------- Right: appearance ----------------
+    {
+        int x = (int)rightCol.x + UI_SP(scale, 4);
+        int y = (int)rightCol.y + UI_SP(scale, 4);
+        int innerW = colW - UI_SP(scale, 8);
+        UI_TextShadow("Appearance", x, y, headFont, UI_GOLD);
+        y += headFont + UI_SP(scale, 4);
+
+        int rowH = (int)(30 * scale);
+        static const char *sexNames[2] = { "Female", "Male" };
+        g_draft.sex = Stepper(x, y, innerW, rowH, "Sex", sexNames[g_draft.sex ? 1 : 0],
+                              font, 2, g_draft.sex);
+        y += rowH + UI_SP(scale, 4);
+
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Style %d", g_draft.hairStyle + 1);
+        g_draft.hairStyle = Stepper(x, y, innerW, rowH, "Hair", buf, font,
+                                    HAIR_STYLE_COUNT, g_draft.hairStyle);
+        y += rowH + UI_SP(scale, 5);
+
+        int sw = (int)(28 * scale);
+        int gap = UI_SP(scale, 2);
+        UI_TextShadow("Skin", x, y, small, UI_TEXT_SECOND);
+        y += small + UI_SP(scale, 2);
+        int picked = SwatchRow(x, y, sw, gap, g_skinTones, SKIN_TONE_COUNT, g_draft.skinTone);
+        if (picked >= 0) g_draft.skinTone = picked;
+        y += sw + UI_SP(scale, 5);
+
+        UI_TextShadow("Hair colour", x, y, small, UI_TEXT_SECOND);
+        y += small + UI_SP(scale, 2);
+        picked = SwatchRow(x, y, sw, gap, g_hairColors, HAIR_COLOR_COUNT, g_draft.hairColor);
+        if (picked >= 0) g_draft.hairColor = picked;
+    }
+
+    // ---------------- Bottom: name + actions ----------------
+    CreateAction action = CREATE_NONE;
+    {
+        int y = (int)(screenHeight * 0.80f);
+        int fieldW = (int)(340 * scale);
+        int fieldH = (int)(38 * scale);
+        int fx = (screenWidth - fieldW) / 2;
+
+        UI_TextShadowCentered("Name", screenWidth / 2, y - small - UI_SP(scale, 2), small,
+                              UI_TEXT_SECOND);
+
+        Rectangle field = { (float)fx, (float)y, (float)fieldW, (float)fieldH };
+        bool hovered = CheckCollisionPointRec(GetMousePosition(), field);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) g_nameFocused = hovered;
+
+        DrawRectangleRec(field, (Color){ 20, 21, 28, 255 });
+        DrawRectangleLinesEx(field, g_nameFocused ? 2.0f : 1.0f,
+                             g_nameFocused ? UI_GOLD : UI_GOLD_DIM);
+
+        // Typed input. Only printable ASCII, and a hard length cap, so
+        // a name can't overflow the nameplate or the save line.
+        if (g_nameFocused) {
+            int c = GetCharPressed();
+            while (c > 0) {
+                int len = (int)strlen(g_draft.name);
+                if (c >= 32 && c <= 126 && len < CHARACTER_NAME_MAX) {
+                    g_draft.name[len] = (char)c;
+                    g_draft.name[len + 1] = '\0';
+                }
+                c = GetCharPressed();
+            }
+            if (IsKeyPressed(KEY_BACKSPACE)) {
+                int len = (int)strlen(g_draft.name);
+                if (len > 0) g_draft.name[len - 1] = '\0';
+            }
+        }
+
+        int tw = UITextWidth(g_draft.name, font);
+        UI_TextShadow(g_draft.name, fx + UI_SP(scale, 3), y + (fieldH - font) / 2, font,
+                      UI_TEXT_PRIMARY);
+        // Blinking caret while focused.
+        if (g_nameFocused && fmodf(g_previewTime, 1.0f) < 0.5f) {
+            DrawRectangle(fx + UI_SP(scale, 3) + tw + 2, y + (fieldH - font) / 2,
+                          (int)(2 * scale), font, UI_GOLD);
+        }
+
+        y += fieldH + UI_SP(scale, 5);
+        int btnW = (int)(200 * scale);
+        int btnH = (int)(44 * scale);
+        int gap = UI_SP(scale, 4);
+        int bx = (screenWidth - (btnW * 2 + gap)) / 2;
+
+        if (UI_Button((Rectangle){ (float)bx, (float)y, (float)btnW, (float)btnH },
+                      "Back", font, true, false)) {
+            action = CREATE_CANCEL;
+        }
+        // A nameless character is the one thing that isn't allowed.
+        bool canCreate = (strlen(g_draft.name) > 0);
+        if (UI_Button((Rectangle){ (float)(bx + btnW + gap), (float)y, (float)btnW, (float)btnH },
+                      "Enter Ascalon", font, canCreate, canCreate)) {
+            action = CREATE_CONFIRM;
+        }
+        if (!canCreate) {
+            UI_TextShadowCentered("Your character needs a name.", screenWidth / 2,
+                                  y + btnH + UI_SP(scale, 2), tiny, UI_NEGATIVE);
+        }
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE)) action = CREATE_CANCEL;
+    if (action == CREATE_CONFIRM) g_character = g_draft;
+    return action;
+}

@@ -33,6 +33,8 @@ endforeach()
 
 add_executable(sotw_demake
     src/main.c
+    src/character.c
+    src/ui_create.c
     src/entity.c
     src/attributes.c
     src/skill.c

@@ -192,6 +192,12 @@ typedef struct Entity {
 
     // --- Sprite animation state (sprite.c) ---
     Species species;
+    // Appearance chosen at character creation (character.h). Only the
+    // player sets these; everyone else keeps the defaults.
+    int sex;
+    int skinTone;
+    int hairColor;
+    int hairStyle;
     Vector2 prevPos;        // last frame's position - drives the walk cycle
     Vector2 facing;         // unit vector of last movement direction
     float animTime;         // advances with distance walked

@@ -190,6 +190,41 @@ aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
 spell — and the whole camp answers. Patrols hunt alone; their threat is
 walking into your fight at the wrong moment.
 
+### Character creation
+
+**New Game** opens a GW1-style creator rather than dropping you into a
+preset character. Three columns: profession on the left, a **live
+preview** in the middle, appearance on the right, name underneath.
+
+The preview is the real thing — it builds an actual `Entity` and runs it
+through the same `sprite.c` the world uses, so it can't drift out of sync
+with what you'll actually see. Change profession and the robe colour,
+weapon and title update immediately.
+
+Profession is a real decision, not a label. Each one issues a different
+starting kit, and armour comes from the armour piece rather than a
+number written twice:
+
+| | Energy | Armour | Weapon | Starting skill |
+|---|---|---|---|---|
+| Warrior | 20 | AL 40 | Ascalon Sword | Gash (adrenaline) |
+| Elementalist | 50 | AL 30 | Kindling Staff | Fire Bolt |
+| Monk | 30 | AL 30 | Smiting Rod | Orison of Healing |
+
+The panel shows those numbers, the accessible attribute lines (with the
+primary marked), and a one-line pitch, so the choice is informed rather
+than a guess at what the words mean.
+
+Appearance is procedural like everything else: sex, hair style, and
+palettes for skin and hair colour, all read straight into the shapes the
+sprite renderer draws. Name is typed, capped at 20 characters, and a
+nameless character can't be created.
+
+**Secondary profession is deliberately absent from creation.** GW1 makes
+you earn it in-game once you've actually played the primary, so a
+freshly created character is single-profession — the nameplate reads
+*"Sera (Mo)"* — and the creator says as much.
+
 ### Conditions and hexes
 
 Two separate families of affliction, kept separate on purpose — that

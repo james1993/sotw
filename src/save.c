@@ -4,6 +4,7 @@
 #include "quests.h"
 #include "world.h"
 #include "skill.h"
+#include "character.h"
 #include "skillbook.h"
 #include "attributes.h"
 #include "progression.h"
@@ -81,6 +82,13 @@ bool Save_Write(void) {
     }
 
     fprintf(f, "version=%d\n", SAVE_VERSION);
+    // The created character. Name goes last on its line so it may
+    // contain spaces.
+    fprintf(f, "primary=%d\n", (int)g_character.primary);
+    fprintf(f, "secondary=%d\n", g_character.secondary);
+    fprintf(f, "look=%d,%d,%d,%d\n", g_character.sex, g_character.skinTone,
+            g_character.hairColor, g_character.hairStyle);
+    fprintf(f, "charName=%s\n", g_character.name);
     fprintf(f, "outpost=%d\n", (int)World_GetLastOutpostId());
     fprintf(f, "level=%d\n", p->level);
     fprintf(f, "xp=%d\n", p->xp);
@@ -163,7 +171,22 @@ bool Save_LoadAndApply(void) {
         val[strcspn(val, "\r\n")] = '\0';
 
         int idx;
-        if (strcmp(key, "outpost") == 0) {
+        if (strcmp(key, "primary") == 0) {
+            int v = atoi(val);
+            g_character.primary = (Profession)ClampInt(v, 0, PROF_COUNT - 1);
+        } else if (strcmp(key, "secondary") == 0) {
+            int v = atoi(val);
+            g_character.secondary = (v < 0) ? PROF_NONE : ClampInt(v, 0, PROF_COUNT - 1);
+        } else if (strcmp(key, "look") == 0) {
+            int sex = 1, skin = 1, hair = 1, style = 0;
+            sscanf(val, "%d,%d,%d,%d", &sex, &skin, &hair, &style);
+            g_character.sex = ClampInt(sex, 0, 1);
+            g_character.skinTone = ClampInt(skin, 0, SKIN_TONE_COUNT - 1);
+            g_character.hairColor = ClampInt(hair, 0, HAIR_COLOR_COUNT - 1);
+            g_character.hairStyle = ClampInt(style, 0, HAIR_STYLE_COUNT - 1);
+        } else if (strcmp(key, "charName") == 0) {
+            snprintf(g_character.name, sizeof(g_character.name), "%s", val);
+        } else if (strcmp(key, "outpost") == 0) {
             outpost = atoi(val);
         } else if (strcmp(key, "level") == 0) {
             p->level = ClampInt(atoi(val), 1, MAX_LEVEL);
@@ -231,6 +254,20 @@ bool Save_LoadAndApply(void) {
     // (+20/level, GW1's rule); equipment re-applies its combat stats
     // through the same path the inventory UI uses.
     p->baseMaxHp = 100 + 20 * (p->level - 1);
+
+    // World_Init built the player from g_character BEFORE this file was
+    // parsed, so the entity is currently wearing the default character.
+    // Re-apply what the save actually says now that we know it.
+    Character_FormatTitle(&g_character, p->name, sizeof(p->name));
+    p->primaryProfession = g_character.primary;
+    p->secondaryProfession = (g_character.secondary == PROF_NONE)
+                             ? g_character.primary
+                             : (Profession)g_character.secondary;
+    p->sex = g_character.sex;
+    p->skinTone = g_character.skinTone;
+    p->hairColor = g_character.hairColor;
+    p->hairStyle = g_character.hairStyle;
+
     Entity_RecomputePenalizedStats(p);
     p->hp = p->maxHp;
     p->energy = p->maxEnergy;
