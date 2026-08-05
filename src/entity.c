@@ -170,3 +170,112 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
         }
     }
 }
+
+// ---------------------------------------------------------------------
+// Conditions and hexes
+
+bool Entity_HasCondition(const Entity *e, ConditionKind kind) {
+    if (!e) return false;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_CONDITION && fx->kind == (int)kind) return true;
+    }
+    return false;
+}
+
+bool Entity_HasHex(const Entity *e, HexKind kind) {
+    if (!e) return false;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_HEX && fx->kind == (int)kind) return true;
+    }
+    return false;
+}
+
+int Entity_CountEffects(const Entity *e, EffectCategory category) {
+    if (!e) return 0;
+    int n = 0;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == category) n++;
+    }
+    return n;
+}
+
+int Entity_RemoveEffects(Entity *e, EffectCategory category, int maxCount) {
+    if (!e || maxCount <= 0) return 0;
+    int removed = 0;
+    while (removed < maxCount) {
+        // Longest remaining first: a cleanse should take the affliction
+        // you'd otherwise be stuck with, not whichever slot came first.
+        int worst = -1;
+        float worstRemaining = -1.0f;
+        for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+            ActiveEffect *fx = &e->effects[i];
+            if (!fx->active || fx->category != category) continue;
+            if (fx->remaining > worstRemaining) {
+                worstRemaining = fx->remaining;
+                worst = i;
+            }
+        }
+        if (worst < 0) break;
+        e->effects[worst].active = false;
+        removed++;
+    }
+    return removed;
+}
+
+float Entity_MoveSpeed(const Entity *e) {
+    if (!e) return 0.0f;
+    // GW1's Crippled is a flat halving, and it's brutal precisely
+    // because it takes kiting away rather than shaving a few percent.
+    return Entity_HasCondition(e, COND_CRIPPLED) ? e->moveSpeed * 0.5f : e->moveSpeed;
+}
+
+float Entity_AttackInterval(const Entity *e) {
+    if (!e) return 1.0f;
+    float interval = e->attackInterval;
+    if (Entity_HasHex(e, HEX_SHROUD_OF_DOUBT)) interval *= 1.5f;
+    return interval;
+}
+
+int Entity_ScaleOutgoingDamage(const Entity *e, int damage) {
+    if (!e) return damage;
+    if (Entity_HasCondition(e, COND_WEAKNESS)) {
+        damage = (int)(damage * 0.75f);
+        if (damage < 1) damage = 1;
+    }
+    return damage;
+}
+
+const char *Entity_EffectName(const ActiveEffect *fx) {
+    if (!fx || !fx->active) return "";
+    if (fx->category == EFFECT_HEX) {
+        switch ((HexKind)fx->kind) {
+            case HEX_SHROUD_OF_DOUBT: return "Shroud of Doubt";
+            case HEX_PRICE_OF_FAITH:  return "Price of Faith";
+            default: return "Hex";
+        }
+    }
+    switch ((ConditionKind)fx->kind) {
+        case COND_BLEEDING: return "Bleeding";
+        case COND_BURNING:  return "Burning";
+        case COND_CRIPPLED: return "Crippled";
+        case COND_WEAKNESS: return "Weakness";
+        default: return "Condition";
+    }
+}
+
+Color Entity_EffectColor(const ActiveEffect *fx) {
+    if (!fx || !fx->active) return (Color){ 200, 200, 200, 255 };
+    // Hexes read purple, conditions read by their own flavor - the same
+    // language the party window has always used for its status arrows.
+    if (fx->category == EFFECT_HEX) return (Color){ 178, 118, 220, 255 };
+    switch ((ConditionKind)fx->kind) {
+        case COND_BLEEDING: return (Color){ 208, 70, 70, 255 };
+        case COND_BURNING:  return (Color){ 240, 140, 50, 255 };
+        case COND_CRIPPLED: return (Color){ 190, 150, 90, 255 };
+        case COND_WEAKNESS: return (Color){ 150, 150, 160, 255 };
+        default: return (Color){ 190, 150, 90, 255 };
+    }
+}

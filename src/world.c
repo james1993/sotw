@@ -517,14 +517,24 @@ static Entity *SpawnMonster(const SpawnDef *def) {
         m->attackRange = 210.0f;
         m->maxEnergy = m->energy = 40;
         m->attributeRank[ATTR_FIRE_MAGIC] = def->strengthRank;
+        m->attributeRank[ATTR_SMITING_PRAYERS] = def->strengthRank;
         m->skillBar[0] = SK_FIRE_BOLT;
         m->skillBar[1] = SK_MIND_SEAR;
-        if (def->withHowl) m->skillBar[2] = SK_FERAL_HOWL;
+        // Shamans hex as well as burn, which is what makes hex removal
+        // worth a slot on the way through the foothills.
+        m->skillBar[2] = SK_SHROUD_OF_DOUBT;
+        if (def->withHowl) m->skillBar[3] = SK_FERAL_HOWL;
+    } else if (def->species == SPECIES_DEVOURER) {
+        // Devourers hobble what they catch - Crippled is their threat.
+        m->skillBar[0] = SK_HOBBLING_STRIKE;
+        m->skillBar[1] = SK_CLAW_SWIPE;
     } else if (def->withHowl) {
         m->skillBar[0] = SK_FERAL_HOWL; // self-heal - interrupt it!
+        m->skillBar[2] = SK_RENDING_CLAWS; // bleeding + weakness
         m->skillBar[1] = SK_CLAW_SWIPE;
     } else {
         m->skillBar[0] = SK_CLAW_SWIPE;
+        m->skillBar[1] = SK_RENDING_CLAWS;
     }
     return m;
 }

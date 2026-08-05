@@ -190,6 +190,52 @@ aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
 spell — and the whole camp answers. Patrols hunt alone; their threat is
 walking into your fight at the wrong moment.
 
+### Conditions and hexes
+
+Two separate families of affliction, kept separate on purpose — that
+separation is what forces a bar to carry answers for both instead of
+one catch-all cleanse.
+
+**Conditions** are physical and every one of them changes what you can
+do, not just your health bar:
+
+| Condition | Effect |
+|---|---|
+| Bleeding | 2 health per second |
+| Burning | 5 health per second |
+| Crippled | Movement speed halved — this is what takes kiting away |
+| Weakness | Your attacks deal 25% less damage |
+
+**Hexes** are magical, and punish what the target *does* rather than
+grinding it down. GW1 puts most hexes on Necromancer and Mesmer, which
+this demake doesn't have, so Smiting Prayers carries them:
+
+- **Shroud of Doubt** — the target attacks 50% slower, plus light
+  degeneration.
+- **Price of Faith** — the target loses health every time it *attacks*,
+  charged on the swing itself so it costs them even on a miss.
+
+Reapplying an affliction refreshes its duration rather than stacking a
+second copy, exactly as GW1 does.
+
+Removal is split to match: **Mend Ailment** (Healing Prayers) strips one
+condition and heals; **Smite Hex** (Smiting Prayers) strips one hex and
+heals. Neither can touch the other category. Both take the
+longest-remaining affliction first, so a cleanse removes the one you'd
+otherwise be stuck with.
+
+Monsters apply them too, which is what makes carrying removal worth a
+slot: Charr use **Rending Claws** (Bleeding + Weakness), Devourers use
+**Hobbling Strike** (Crippled — the reason you can't stroll out of their
+gully), and Charr Shamans hex as well as burn.
+
+Everything is visible on **foes as well as allies**: coloured pips ride
+under every nameplate (round for conditions, diamond for hexes, so the
+category reads without relying on colour), and the focused target's
+panel lists each affliction by name with a live countdown —
+*"Bleeding 5s"*, *"Weakness 3s"* — which is the information a cleanse
+decision actually needs.
+
 ### Skills and build-crafting
 
 A new character knows **one skill** and has seven empty slots. Filling

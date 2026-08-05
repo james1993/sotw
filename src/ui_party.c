@@ -133,7 +133,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         bool hasCondition = false, hasHex = false;
         for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) {
             if (!e->effects[j].active) continue;
-            if (e->effects[j].isHex) hasHex = true;
+            if (e->effects[j].category == EFFECT_HEX) hasHex = true;
             else hasCondition = true;
         }
         int arrowX = x + pad + barW + 4;

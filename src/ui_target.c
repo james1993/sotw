@@ -30,8 +30,12 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
     bool showCast = Entity_IsCasting(target) ||
                     (target->postCastDisplayTimer > 0.0f && target->lastCastSkillSlot >= 0);
     int castBarH = (int)(16 * scale);
+    int effectCount = Entity_CountEffects(target, EFFECT_CONDITION) +
+                      Entity_CountEffects(target, EFFECT_HEX);
+    int chipH = (int)(15 * scale);
     int panelH = pad * 2 + font + (int)(4 * scale) + barH +
-                 (showCast ? castBarH + (int)(4 * scale) : 0);
+                 (showCast ? castBarH + (int)(4 * scale) : 0) +
+                 (effectCount > 0 ? chipH + (int)(4 * scale) : 0);
 
     Rectangle frame = { (float)x, (float)y, (float)panelW, (float)panelH };
     UIHit_Claim(frame);
@@ -107,6 +111,40 @@ void UI_DrawTargetPanel(int screenWidth, int screenHeight, int startY) {
                         pct, fillColor, label, smallFont);
             y += castBarH + pad;
         }
+    }
+
+    // --- Afflictions, named and counting down ---
+    // The nameplate pips answer "is anything on it?" at a glance; the
+    // focused target is where you get to read WHAT and HOW LONG, which
+    // is the information a cleanse decision actually needs.
+    if (effectCount > 0) {
+        int chipX = x;
+        for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+            const ActiveEffect *fx = &target->effects[i];
+            if (!fx->active) continue;
+
+            char label[48];
+            snprintf(label, sizeof(label), "%s %.0fs", Entity_EffectName(fx), fx->remaining);
+            int tw = UITextWidth(label, smallFont);
+            int chipW = tw + (int)(14 * scale);
+            if (chipX + chipW > x + panelW) break; // out of room; the pips still show the rest
+
+            Color c = Entity_EffectColor(fx);
+            Rectangle chip = { (float)chipX, (float)y, (float)chipW, (float)chipH };
+            DrawRectangleRounded(chip, 0.4f, 6, (Color){ c.r / 5, c.g / 5, c.b / 5, 235 });
+            DrawRectangleRoundedLines(chip, 0.4f, 6, c);
+            // Hexes get a leading diamond so the category reads without
+            // relying on color alone.
+            int textX = chipX + (int)(6 * scale);
+            if (fx->category == EFFECT_HEX) {
+                DrawPoly((Vector2){ (float)(chipX + 6 * scale), (float)(y + chipH / 2) },
+                         4, 3.0f * scale, 45.0f, c);
+                textX += (int)(7 * scale);
+            }
+            UIText(label, textX, y + (chipH - smallFont) / 2, smallFont, c);
+            chipX += chipW + (int)(4 * scale);
+        }
+        y += chipH + (int)(4 * scale);
     }
 
     if (target->interruptFlashTimer > 0.0f) {

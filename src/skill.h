@@ -28,6 +28,12 @@ typedef enum {
     SK_SMITE,
     SK_BANE_SIGNET,
     SK_HEALING_LIGHT,
+    SK_SHROUD_OF_DOUBT,
+    SK_PRICE_OF_FAITH,
+    SK_MEND_AILMENT,
+    SK_SMITE_HEX,
+    SK_RENDING_CLAWS,
+    SK_HOBBLING_STRIKE,
     SK_COUNT
 } SkillId;
 
@@ -56,6 +62,12 @@ typedef enum {
     FX_DAMAGE,
     FX_HEAL,
     FX_APPLY_CONDITION,
+    // Hexes are a separate category on purpose: FX_REMOVE_CONDITION
+    // cannot touch them and FX_REMOVE_HEX cannot touch a condition, so
+    // a build has to answer both rather than packing one cure-all.
+    FX_APPLY_HEX,
+    FX_REMOVE_CONDITION,
+    FX_REMOVE_HEX,
     FX_ENERGY_DELTA,
     FX_ADRENALINE_DELTA,
     FX_KNOCKDOWN,
@@ -70,7 +82,9 @@ typedef struct {
     EffectKind kind;
     float baseValue;
     float perAttributeRank; // linear scaling term against skill->attribute
-    int conditionKind;      // ConditionKind, only used by FX_APPLY_CONDITION
+    // FX_APPLY_CONDITION: a ConditionKind. FX_APPLY_HEX: a HexKind.
+    // FX_REMOVE_*: how many effects to strip.
+    int conditionKind;
     float duration;
 } EffectStep;
 

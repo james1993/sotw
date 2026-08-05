@@ -45,19 +45,41 @@ typedef enum {
     COND_BLEEDING,
     COND_BURNING,
     COND_CRIPPLED,
-    COND_WEAKNESS
+    COND_WEAKNESS,
+    COND_COUNT
 } ConditionKind;
+
+// Hexes: the magical counterpart to conditions. GW1 keeps them strictly
+// separate - a condition-removal skill cannot touch a hex and vice
+// versa - and that separation is the whole point, because it forces a
+// build to carry answers for both rather than one catch-all cleanse.
+//
+// GW1 puts most hexes on Necromancer and Mesmer, neither of which this
+// demake has, so Smiting Prayers carries them here: divine affliction
+// rather than dark magic, same mechanical role.
+typedef enum {
+    HEX_NONE = 0,
+    HEX_SHROUD_OF_DOUBT,  // attacks come slower while hexed
+    HEX_PRICE_OF_FAITH,   // attacking costs the hexed target health
+    HEX_COUNT
+} HexKind;
+
+typedef enum {
+    EFFECT_CONDITION = 0,
+    EFFECT_HEX
+} EffectCategory;
 
 typedef struct {
     bool active;
-    bool isHex;        // hex vs condition - separate categories with separate
-                       // removal counters in GW1, and shown differently in the
-                       // party window (purple vs brown arrow)
-    ConditionKind kind;
+    EffectCategory category;
+    // ConditionKind or HexKind depending on `category`. One slot array
+    // holds both so a character has a single, bounded effect budget.
+    int kind;
     float remaining;
-    float tickDamage; // > 0 for DoT-style conditions (bleeding/burning)
+    float tickDamage; // > 0 for DoT-style effects (bleeding/burning/hexes)
     float tickAccum;
 } ActiveEffect;
+
 
 // Generational entity handle. A bare slot index stays "valid" after the
 // entity in that slot dies AND after the slot is reused by a different
@@ -223,5 +245,38 @@ void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe);
 // Recomputes penalized maxHp/maxEnergy from base stats and the current
 // death penalty. Call after changing baseMax*, deathPenalty, or both.
 void Entity_RecomputePenalizedStats(Entity *e);
+
+// --- Conditions and hexes -------------------------------------------
+//
+// Effects are only worth applying if they change what a character can
+// do, so every one of these is read from the place that governs the
+// behaviour it impairs, rather than being checked ad hoc at call sites.
+
+bool Entity_HasCondition(const Entity *e, ConditionKind kind);
+bool Entity_HasHex(const Entity *e, HexKind kind);
+
+// How many conditions / hexes are currently on this character - drives
+// both the nameplate pips and what a removal skill has to work with.
+int Entity_CountEffects(const Entity *e, EffectCategory category);
+
+// Strips up to `maxCount` effects of one category, oldest-expiring
+// first so a cleanse takes the affliction you'd otherwise wait longest
+// on. Returns how many actually came off.
+int Entity_RemoveEffects(Entity *e, EffectCategory category, int maxCount);
+
+// Movement speed after Crippled. Used by every mover (click-to-move,
+// gamepad stick, AI chase) so being crippled slows you the same way no
+// matter how you're steering.
+float Entity_MoveSpeed(const Entity *e);
+
+// Seconds between auto-attacks after any attack-slowing hex.
+float Entity_AttackInterval(const Entity *e);
+
+// Outgoing attack damage after Weakness.
+int Entity_ScaleOutgoingDamage(const Entity *e, int damage);
+
+// Display name / color for an active effect, shared by every readout.
+const char *Entity_EffectName(const ActiveEffect *fx);
+Color Entity_EffectColor(const ActiveEffect *fx);
 
 #endif

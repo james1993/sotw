@@ -168,4 +168,50 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_HEAL, 45, 5.0f, 0, 0);
     AddStep(&s, FX_ENERGY_DELTA, 3, 0.5f, 0, 0);
     RegisterAs(SK_HEALING_LIGHT, s);
+
+    // --- Hexes (Smiting Prayers) ---
+    // Both punish what the target DOES rather than simply ticking
+    // damage, which is what keeps them distinct from conditions: a
+    // condition wears you down, a hex makes your own actions expensive.
+    s = MakeSkill("Shroud of Doubt", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
+                  10, 0, 1.5f, 20.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_SHROUD_OF_DOUBT, 10.0f);
+    RegisterAs(SK_SHROUD_OF_DOUBT, s);
+
+    s = MakeSkill("Price of Faith", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
+                  15, 0, 2.0f, 25.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_PRICE_OF_FAITH, 12.0f);
+    RegisterAs(SK_PRICE_OF_FAITH, s);
+
+    // --- Cleanses ---
+    // Deliberately one skill per category. Carrying an answer to
+    // conditions does nothing about a hex, which is the counterplay web
+    // GW1 builds its bars around (docs/research/gw1-mechanics.md #5).
+    s = MakeSkill("Mend Ailment", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
+                  5, 0, 0.75f, 4.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_REMOVE_CONDITION, 15, 2.0f, 1, 0); // strip 1, heal on success
+    RegisterAs(SK_MEND_AILMENT, s);
+
+    s = MakeSkill("Smite Hex", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
+                  10, 0, 1.0f, 8.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_REMOVE_HEX, 10, 2.0f, 1, 0);
+    RegisterAs(SK_SMITE_HEX, s);
+
+    // --- Monster skills that make cleanses worth a bar slot ---
+    // Without something applying afflictions to the party, removal is
+    // dead weight; these are what put Crippled and the hexes on YOU.
+    s = MakeSkill("Rending Claws", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+                  0, 20, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 8, 0, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 10.0f);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_WEAKNESS, 8.0f);
+    RegisterAs(SK_RENDING_CLAWS, s);
+
+    // The Devourer's pincers: Crippled is their whole threat, because a
+    // halved walk speed is what stops you strolling out of the gully.
+    s = MakeSkill("Hobbling Strike", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+                  0, 20, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 6, 0, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_CRIPPLED, 8.0f);
+    RegisterAs(SK_HOBBLING_STRIKE, s);
 }

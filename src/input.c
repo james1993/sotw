@@ -144,8 +144,11 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
         if (mag > 1.0f) { lx /= mag; ly /= mag; }
         // Casting roots the caster, same as the click-to-move path.
         if (!Entity_IsCasting(player)) {
-            player->pos.x += lx * player->moveSpeed * dt;
-            player->pos.y += ly * player->moveSpeed * dt;
+            // Crippled halves stick movement too, so the condition
+            // costs you kiting whichever way you're steering.
+            float speed = Entity_MoveSpeed(player);
+            player->pos.x += lx * speed * dt;
+            player->pos.y += ly * speed * dt;
             Rectangle b = World_GetBounds();
             if (player->pos.x < b.x) player->pos.x = b.x;
             if (player->pos.y < b.y) player->pos.y = b.y;

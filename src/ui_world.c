@@ -193,6 +193,9 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
         pl.role = (e->kind == ENT_NPC) ? NpcRoleLabel(e->npcRole) : NULL;
 
         float h = 10.0f * scale;
+        if (Entity_CountEffects(e, EFFECT_CONDITION) + Entity_CountEffects(e, EFFECT_HEX) > 0) {
+            h += 6.0f * scale + 3.0f * scale; // pip row
+        }
         if (pl.showCast) h += barH + 3.0f * scale;
         if (pl.showBar) h += barH + 3.0f * scale;
         if (pl.showPlate) {
@@ -280,6 +283,36 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
             stackY -= barH + 3.0f * scale;
             FloatBar(head.x - barW / 2, stackY, barW, barH, pct,
                      (Color){ 120, 190, 255, 255 });
+        }
+
+        // --- Affliction pips, tucked between the character and its bar ---
+        // Conditions and hexes have to be visible on FOES, not just on
+        // your own party: "is that Charr still bleeding?" and "did my
+        // hex land?" are questions you answer mid-fight, at a glance.
+        {
+            int conds = Entity_CountEffects(e, EFFECT_CONDITION);
+            int hexes = Entity_CountEffects(e, EFFECT_HEX);
+            if (conds + hexes > 0) {
+                float pipR = 3.0f * scale;
+                float gap = 2.5f * scale;
+                float totalW = (conds + hexes) * (pipR * 2 + gap) - gap;
+                float px = head.x - totalW / 2 + pipR;
+                stackY -= pipR * 2 + 3.0f * scale;
+                for (int s = 0; s < MAX_ACTIVE_EFFECTS; s++) {
+                    const ActiveEffect *fx = &e->effects[s];
+                    if (!fx->active) continue;
+                    Color c = Entity_EffectColor(fx);
+                    DrawCircleV((Vector2){ px, stackY + pipR }, pipR + 1.0f, (Color){ 0, 0, 0, 170 });
+                    if (fx->category == EFFECT_HEX) {
+                        // Hexes are diamonds, conditions are dots, so the
+                        // two categories are distinguishable without color.
+                        DrawPoly((Vector2){ px, stackY + pipR }, 4, pipR + 0.5f, 45.0f, c);
+                    } else {
+                        DrawCircleV((Vector2){ px, stackY + pipR }, pipR, c);
+                    }
+                    px += pipR * 2 + gap;
+                }
+            }
         }
 
         if (showBar) {

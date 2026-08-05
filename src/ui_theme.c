@@ -249,13 +249,74 @@ void UI_DrawSkillIcon(int skillId, Rectangle r) {
             DrawCircleV((Vector2){ cx - 7 * u, cy + 4 * u }, 3 * u, glow);
             break;
         case SK_CLAW_SWIPE:
-            // Three raking claws.
+        case SK_RENDING_CLAWS:
+            // Three raking claws; the rending version drips.
             for (int i = 0; i < 3; i++) {
                 float ox = (i - 1) * 8 * u;
                 DrawLineEx((Vector2){ cx + ox - 4 * u, cy - 11 * u }, (Vector2){ cx + ox + 4 * u, cy + 11 * u },
                            2.5f * u, (Color){ 230, 120, 90, 255 });
+                if (skillId == SK_RENDING_CLAWS) {
+                    DrawCircleV((Vector2){ cx + ox + 5 * u, cy + 14 * u }, 2.0f * u,
+                                (Color){ 208, 70, 70, 255 });
+                }
             }
             break;
+        case SK_HOBBLING_STRIKE: {
+            // A shackle round an ankle - Crippled made literal.
+            DrawRing((Vector2){ cx, cy + 3 * u }, 7 * u, 10 * u, 0, 360, 20,
+                     (Color){ 190, 190, 200, 255 });
+            DrawLineEx((Vector2){ cx, cy - 7 * u }, (Vector2){ cx, cy - 14 * u }, 3 * u,
+                       (Color){ 150, 150, 160, 255 });
+            DrawCircleV((Vector2){ cx, cy - 15 * u }, 3.5f * u, (Color){ 190, 190, 200, 255 });
+            break;
+        }
+        case SK_SHROUD_OF_DOUBT: {
+            // A veil drawn over the target, with the weight of it
+            // dragging downward - the hex that slows what you do.
+            DrawCircleSector((Vector2){ cx, cy + 2 * u }, 12 * u, 180, 360, 16,
+                             (Color){ 150, 110, 200, 255 });
+            DrawRectangle((int)(cx - 12 * u), (int)(cy + 1 * u), (int)(24 * u), (int)(5 * u),
+                          (Color){ 120, 86, 168, 255 });
+            for (int i = -1; i <= 1; i++) {
+                float ox = i * 7 * u;
+                DrawLineEx((Vector2){ cx + ox - 3 * u, cy + 7 * u },
+                           (Vector2){ cx + ox, cy + 13 * u }, 2 * u, ink);
+                DrawLineEx((Vector2){ cx + ox, cy + 13 * u },
+                           (Vector2){ cx + ox + 3 * u, cy + 7 * u }, 2 * u, ink);
+            }
+            break;
+        }
+        case SK_PRICE_OF_FAITH: {
+            // A hex diamond with the cost being drawn out of it.
+            DrawPoly((Vector2){ cx, cy - 3 * u }, 4, 11 * u, 45, (Color){ 150, 110, 200, 255 });
+            DrawPolyLines((Vector2){ cx, cy - 3 * u }, 4, 11 * u, 45, ink);
+            DrawLineEx((Vector2){ cx, cy + 2 * u }, (Vector2){ cx, cy + 13 * u }, 3 * u, ink);
+            DrawTriangle((Vector2){ cx - 5 * u, cy + 10 * u }, (Vector2){ cx + 5 * u, cy + 10 * u },
+                         (Vector2){ cx, cy + 16 * u }, (Color){ 220, 90, 80, 255 });
+            break;
+        }
+        case SK_MEND_AILMENT: {
+            // The healer's cross lifting an affliction clear of a body.
+            DrawRectangle((int)(cx - 2.5f * u), (int)(cy - 4 * u), (int)(5 * u), (int)(18 * u), ink);
+            DrawRectangle((int)(cx - 9 * u), (int)(cy + 1.5f * u), (int)(18 * u), (int)(5 * u), ink);
+            // The condition coming off the top.
+            DrawCircleV((Vector2){ cx + 8 * u, cy - 11 * u }, 4 * u, (Color){ 208, 90, 80, 220 });
+            DrawLineEx((Vector2){ cx + 4 * u, cy - 15 * u }, (Vector2){ cx + 12 * u, cy - 7 * u },
+                       2 * u, (Color){ 255, 245, 225, 255 });
+            break;
+        }
+        case SK_SMITE_HEX: {
+            // A hex diamond struck apart by a bolt of smiting light.
+            DrawPolyLines((Vector2){ cx, cy }, 4, 12 * u, 45, (Color){ 150, 110, 200, 255 });
+            DrawPolyLines((Vector2){ cx, cy }, 4, 9 * u, 45, (Color){ 120, 86, 168, 200 });
+            DrawLineEx((Vector2){ cx - 10 * u, cy - 13 * u }, (Vector2){ cx + 3 * u, cy + 1 * u },
+                       3.5f * u, (Color){ 255, 240, 180, 255 });
+            DrawLineEx((Vector2){ cx + 3 * u, cy + 1 * u }, (Vector2){ cx - 2 * u, cy + 4 * u },
+                       3.5f * u, (Color){ 255, 240, 180, 255 });
+            DrawLineEx((Vector2){ cx - 2 * u, cy + 4 * u }, (Vector2){ cx + 10 * u, cy + 14 * u },
+                       3.5f * u, (Color){ 255, 240, 180, 255 });
+            break;
+        }
         case SK_DISTRACTING_BLOW:
             // A starburst - the interrupt's "smack".
             for (int i = 0; i < 4; i++) {

@@ -192,7 +192,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         if (d > 2.0f) {
             // Clamp to the remaining distance so a long frame (window
             // drag, zone hiccup) can't overshoot the target and oscillate.
-            float step = e->moveSpeed * dt;
+            float step = Entity_MoveSpeed(e) * dt;
             if (step > d) step = d;
             e->pos.x += (dx / d) * step;
             e->pos.y += (dy / d) * step;
@@ -218,7 +218,17 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             e->attackTimer -= dt;
             if (e->attackTimer <= 0.0f) {
                 int dmg = e->attackDamageMin + GetRandomValue(0, e->attackDamageMax - e->attackDamageMin);
+                dmg = Entity_ScaleOutgoingDamage(e, dmg); // Weakness
                 Entity_MarkInCombat(e);
+
+                // Price of Faith: the hex punishes the act of attacking,
+                // so it resolves on the swing itself rather than on the
+                // hit - it costs you even when the blow misses or the
+                // projectile is dodged.
+                if (Entity_HasHex(e, HEX_PRICE_OF_FAITH)) {
+                    Entity_ApplyDamage(e, 12, NULL);
+                    Fx_Burst(e->pos, (Color){ 178, 118, 220, 255 });
+                }
                 e->attackAnimTimer = ATTACK_ANIM_DURATION; // the visible swing (sprite.c)
                 if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
                     // Ranged: a visible bolt flies to where the target is
@@ -239,7 +249,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     e->adrenaline += 4; // basic attacks also build adrenaline in GW1
                     if (e->adrenaline > 100) e->adrenaline = 100;
                 }
-                e->attackTimer = e->attackInterval;
+                e->attackTimer = Entity_AttackInterval(e); // slowed while hexed
             }
         } else {
             e->moveTarget = target->pos;

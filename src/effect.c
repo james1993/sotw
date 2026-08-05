@@ -8,6 +8,43 @@ static float RankScaledValue(const EffectStep *step, const Entity *caster, Attri
     return step->baseValue + step->perAttributeRank * (float)rank;
 }
 
+// Per-second health loss for the afflictions that degenerate. GW1 calls
+// these "degeneration pips"; keeping the numbers in one table means a
+// hex and a condition that both tick are balanced against each other
+// rather than against whatever the skill author happened to type.
+static float AfflictionTickDamage(EffectCategory category, int kind) {
+    if (category == EFFECT_HEX) {
+        return ((HexKind)kind == HEX_SHROUD_OF_DOUBT) ? 1.0f : 0.0f;
+    }
+    switch ((ConditionKind)kind) {
+        case COND_BLEEDING: return 2.0f;
+        case COND_BURNING:  return 5.0f;
+        default:            return 0.0f; // Crippled/Weakness impair, not damage
+    }
+}
+
+// Applies a condition or hex, refreshing rather than stacking when the
+// same affliction is already present - GW1's rule, and the reason
+// spamming one skill doesn't multiply its degeneration.
+static void ApplyAffliction(Entity *target, EffectCategory category, int kind, float duration) {
+    ActiveEffect *free = NULL;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        ActiveEffect *fx = &target->effects[i];
+        if (fx->active && fx->category == category && fx->kind == kind) {
+            if (duration > fx->remaining) fx->remaining = duration;
+            return;
+        }
+        if (!free && !fx->active) free = fx;
+    }
+    if (!free) return; // effect budget full; the weakest thing to do is nothing
+    free->active = true;
+    free->category = category;
+    free->kind = kind;
+    free->remaining = duration;
+    free->tickAccum = 0.0f;
+    free->tickDamage = AfflictionTickDamage(category, kind);
+}
+
 static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectStep *step, Entity *target) {
     if (!target || !target->alive) return;
 
@@ -38,27 +75,41 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             if (target->hp > target->maxHp) target->hp = target->maxHp;
             break;
         }
-        case FX_APPLY_CONDITION: {
-            // GW1 semantics: reapplying a condition refreshes its
-            // duration; the same condition never stacks in two slots.
-            ActiveEffect *slot = NULL;
-            for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
-                ActiveEffect *fx = &target->effects[i];
-                if (fx->active && fx->kind == (ConditionKind)step->conditionKind) {
-                    if (step->duration > fx->remaining) fx->remaining = step->duration;
-                    slot = fx;
-                    break;
+        case FX_APPLY_CONDITION:
+        case FX_APPLY_HEX: {
+            // GW1 semantics: reapplying refreshes duration; the same
+            // affliction never occupies two slots. Category is part of
+            // the identity, so a hex and a condition that happen to
+            // share a numeric kind are still distinct effects.
+            EffectCategory category =
+                (step->kind == FX_APPLY_HEX) ? EFFECT_HEX : EFFECT_CONDITION;
+            ApplyAffliction(target, category, step->conditionKind, step->duration);
+            break;
+        }
+        case FX_REMOVE_CONDITION:
+        case FX_REMOVE_HEX: {
+            // Cleanses land on an ally, and the count comes from the
+            // step so one skill can strip a single affliction and
+            // another can wipe the board.
+            EffectCategory category =
+                (step->kind == FX_REMOVE_HEX) ? EFFECT_HEX : EFFECT_CONDITION;
+            int want = (step->conditionKind > 0) ? step->conditionKind : 1;
+            int removed = Entity_RemoveEffects(target, category, want);
+            if (removed > 0) {
+                // A visible pop so a cleanse reads as having done
+                // something even when nothing else about the target
+                // changes on screen.
+                Fx_Burst(target->pos, category == EFFECT_HEX
+                         ? (Color){ 178, 118, 220, 255 }
+                         : (Color){ 200, 230, 255, 255 });
+                // Cleanses that also heal put the number in baseValue.
+                int heal = (int)RankScaledValue(step, caster, skill->attribute);
+                if (heal > 0) {
+                    heal += 3 * caster->attributeRank[ATTR_DIVINE_FAVOR];
+                    target->hp += heal;
+                    if (target->hp > target->maxHp) target->hp = target->maxHp;
+                    Fx_Heal(target->pos);
                 }
-                if (!slot && !fx->active) slot = fx;
-            }
-            if (slot && !slot->active) {
-                slot->active = true;
-                slot->kind = (ConditionKind)step->conditionKind;
-                slot->remaining = step->duration;
-                slot->tickAccum = 0.0f;
-                slot->tickDamage =
-                    (step->conditionKind == COND_BLEEDING) ? 2.0f :
-                    (step->conditionKind == COND_BURNING) ? 5.0f : 0.0f;
             }
             break;
         }
