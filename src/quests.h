@@ -28,6 +28,12 @@ typedef enum {
     QUEST_DONE
 } QuestState;
 
+// "A skill of your calling": resolved against the player's professions
+// at the moment it's shown or handed over. A quest that hard-named a
+// Monk spell would be worthless to a Ranger, and there are six
+// professions to serve off one quest chain.
+#define QUEST_REWARD_ANY_SKILL (-2)
+
 typedef struct {
     const char *name;
     const char *objective;
@@ -45,9 +51,11 @@ typedef struct {
     int rewardXP;
     int rewardGold;
     const Item *rewardItem; // optional extra reward, NULL = none
-    int rewardSkill;        // SkillId taught on turn-in, -1 = none. Quests
-                            // are the main early source of skills, so the
-                            // bar fills as the story does.
+    int rewardSkill;        // SkillId taught on turn-in, -1 = none, or
+                            // QUEST_REWARD_ANY_SKILL to teach whatever
+                            // suits the character. Quests are the main
+                            // early source of skills, so the bar fills
+                            // as the story does.
     QuestState state;
     int prereq; // index of a quest that must be DONE first, -1 = none
 } Quest;
@@ -59,6 +67,16 @@ extern Quest g_quests[QUEST_COUNT];
 // quest index FOR THIS GIVER, or -1. NULL matches any giver.
 int Quests_OfferableIndexFor(const char *giverName);
 int Quests_ReadyToTurnInIndexFor(const char *giverName);
+
+// Which skill this quest will actually teach THIS character, or -1 if
+// none (or nothing suitable is left). Used both by the reward summary
+// and by the turn-in, so the promise and the payout can't differ.
+int Quests_ResolveRewardSkill(const Quest *q, const struct Entity *player);
+
+// True once the named quest has been turned in. The profession trainer
+// gates the second profession on this: GW1 makes you actually play the
+// primary for a while before it lets you pick a second.
+bool Quests_IsDoneByName(const char *name);
 
 // True when this quest giver has anything for the player - drives the
 // green "!" marker over their head.

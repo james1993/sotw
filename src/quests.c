@@ -33,7 +33,7 @@ Quest g_quests[QUEST_COUNT] = {
         .targetName = "Charr", // only Charr kills advance this quest
         .rewardXP = 250,
         .rewardGold = 100,
-        .rewardSkill = SK_SMITE,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -48,7 +48,7 @@ Quest g_quests[QUEST_COUNT] = {
         .targetZone = ZONE_ASHFORD_PLAINS,
         .rewardXP = 300,
         .rewardGold = 150,
-        .rewardSkill = SK_BANE_SIGNET,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = 0, // opens up after Charr at the Gate, GW1 chain-style
     },
@@ -65,7 +65,7 @@ Quest g_quests[QUEST_COUNT] = {
         .rewardXP = 400,
         .rewardGold = 150,
         .rewardItem = &g_rewardWarhammer,
-        .rewardSkill = SK_BANISH,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -80,7 +80,7 @@ Quest g_quests[QUEST_COUNT] = {
         .rewardXP = 350,
         .rewardGold = 120,
         .rewardItem = &g_rewardIdKit,
-        .rewardSkill = SK_FIRE_BOLT,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
@@ -125,6 +125,22 @@ int Quests_ReadyToTurnInIndexFor(const char *giverName) {
     return -1;
 }
 
+int Quests_ResolveRewardSkill(const Quest *q, const Entity *player) {
+    if (!q || q->rewardSkill == -1) return -1;
+    if (q->rewardSkill == QUEST_REWARD_ANY_SKILL) {
+        if (!player) return -1;
+        return Skillbook_PickReward(player->primaryProfession, player->secondaryProfession);
+    }
+    return q->rewardSkill;
+}
+
+bool Quests_IsDoneByName(const char *name) {
+    for (int i = 0; i < QUEST_COUNT; i++) {
+        if (strcmp(g_quests[i].name, name) == 0) return g_quests[i].state == QUEST_DONE;
+    }
+    return false;
+}
+
 bool Quests_GiverHasAttentionFor(const char *giverName) {
     return Quests_OfferableIndexFor(giverName) >= 0 ||
            Quests_ReadyToTurnInIndexFor(giverName) >= 0;
@@ -166,9 +182,10 @@ bool Quests_TurnIn(Entity *player, int index) {
 
     // The skill is the headline reward - announce it, because a new
     // skill changes what builds are open to you far more than the gold.
-    if (q->rewardSkill >= 0 && Skillbook_Unlock(q->rewardSkill)) {
+    int taught = Quests_ResolveRewardSkill(q, player);
+    if (taught >= 0 && Skillbook_Unlock(taught)) {
         char msg[96];
-        snprintf(msg, sizeof(msg), "Skill learned:  %s", g_skillDB[q->rewardSkill].name);
+        snprintf(msg, sizeof(msg), "Skill learned:  %s", g_skillDB[taught].name);
         UI_Notify(msg);
     }
 

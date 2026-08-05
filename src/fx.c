@@ -27,11 +27,31 @@ static WorldFx g_fx[MAX_FX];
 Color Fx_AttrColor(AttributeKind a) {
     switch (a) {
         case ATTR_FIRE_MAGIC:      return (Color){ 255, 140, 50, 255 };
+        case ATTR_WATER_MAGIC:     return (Color){ 110, 190, 245, 255 };
+        case ATTR_AIR_MAGIC:       return (Color){ 210, 235, 255, 255 };
+        case ATTR_EARTH_MAGIC:     return (Color){ 190, 150, 90, 255 };
         case ATTR_ENERGY_STORAGE:  return (Color){ 150, 120, 255, 255 };
         case ATTR_HEALING_PRAYERS: return (Color){ 120, 240, 140, 255 };
         case ATTR_SMITING_PRAYERS: return (Color){ 255, 220, 110, 255 };
+        case ATTR_PROTECTION_PRAYERS: return (Color){ 170, 235, 200, 255 };
         case ATTR_DIVINE_FAVOR:    return (Color){ 220, 240, 255, 255 };
+        // Necromancer: sickly green for death, deep red for blood.
+        case ATTR_BLOOD_MAGIC:     return (Color){ 200,  60,  70, 255 };
+        case ATTR_DEATH_MAGIC:     return (Color){ 130, 180, 110, 255 };
+        case ATTR_CURSES:          return (Color){ 130,  95, 165, 255 };
+        case ATTR_SOUL_REAPING:    return (Color){ 165, 130, 200, 255 };
+        // Mesmer: the colour of the profession itself.
+        case ATTR_DOMINATION_MAGIC:
+        case ATTR_ILLUSION_MAGIC:
+        case ATTR_INSPIRATION_MAGIC:
+        case ATTR_FAST_CASTING:    return (Color){ 225, 130, 210, 255 };
+        // Ranger: bowstring and bark.
+        case ATTR_MARKSMANSHIP:
+        case ATTR_WILDERNESS_SURVIVAL:
+        case ATTR_BEAST_MASTERY:
+        case ATTR_EXPERTISE:       return (Color){ 150, 200, 120, 255 };
         case ATTR_STRENGTH:
+        case ATTR_SWORDSMANSHIP:
         case ATTR_TACTICS:         return (Color){ 210, 210, 220, 255 };
         default:                   return (Color){ 200, 200, 210, 255 };
     }

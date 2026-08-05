@@ -1,4 +1,5 @@
 #include "entity.h"
+#include "gwmath.h"
 #include "items.h"
 #include "progression.h"
 #include "quests.h"
@@ -35,8 +36,11 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->radius = 12.0f;
     e->color = color;
 
-    e->hp = e->maxHp = e->baseMaxHp = 100;
-    e->energy = e->maxEnergy = e->baseMaxEnergy = 40;
+    e->hp = e->maxHp = e->baseMaxHp = GW_BASE_HEALTH;
+    // 20 energy for everyone, GW1's rule - a caster's pool comes from
+    // Energy Storage, not from being a caster.
+    e->energy = e->maxEnergy = e->baseMaxEnergy = GW_BASE_ENERGY;
+    e->energyRegenPips = GW_BASE_ENERGY_PIPS;
     e->deathPenalty = 0;
     e->adrenaline = 0;
     e->armor = 60; // neutral AL - no bonus, no penalty
@@ -123,15 +127,51 @@ void Entity_RecomputePenalizedStats(Entity *e) {
     if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
 }
 
+void Entity_RecomputeAttributeStats(Entity *e) {
+    if (!e) return;
+    e->baseMaxHp = GW_BASE_HEALTH + GW_HEALTH_PER_LEVEL * (e->level - 1);
+    e->baseMaxEnergy = GW_MaxEnergy(e->attributeRank[ATTR_ENERGY_STORAGE]);
+    Entity_RecomputePenalizedStats(e);
+}
+
+float Entity_EnergyRegenInterval(const Entity *e) {
+    return GW_EnergyRegenInterval(e ? e->energyRegenPips : GW_BASE_ENERGY_PIPS);
+}
+
+// Soul Reaping: GW1 hands a Necromancer energy equal to their rank
+// whenever a creature dies near them - friend, foe or minion - which is
+// what lets the profession spend far past a 20-point pool. The 3-per-15s
+// throttle is GW1's own, and without it a single wipe refills you.
+static void AwardSoulReaping(const Entity *dying) {
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (e == dying || !e->alive) continue;
+        int rank = e->attributeRank[ATTR_SOUL_REAPING];
+        if (rank <= 0) continue;
+        float dx = e->pos.x - dying->pos.x, dy = e->pos.y - dying->pos.y;
+        if (sqrtf(dx * dx + dy * dy) > GW_SOUL_REAPING_RADIUS) continue;
+
+        if (e->soulReapingWindow <= 0.0f) {
+            e->soulReapingWindow = GW_SOUL_REAPING_WINDOW;
+            e->soulReapingTriggers = 0;
+        }
+        if (e->soulReapingTriggers >= GW_SOUL_REAPING_MAX_TRIGGERS) continue;
+        e->soulReapingTriggers++;
+
+        e->energy += rank;
+        if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+    }
+}
+
 void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
+    Entity_ApplyDamagePen(e, amount, attacker, 0.0f);
+}
+
+void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorPenetration) {
     (void)attacker; // kills award party-wide XP regardless of who landed the blow
     if (!e->alive) return;
 
-    // GW1's armor formula: every 40 AL above/below the 60 baseline
-    // halves/doubles incoming damage.
-    float scaled = (float)amount * powf(2.0f, (60.0f - (float)e->armor) / 40.0f);
-    int finalDamage = (int)scaled;
-    if (finalDamage < 1 && amount > 0) finalDamage = 1;
+    int finalDamage = GW_ArmorScaledDamage(amount, e->armor, armorPenetration);
 
     e->hp -= finalDamage;
     Entity_MarkInCombat(e);
@@ -140,6 +180,11 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
         e->alive = false;
         e->hasMoveTarget = false;
         e->castingSlot = -1;
+
+        // Every death feeds nearby Soul Reaping, whichever side it was
+        // on - GW1 makes no distinction, and that's what makes a
+        // Necromancer strongest in exactly the fights that go badly.
+        AwardSoulReaping(e);
 
         // GW1's death penalty: dying costs party members 15% of max
         // health and energy, stacking to -60%, until they rezone.
@@ -235,7 +280,7 @@ float Entity_MoveSpeed(const Entity *e) {
 float Entity_AttackInterval(const Entity *e) {
     if (!e) return 1.0f;
     float interval = e->attackInterval;
-    if (Entity_HasHex(e, HEX_SHROUD_OF_DOUBT)) interval *= 1.5f;
+    if (Entity_HasHex(e, HEX_FALTERING)) interval *= 1.5f;
     return interval;
 }
 
@@ -252,8 +297,8 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
     if (!fx || !fx->active) return "";
     if (fx->category == EFFECT_HEX) {
         switch ((HexKind)fx->kind) {
-            case HEX_SHROUD_OF_DOUBT: return "Shroud of Doubt";
-            case HEX_PRICE_OF_FAITH:  return "Price of Faith";
+            case HEX_FALTERING: return "Faltering";
+            case HEX_BACKLASH:  return "Backlash";
             default: return "Hex";
         }
     }

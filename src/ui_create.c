@@ -3,6 +3,7 @@
 #include "sprite.h"
 #include "skill.h"
 #include "attributes.h"
+#include "gwmath.h"
 #include "ui_font.h"
 #include "ui_theme.h"
 #include "raylib.h"
@@ -29,22 +30,53 @@ void UI_CreateReset(void) {
     g_previewTime = 0.0f;
 }
 
-static const Profession g_professions[] = { PROF_WARRIOR, PROF_ELEMENTALIST, PROF_MONK };
+// All six Prophecies professions, in GW1's own listing order.
+static const Profession g_professions[] = {
+    PROF_WARRIOR, PROF_RANGER, PROF_MONK,
+    PROF_NECROMANCER, PROF_MESMER, PROF_ELEMENTALIST
+};
 #define PROFESSION_COUNT (int)(sizeof(g_professions) / sizeof(g_professions[0]))
 
 // What each profession starts with, mirroring World_Init's kit. Shown
 // on the screen so the choice is informed rather than a guess at what
 // the words mean.
+//
+// Energy is 20 across the board and that is not an oversight - it's
+// GW1's rule. The Elementalist's deep pool comes from ranks in Energy
+// Storage, so the starting kit's 3 ranks are what put them at 29.
 static void ProfessionStats(Profession p, int *energy, int *armor, const char **weapon,
                             const char **skill) {
+    *energy = GW_MaxEnergy(0);
     switch (p) {
         case PROF_WARRIOR:
-            *energy = 20; *armor = 40; *weapon = "Ascalon Sword"; *skill = "Gash"; break;
-        case PROF_ELEMENTALIST:
-            *energy = 50; *armor = 30; *weapon = "Kindling Staff"; *skill = "Fire Bolt"; break;
+            *armor = 40; *weapon = "Ascalon Sword"; *skill = "Gash"; break;
+        case PROF_RANGER:
+            *armor = 35; *weapon = "Ascalon Longbow"; *skill = "Power Shot"; break;
         case PROF_MONK:
+            *armor = 30; *weapon = "Smiting Rod"; *skill = "Orison of Healing"; break;
+        case PROF_NECROMANCER:
+            *armor = 30; *weapon = "Bone Idol"; *skill = "Vampiric Gaze"; break;
+        case PROF_MESMER:
+            *armor = 30; *weapon = "Jeweled Wand"; *skill = "Ether Feast"; break;
+        case PROF_ELEMENTALIST:
         default:
-            *energy = 30; *armor = 30; *weapon = "Smiting Rod"; *skill = "Orison of Healing"; break;
+            *energy = GW_MaxEnergy(3); // 3 starting ranks of Energy Storage
+            *armor = 30; *weapon = "Kindling Staff"; *skill = "Fire Bolt"; break;
+    }
+}
+
+// One line on what this profession's PRIMARY attribute actually does.
+// The primary is the permanent half of the choice - a secondary can be
+// changed later, this can't - so it gets stated outright.
+static const char *PrimaryEffect(Profession p) {
+    switch (p) {
+        case PROF_WARRIOR:      return "Ignores 1% of a foe's armour per rank.";
+        case PROF_RANGER:       return "Attack skills cost 4% less energy per rank.";
+        case PROF_MONK:         return "Your healing spells give +3.2 health per rank.";
+        case PROF_NECROMANCER:  return "Regain energy when a creature dies nearby.";
+        case PROF_MESMER:       return "Spells cast faster - rank 15 halves them.";
+        case PROF_ELEMENTALIST: return "+3 maximum energy per rank.";
+        default:                return "";
     }
 }
 
@@ -67,13 +99,9 @@ static void SyncPreview(void) {
     for (int i = 0; i < SKILL_BAR_SIZE; i++) g_previewEntity.skillBar[i] = -1;
 
     // Robe colour by profession, matching the starting armour each one
-    // is issued.
-    switch (g_draft.primary) {
-        case PROF_WARRIOR:      g_previewEntity.color = (Color){ 170, 96, 72, 255 }; break;
-        case PROF_ELEMENTALIST: g_previewEntity.color = (Color){ 80, 120, 200, 255 }; break;
-        case PROF_MONK:
-        default:                g_previewEntity.color = (Color){ 205, 190, 150, 255 }; break;
-    }
+    // is issued (character.c owns the palette, so the preview and the
+    // world can't disagree about what a Necromancer looks like).
+    g_previewEntity.color = Character_ProfessionColor(g_draft.primary);
 }
 
 // A row of small swatches; returns the index clicked, or -1.
@@ -147,17 +175,23 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         UI_TextShadow("Profession", x, y, headFont, UI_GOLD);
         y += headFont + UI_SP(scale, 3);
 
-        int btnH = (int)(38 * scale);
+        // Six buttons in two columns. A single column of six would push
+        // the stats below the fold at 720p, and the whole point of this
+        // panel is that the numbers sit next to the choice.
+        int btnH = (int)(32 * scale);
+        int colGap = UI_SP(scale, 2);
+        int btnW = (innerW - colGap) / 2;
         for (int i = 0; i < PROFESSION_COUNT; i++) {
             Profession p = g_professions[i];
-            Rectangle r = { (float)x, (float)y, (float)innerW, (float)btnH };
-            if (UI_Button(r, Character_ProfessionName(p), font, true, g_draft.primary == p)) {
+            Rectangle r = { (float)(x + (i % 2) * (btnW + colGap)),
+                            (float)(y + (i / 2) * (btnH + UI_SP(scale, 2))),
+                            (float)btnW, (float)btnH };
+            if (UI_Button(r, Character_ProfessionName(p), small, true, g_draft.primary == p)) {
                 g_draft.primary = p;
             }
-            y += btnH + UI_SP(scale, 2);
         }
+        y += ((PROFESSION_COUNT + 1) / 2) * (btnH + UI_SP(scale, 2)) + UI_SP(scale, 2);
 
-        y += UI_SP(scale, 2);
         // The pitch, then the concrete numbers. A player who doesn't
         // know GW1 needs both: the sentence to understand the fantasy,
         // the stats to understand the trade.
@@ -188,6 +222,11 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
                           g_attributeIsPrimary[a] ? UI_GOLD : UI_TEXT_SECOND);
             y += tiny + UI_SP(scale, 1);
         }
+
+        // What the primary actually does. This is the line that makes
+        // the choice permanent, so it goes last and it goes in gold.
+        y += UI_SP(scale, 1);
+        UI_TextShadow(PrimaryEffect(g_draft.primary), x + UI_SP(scale, 2), y, tiny, UI_GOLD_DIM);
     }
 
     // ---------------- Middle: live preview ----------------

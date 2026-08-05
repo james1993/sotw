@@ -1,7 +1,25 @@
 #include "effect.h"
 #include "fx.h"
+#include "gwmath.h"
 #include <math.h>
 #include <stddef.h>
+
+// Strength's armor penetration, which GW1 grants only on attack skills -
+// a Warrior's spells and shouts penetrate nothing. Returns a 0..1
+// fraction of the target's armor to ignore.
+static float AttackPenetration(const Entity *caster, const Skill *skill) {
+    if (skill->type != SKILLTYPE_ATTACK_SKILL) return 0.0f;
+    return GW_STRENGTH_PENETRATION_PER_RANK * (float)caster->attributeRank[ATTR_STRENGTH];
+}
+
+// Divine Favor fires on Monk SPELLS cast on an ally - not on signets,
+// not on a secondary's borrowed Healing Prayers used by someone whose
+// primary is something else (they simply can't have the rank).
+static int DivineFavorBonus(const Entity *caster, const Skill *skill) {
+    if (skill->type != SKILLTYPE_SPELL) return 0;
+    if (g_attributeProfession[skill->attribute] != PROF_MONK) return 0;
+    return GW_DivineFavorBonus(caster->attributeRank[ATTR_DIVINE_FAVOR]);
+}
 
 static float RankScaledValue(const EffectStep *step, const Entity *caster, AttributeKind attr) {
     int rank = (attr >= 0 && attr < ATTR_COUNT) ? caster->attributeRank[attr] : 0;
@@ -14,7 +32,7 @@ static float RankScaledValue(const EffectStep *step, const Entity *caster, Attri
 // rather than against whatever the skill author happened to type.
 static float AfflictionTickDamage(EffectCategory category, int kind) {
     if (category == EFFECT_HEX) {
-        return ((HexKind)kind == HEX_SHROUD_OF_DOUBT) ? 1.0f : 0.0f;
+        return ((HexKind)kind == HEX_FALTERING) ? 1.0f : 0.0f;
     }
     switch ((ConditionKind)kind) {
         case COND_BLEEDING: return 2.0f;
@@ -51,7 +69,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
     switch (step->kind) {
         case FX_DAMAGE: {
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
-            Entity_ApplyDamage(target, dmg, caster);
+            Entity_ApplyDamagePen(target, dmg, caster, AttackPenetration(caster, skill));
             Fx_Burst(target->pos, Fx_AttrColor(skill->attribute));
             Entity_MarkInCombat(caster);
             if (target->kind == ENT_MONSTER && !target->aggroed) {
@@ -65,11 +83,11 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
         }
         case FX_HEAL: {
             int amount = (int)RankScaledValue(step, caster, skill->attribute);
-            // Divine Favor: GW1's Monk primary attribute adds bonus
-            // healing (~3.2/rank there, 3/rank here) to every monk spell
-            // that heals - the whole reason a primary Monk out-heals a
-            // secondary one with identical Healing Prayers.
-            amount += 3 * caster->attributeRank[ATTR_DIVINE_FAVOR];
+            // Divine Favor: GW1's Monk primary adds 3.2 healing per rank
+            // to every Monk spell that heals - the whole reason a primary
+            // Monk out-heals a secondary one with identical Healing
+            // Prayers, and the reason it's worth being one.
+            amount += DivineFavorBonus(caster, skill);
             Fx_Heal(target->pos);
             target->hp += amount;
             if (target->hp > target->maxHp) target->hp = target->maxHp;
@@ -105,7 +123,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 // Cleanses that also heal put the number in baseValue.
                 int heal = (int)RankScaledValue(step, caster, skill->attribute);
                 if (heal > 0) {
-                    heal += 3 * caster->attributeRank[ATTR_DIVINE_FAVOR];
+                    heal += DivineFavorBonus(caster, skill);
                     target->hp += heal;
                     if (target->hp > target->maxHp) target->hp = target->maxHp;
                     Fx_Heal(target->pos);
@@ -160,6 +178,14 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
 void Effect_Execute(Entity *caster, const Skill *skill, Entity *target) {
     for (int i = 0; i < skill->stepCount; i++) {
         const EffectStep *step = &skill->steps[i];
+
+        // A self step lands on the caster no matter what the skill is
+        // aimed at, which is how one skill can drain a foe and feed you
+        // in the same breath.
+        if (step->selfTarget) {
+            ApplyStepToEntity(caster, skill, step, caster);
+            continue;
+        }
 
         if (skill->targeting == TARGET_SELF) {
             ApplyStepToEntity(caster, skill, step, caster);

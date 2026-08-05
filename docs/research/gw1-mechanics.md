@@ -316,12 +316,100 @@ resolution- and dimension-independent, not in its 3D positioning, camera
 work, or graphical fidelity (those matter for feel, but not for the core
 loop).
 
+## 14. The exact numbers
+
+Everything above is design intent. This section is the arithmetic, kept
+separate because it's what the code has to match rather than what the
+design has to argue for. The demake states all of it once, in
+`src/gwmath.h` / `src/gwmath.c`, so a formula can be checked against
+this table instead of hunted for across call sites.
+
+### Armor
+
+Damage is scaled by `2^((60 - AL) / 40)`
+[[wiki: Armor rating]](https://wiki.guildwars.com/wiki/Armor_rating).
+
+- AL 60 is the baseline: multiplier 1.0.
+- Every **+40 AL halves** incoming damage; every **-40 AL doubles** it.
+- So a Warrior in AL 80 takes ~71% of what an AL 60 caster takes, and an
+  AL 100 target takes 50%.
+
+**Armor penetration** removes a percentage of the target's armor
+*before* the curve, which is why the same 20% penetration is worth far
+more against a heavily armored target than a lightly armored one.
+
+Profession armor ceilings differ, and that difference is the entire
+reason "who stands in front" is a build decision:
+
+| Profession | Max AL |
+|---|---|
+| Warrior | 80 |
+| Ranger | 70 |
+| Monk, Necromancer, Mesmer, Elementalist | 60 |
+
+### Energy
+
+- **Every character has 20 base energy**, regardless of profession
+  [[wiki: Energy]](https://wiki.guildwars.com/wiki/Energy). A caster does
+  *not* get a deeper pool for being a caster.
+- **Energy Storage** (Elementalist primary) adds **+3 maximum energy per
+  rank** — the only attribute that raises the pool itself, which is
+  precisely what makes it the Elementalist's identity.
+- **Regeneration is measured in pips.** One pip = **1 energy per 3
+  seconds**. Characters have **3 pips** naturally, so baseline
+  regeneration is **1 energy per second**, in real time.
+- A **health** pip is a different rate: **2 health per second**.
+
+### Level
+
+- **100 base health at level 1, +20 per level** thereafter.
+- Attribute points accumulate on a curve reaching **200 at level 20**.
+
+### Attribute costs
+
+Cumulative points to reach each rank, 0 through 12
+[[wiki: Attribute point]](https://wiki.guildwars.com/wiki/Attribute_point):
+
+`0, 1, 3, 6, 10, 15, 21, 28, 37, 48, 61, 77, 97`
+
+Rank 12 costs 97 of a level-20 character's 200 points — which is why
+maxing two lines is roughly the whole budget, and why "spread thin or
+commit" is a genuine decision rather than an obvious one.
+
+### Primary attribute effects
+
+| Primary | Effect per rank | Applies to |
+|---|---|---|
+| Strength | 1% armor penetration | attack skills only |
+| Expertise | -4% energy cost | attack skills (and other non-spells) |
+| Divine Favor | +3.2 healing | Monk spells cast on an ally |
+| Soul Reaping | +1 energy per rank on a nearby death | any creature, capped at 3 triggers per 15s |
+| Fast Casting | cast time × `2^(-rank/15)` | spells only — rank 15 halves it |
+| Energy Storage | +3 maximum energy | always |
+
+## 15. Prophecies pacing: the second profession
+
+Prophecies does two separate things with your secondary profession, and
+the distance between them is deliberate:
+
+1. You **acquire** a secondary early, shortly after leaving the tutorial
+   region, once you have actually played the primary long enough to have
+   an opinion about what it lacks.
+2. You cannot **change** it until much later in the campaign
+   [[wiki: Secondary profession]](https://wiki.guildwars.com/wiki/Secondary_profession).
+
+That gap is what makes the choice a commitment. A build you can rewrite
+on a whim isn't a build, it's a menu — the cost of being wrong is what
+gives being right any weight.
+
 ## Sources
 
+- [Armor rating – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Armor_rating)
 - [Attribute – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Attribute)
 - [Attribute point – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Attribute_point)
 - [Profession – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Profession)
 - [Secondary profession – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Secondary_profession)
+- [Energy – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Energy)
 - [Skill – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Skill)
 - [Skill type – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Skill_type)
 - [Build – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Build)

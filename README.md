@@ -27,7 +27,7 @@ built in raylib/C.
 ## The prototype
 
 `src/` is a working vertical slice validating the architecture above:
-one player character (Warrior primary / Elementalist secondary), one
+a player character of any of the six Prophecies professions, one
 AI-controlled Hero companion (Elementalist), and one monster, fighting
 in a top-down arena with a real 8-slot skill bar, energy/adrenaline
 resource pools, cast bars, interrupts-by-type, and skill recharge —
@@ -201,6 +201,10 @@ through the same `sprite.c` the world uses, so it can't drift out of sync
 with what you'll actually see. Change profession and the robe colour,
 weapon and title update immediately.
 
+**All six Prophecies professions** are playable — Warrior, Ranger, Monk,
+Necromancer, Mesmer, Elementalist. Factions and Nightfall professions
+are out of scope, so they're absent rather than half-built.
+
 Profession is a real decision, not a label. Each one issues a different
 starting kit, and armour comes from the armour piece rather than a
 number written twice:
@@ -208,12 +212,21 @@ number written twice:
 | | Energy | Armour | Weapon | Starting skill |
 |---|---|---|---|---|
 | Warrior | 20 | AL 40 | Ascalon Sword | Gash (adrenaline) |
-| Elementalist | 50 | AL 30 | Kindling Staff | Fire Bolt |
-| Monk | 30 | AL 30 | Smiting Rod | Orison of Healing |
+| Ranger | 20 | AL 35 | Ascalon Longbow | Power Shot |
+| Monk | 20 | AL 30 | Smiting Rod | Orison of Healing |
+| Necromancer | 20 | AL 30 | Bone Idol | Vampiric Gaze |
+| Mesmer | 20 | AL 30 | Jeweled Wand | Ether Feast |
+| Elementalist | 29 | AL 30 | Kindling Staff | Fire Bolt |
+
+Everyone starting on 20 energy is not an oversight — it's GW1's rule.
+The Elementalist's 29 is 20 plus three ranks of Energy Storage, which is
+exactly why that attribute is their primary and why a *secondary*
+Elementalist never gets it.
 
 The panel shows those numbers, the accessible attribute lines (with the
-primary marked), and a one-line pitch, so the choice is informed rather
-than a guess at what the words mean.
+primary marked), a one-line pitch, and — in gold — what the primary
+attribute actually *does*, since that's the half of the choice you can
+never take back.
 
 Appearance is procedural like everything else: sex, hair style, and
 palettes for skin and hair colour, all read straight into the shapes the
@@ -223,7 +236,69 @@ nameless character can't be created.
 **Secondary profession is deliberately absent from creation.** GW1 makes
 you earn it in-game once you've actually played the primary, so a
 freshly created character is single-profession — the nameplate reads
-*"Sera (Mo)"* — and the creator says as much.
+*"Sera (Mo)"* — and the creator says as much. See *Prophecies pacing*
+below for when you get one.
+
+### Prophecies pacing: the second profession
+
+Prophecies does two separate things with your secondary, a campaign
+apart, and the distance between them is the design. The demake keeps
+both halves:
+
+- **Sebedoh the Mesmer** stands in Ashford Camp and will grant you a
+  second profession — but only once *Charr at the Gate* is done. Before
+  that he tells you so, by name: "Requires: Charr at the Gate."
+- **Nicholas the Restless** is out at Piken Watch and is the only one who
+  will *change* it, and only at **level 10 or above**. Under that, the
+  button reads "Requires: level 10 (you are 6)."
+
+A build you can rewrite on a whim isn't a build, it's a menu. Changing
+your secondary refunds every attribute point sunk into the old one's
+lines (GW1 refunds them too — it has to, or the change costs you a chunk
+of character with no way to earn it back) and clears any bar slot holding
+a skill you can no longer use.
+
+### GW1's actual numbers
+
+Armour, energy, regeneration and the primary-attribute effects are GW1's
+real formulas, not approximations of them. They live in one file,
+`src/gwmath.h` / `gwmath.c`, so each one can be checked against
+`docs/research/gw1-mechanics.md` §14 rather than hunted for across call
+sites.
+
+**Armour** scales incoming damage by `2^((60 - AL) / 40)`: every +40 AL
+halves the damage, every -40 doubles it, AL 60 is neutral. Armour
+penetration removes a fraction of the target's AL *before* the curve, so
+the same penetration is worth much more against a Warrior than a caster.
+
+**Energy** is 20 base for everyone, +3 per rank of Energy Storage.
+**Regeneration is in pips**: one pip is 1 energy per 3 seconds, everyone
+has 3, so the baseline is **1 energy per second in real time** — the same
+clock every energy cost in GW1 is balanced against. The pip count is a
+per-character field, and the arrows drawn in the energy bar read it, so
+anything that ever moves regen moves the readout with it.
+
+**Health** is 100 at level 1, +20 per level.
+
+Every primary attribute carries its real mechanic:
+
+| Primary | Per rank | Applies to |
+|---|---|---|
+| Strength | 1% armour penetration | attack skills only |
+| Expertise | -4% energy cost | attack skills |
+| Divine Favor | +3.2 healing | Monk spells cast on an ally |
+| Soul Reaping | +1 energy on a nearby death | any death, max 3 per 15s |
+| Fast Casting | cast time × `2^(-rank/15)` | spells only |
+| Energy Storage | +3 maximum energy | always |
+
+Spending a point into Energy Storage moves your maximum energy on the
+spot, in the attributes panel — the feedback is what makes a primary
+attribute legible.
+
+Monster skills sit on an attribute (`ATTR_MONSTROUS`) that belongs to no
+profession at all, so Claw Swipe and friends fall out of every trainer
+list and attribute panel automatically. The check is ownership, so
+there's nothing to remember to filter.
 
 ### Conditions and hexes
 
@@ -242,13 +317,16 @@ do, not just your health bar:
 | Weakness | Your attacks deal 25% less damage |
 
 **Hexes** are magical, and punish what the target *does* rather than
-grinding it down. GW1 puts most hexes on Necromancer and Mesmer, which
-this demake doesn't have, so Smiting Prayers carries them:
+grinding it down. There are two hex *mechanics*, named for what they do
+rather than for a skill, because GW1 has dozens of hexes that all mean
+"your attacks come slower" and several professions need to reach them:
 
-- **Shroud of Doubt** — the target attacks 50% slower, plus light
-  degeneration.
-- **Price of Faith** — the target loses health every time it *attacks*,
-  charged on the swing itself so it costs them even on a miss.
+- **Faltering** — the target attacks 50% slower, plus light
+  degeneration. Applied by *Shroud of Doubt* (Smiting Prayers) and
+  *Faintheartedness* (Curses).
+- **Backlash** — the target loses health every time it *attacks*,
+  charged on the swing itself so it costs them even on a miss. Applied
+  by *Price of Faith* (Smiting Prayers) and *Empathy* (Domination).
 
 Reapplying an affliction refreshes its duration rather than stacking a
 second copy, exactly as GW1 does.
@@ -281,13 +359,17 @@ got:
 
 - **Quests** are the main early source. Each one names its skill reward
   up front (*"Accept: Charr at the Gate (250 XP, 100g, Smite)"*), and
-  learning it throws a banner across the screen.
+  learning it throws a banner across the screen. The skill is resolved
+  against *your* professions rather than hard-named, preferring your
+  primary's lines — with six professions in play, a fixed reward would
+  be dead loot to four of them.
 - **Skill trainers** (Master Ilsa in Ashford Camp, Adept Kerra at Piken
   Watch) sell skills for **1 skill point plus gold**, with the gold
   price climbing on every purchase. You earn a skill point per level.
   Their stock is filtered to what your two professions can actually
   use — a Mo/E is offered Monk and Fire Magic skills, but never Energy
-  Storage, which is the Elementalist *primary* attribute.
+  Storage, which is the Elementalist *primary* attribute. Until you've
+  earned a secondary, that's your primary's skills and nothing else.
 - **Elites are never sold.** The only way one reaches your bar is
   killing the boss that uses it: **Kruul the Emberfang** in Ashford
   Plains teaches Meteor, **Vharn the Bonesmith** in the foothills
@@ -300,8 +382,8 @@ your bar unless the book backs it.
 Quests are per-giver, GW1-style: Captain Osric's chain in Ashford
 (finish *Charr at the Gate* and he offers *Scout the Eastern Ridge*,
 whose marker points at the foothills gate), and Warmaster Grast's book
-at Piken Watch — *Silence the Shamans* (Warmaster's Hammer plus
-Banish), *Clear the Gullies* (an Identification Kit plus Fire Bolt), and the
+at Piken Watch — *Silence the Shamans* (Warmaster's Hammer plus a
+skill), *Clear the Gullies* (an Identification Kit plus a skill), and the
 collect quest *Hides for the Watch*, which consumes 4 Charr Hides on
 turn-in and tracks your bag live. Item rewards need a free bag slot,
 and each giver's green "!" only lights for their own work.
@@ -328,16 +410,23 @@ one always spawns it fresh. One slot, plain text, at
 `$XDG_DATA_HOME/sotw-demake/save.txt` (Linux, default
 `~/.local/share/...`) or `%APPDATA%\sotw-demake\save.txt` (Windows).
 
+The file carries a version, and **a save from before the six-profession
+work is declined rather than mis-read**. Adding the remaining
+professions renumbered the `Profession`, `AttributeKind` and `SkillId`
+enums, all three of which the save stores *by number* — loading an old
+file would silently turn a Monk into a Ranger with points in the wrong
+lines. Refusing it and starting fresh is the honest failure.
+
 ### What's deliberately not built yet
 
-Only two professions' worth of sample skills (see `src/skill.c`), one
-arena, no outpost/skill-trainer/attribute-panel UI, no tilemap/LoS, no
-JSON skill loading (skills are inline C data for now — see
-`docs/design/raylib-architecture.md` #3 for the planned JSON format).
-These are content/scope gaps, not architecture gaps: the effect VM,
-entity model, and AI loop the doc describes are what's actually running,
-so extending to more skills/professions is additive work on top of a
-validated foundation, not a rewrite.
+All six Prophecies professions exist with their real mechanics, but only
+a handful of skills each (see `src/skill.c`) — GW1 ships ~80 per
+profession. No tilemap/LoS, and no JSON skill loading (skills are inline
+C data for now — see `docs/design/raylib-architecture.md` #3 for the
+planned JSON format). These are content/scope gaps, not architecture
+gaps: the effect VM, entity model, and AI loop the doc describes are
+what's actually running, so extending to more skills is additive work on
+top of a validated foundation, not a rewrite.
 
 ### Known limitations
 

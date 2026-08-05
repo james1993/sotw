@@ -1,4 +1,5 @@
 #include "combat.h"
+#include "gwmath.h"
 #include "skill.h"
 #include "effect.h"
 #include "world.h"
@@ -40,7 +41,14 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
 
     Skill *skill = &g_skillDB[skillIdx];
 
-    if (skill->energyCost > 0 && caster->energy < skill->energyCost) return false;
+    // Expertise (Ranger primary) discounts attack skills by 4% a rank,
+    // which is the only reason a Ranger can afford to press one every
+    // few seconds off a 20-energy pool.
+    int energyCost = GW_SkillEnergyCost(skill->energyCost,
+                                        caster->attributeRank[ATTR_EXPERTISE],
+                                        skill->type == SKILLTYPE_ATTACK_SKILL);
+
+    if (energyCost > 0 && caster->energy < energyCost) return false;
     if (skill->adrenalineCost > 0 && caster->adrenaline < skill->adrenalineCost) return false;
 
     Entity *target = Entity_Get(targetIndex);
@@ -59,7 +67,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     }
     EntityRef targetRef = Entity_RefOf(targetIndex);
 
-    caster->energy -= skill->energyCost;
+    caster->energy -= energyCost;
     caster->adrenaline -= skill->adrenalineCost;
     if (caster->adrenaline < 0) caster->adrenaline = 0;
 
@@ -67,10 +75,17 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     // it covers both branches below, not just cast-time skills.
     caster->lastCastSkillSlot = slot;
 
-    if (skill->castTime > 0.0f) {
+    // Fast Casting (Mesmer primary) multiplies SPELL activation by
+    // 2^(-rank/15) - rank 15 halves it. Signets and attack skills are
+    // untouched, which is why a Mesmer bar is spells almost end to end.
+    float castTime = GW_SkillCastTime(skill->castTime,
+                                      caster->attributeRank[ATTR_FAST_CASTING],
+                                      skill->type == SKILLTYPE_SPELL);
+
+    if (castTime > 0.0f) {
         caster->castingSlot = slot;
-        caster->castTimeRemaining = skill->castTime;
-        caster->castTimeTotal = skill->castTime;
+        caster->castTimeRemaining = castTime;
+        caster->castTimeTotal = castTime;
         caster->castTargetRef = targetRef;
         // Chasing/attacking only follows foe targets, so only offensive
         // casts update the caster's current target.
@@ -113,14 +128,22 @@ static void ResolveCast(Entity *caster) {
 void Combat_UpdateEntity(Entity *e, float dt) {
     if (!e->alive) return;
 
-    // Energy regen: roughly one pip every 3 seconds at baseline. The
+    // Energy regen on GW1's real clock: a pip is 1 energy every 3
+    // seconds, everyone has 3 pips, so this is 1 energy per second. The
     // accumulator doubles as the fractional part the resource bars use
     // to fill smoothly between whole-point ticks.
+    float regenInterval = Entity_EnergyRegenInterval(e);
     e->energyRegenAccum += dt;
-    if (e->energyRegenAccum >= ENERGY_REGEN_INTERVAL) {
-        e->energyRegenAccum -= ENERGY_REGEN_INTERVAL;
+    while (e->energyRegenAccum >= regenInterval) {
+        e->energyRegenAccum -= regenInterval;
         e->energy++;
         if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+    }
+
+    // Soul Reaping's rolling 15-second trigger window (entity.c).
+    if (e->soulReapingWindow > 0.0f) {
+        e->soulReapingWindow -= dt;
+        if (e->soulReapingWindow <= 0.0f) e->soulReapingTriggers = 0;
     }
 
     // Health regen: nothing while anyone's recently traded blows, then a
@@ -225,7 +248,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                 // so it resolves on the swing itself rather than on the
                 // hit - it costs you even when the blow misses or the
                 // projectile is dodged.
-                if (Entity_HasHex(e, HEX_PRICE_OF_FAITH)) {
+                if (Entity_HasHex(e, HEX_BACKLASH)) {
                     Entity_ApplyDamage(e, 12, NULL);
                     Fx_Burst(e->pos, (Color){ 178, 118, 220, 255 });
                 }

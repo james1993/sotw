@@ -14,7 +14,13 @@
 #include <string.h>
 
 #define PLAYER_INDEX 0
-#define SAVE_VERSION 1
+// Version 2 added the remaining three Prophecies professions. Doing so
+// renumbered the Profession, AttributeKind and SkillId enums, and this
+// file stores all three BY NUMBER (primary=, attr%d=, skill%d=). A
+// version-1 file read as version 2 would silently turn a Monk into a
+// Ranger with points in the wrong lines, which is worse than refusing
+// it, so old saves are declined and the character is remade.
+#define SAVE_VERSION 2
 
 static bool g_enabled = false;
 static char g_saveDir[448];
@@ -147,6 +153,25 @@ bool Save_LoadAndApply(void) {
         return false;
     }
 
+    // Check the version before touching anything. The parse loop below
+    // overwrites live state as it goes, so a file we're going to reject
+    // has to be rejected while the world is still intact.
+    {
+        char probe[512];
+        int fileVersion = 0;
+        while (fgets(probe, sizeof(probe), f)) {
+            if (sscanf(probe, "version=%d", &fileVersion) == 1) break;
+        }
+        if (fileVersion < SAVE_VERSION) {
+            fclose(f);
+            TraceLog(LOG_WARNING,
+                     "SAVE: %s is version %d, this build needs %d - starting fresh",
+                     g_savePath, fileVersion, SAVE_VERSION);
+            return false;
+        }
+        rewind(f);
+    }
+
     // The save's inventory replaces the starting kit World_Init handed out.
     g_inventoryCount = 0;
     g_equippedWeapon = -1;
@@ -250,11 +275,6 @@ bool Save_LoadAndApply(void) {
     }
     fclose(f);
 
-    // Rebuild what's derived rather than stored: HP scales with level
-    // (+20/level, GW1's rule); equipment re-applies its combat stats
-    // through the same path the inventory UI uses.
-    p->baseMaxHp = 100 + 20 * (p->level - 1);
-
     // World_Init built the player from g_character BEFORE this file was
     // parsed, so the entity is currently wearing the default character.
     // Re-apply what the save actually says now that we know it.
@@ -268,7 +288,10 @@ bool Save_LoadAndApply(void) {
     p->hairColor = g_character.hairColor;
     p->hairStyle = g_character.hairStyle;
 
-    Entity_RecomputePenalizedStats(p);
+    // Rebuild what's derived rather than stored - health from level,
+    // energy from Energy Storage - through the same call World_Init
+    // uses, so a loaded character and a new one can't disagree.
+    Entity_RecomputeAttributeStats(p);
     p->hp = p->maxHp;
     p->energy = p->maxEnergy;
 

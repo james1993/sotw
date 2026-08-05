@@ -44,6 +44,7 @@ extern const Color g_hairColors[HAIR_COLOR_COUNT];
 const char *Character_ProfessionName(int profession);      // "Warrior"
 const char *Character_ProfessionAbbrev(int profession);    // "W"
 const char *Character_ProfessionBlurb(int profession);     // one-line pitch
+Color Character_ProfessionColor(int profession);           // starting armour colour
 
 // "Ilsa (Mo/E)", or "Ilsa (Mo)" before a secondary is earned - the
 // nameplate format GW1 uses everywhere.

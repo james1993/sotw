@@ -37,7 +37,8 @@ typedef enum {
     NPC_MERCHANT,
     NPC_HENCHMAN,
     NPC_CRAFTER, // armorer: crafts armor for gold + materials (GW1: armor is craft-only)
-    NPC_SKILL_TRAINER // sells non-elite skills for a skill point + gold
+    NPC_SKILL_TRAINER, // sells non-elite skills for a skill point + gold
+    NPC_PROFESSION_CHANGER // grants, then later re-chooses, your second profession
 } NpcRole;
 
 typedef enum {
@@ -54,13 +55,15 @@ typedef enum {
 // versa - and that separation is the whole point, because it forces a
 // build to carry answers for both rather than one catch-all cleanse.
 //
-// GW1 puts most hexes on Necromancer and Mesmer, neither of which this
-// demake has, so Smiting Prayers carries them here: divine affliction
-// rather than dark magic, same mechanical role.
+// These are named for the MECHANIC, not for a skill. GW1 has dozens of
+// hexes that all do "your attacks come slower" (Faintheartedness,
+// Shadow of Fear, Clumsiness...) and the demake models the effect once
+// so a Necromancer's Curses and a Mesmer's Domination skills can reach
+// for the same behaviour without a new enum per skill.
 typedef enum {
     HEX_NONE = 0,
-    HEX_SHROUD_OF_DOUBT,  // attacks come slower while hexed
-    HEX_PRICE_OF_FAITH,   // attacking costs the hexed target health
+    HEX_FALTERING,  // attacks come slower, and the hex bleeds you slowly
+    HEX_BACKLASH,   // attacking costs the hexed target health
     HEX_COUNT
 } HexKind;
 
@@ -92,10 +95,6 @@ typedef struct {
     unsigned gen; // g_entityGen[idx] at the time the ref was taken
 } EntityRef;
 
-// One energy pip of regen every this many seconds at baseline. Shared
-// by the regen tick (combat.c) and the resource bars, which use the
-// regen accumulator to fill smoothly between whole-point ticks.
-#define ENERGY_REGEN_INTERVAL 3.0f
 
 // How long a melee swing animation runs. Long enough that the wind-up
 // reads as a telegraph before the blow lands (sprite.c AttackSwing),
@@ -123,8 +122,15 @@ typedef struct Entity {
     // the *penalized* values; base* hold the real stats.
     int baseMaxHp, baseMaxEnergy;
     int deathPenalty; // percent, 0-60
+    // Energy regeneration in GW1 pips. Everyone has 3 naturally; the
+    // number exists as a field because pips are what skills, stances and
+    // weapon mods actually move in GW1, not a flat "energy per second".
+    int energyRegenPips;
     float energyRegenAccum;
     float hpRegenAccum;
+    // Soul Reaping's rolling throttle: at most 3 triggers per 15s.
+    float soulReapingWindow;
+    int soulReapingTriggers;
     float timeSinceCombat; // seconds since this entity last dealt or took damage
     int adrenaline; // simplified 0-100 shared pool (GW1 tracks this per adrenaline skill)
 
@@ -232,6 +238,21 @@ int Entity_RefIndex(EntityRef ref);       // slot index while valid, else -1
 // ticks). Monster deaths award party XP and roll loot drops here, so
 // every damage source shares one death path.
 void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker);
+
+// As above, but ignoring `armorPenetration` (0..1) of the target's
+// armor - Strength on attack skills, and anything else that penetrates.
+void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorPenetration);
+
+// Seconds between whole points of energy, from this entity's pip count.
+// GW1's clock exactly: one pip is 1 energy per 3 seconds and everyone
+// has 3 pips, so the baseline is 1 energy per second.
+float Entity_EnergyRegenInterval(const Entity *e);
+
+// Recomputes what GW1 derives from level and attributes - maximum health
+// from level, maximum energy from Energy Storage - then reapplies the
+// death penalty. Call after changing either. Only meaningful for
+// characters; monsters carry hand-authored stat blocks.
+void Entity_RecomputeAttributeStats(Entity *e);
 
 // Resets the out-of-combat regen timer. Called whenever an entity deals
 // or takes damage, matching GW1's "recent combat activity blocks fast

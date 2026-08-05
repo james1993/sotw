@@ -124,7 +124,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         // Thin energy strip under each member's health, like GW1's party
         // window gives heroes.
         int enY = barY + barH + 2;
-        float smoothEn = (float)e->energy + e->energyRegenAccum / ENERGY_REGEN_INTERVAL;
+        float smoothEn = (float)e->energy + e->energyRegenAccum / Entity_EnergyRegenInterval(e);
         float enPct = (e->maxEnergy > 0) ? smoothEn / (float)e->maxEnergy : 0.0f;
         if (enPct > 1.0f) enPct = 1.0f;
         UI_ThemeBar((Rectangle){ (float)(x + pad), (float)enY, (float)barW, (float)energyH },

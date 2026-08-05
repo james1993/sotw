@@ -46,6 +46,12 @@ int Skillbook_TrainerGoldCost(void);
 bool Skillbook_CanBuy(int skillId, Profession primary, Profession secondary);
 bool Skillbook_Buy(int skillId, Profession primary, Profession secondary);
 
+// A skill this character could use and doesn't already know, preferring
+// their PRIMARY profession's lines. Quests promise "a skill" rather than
+// a named one, because a fixed reward is dead loot to four of the six
+// professions. Returns -1 when there's nothing left worth giving.
+int Skillbook_PickReward(Profession primary, Profession secondary);
+
 // Save/restore support: the unlock set as a compact "0110..." string
 // indexed by SkillId.
 void Skillbook_WriteMask(char *out, int outSize);

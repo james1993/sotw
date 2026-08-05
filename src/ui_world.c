@@ -26,6 +26,7 @@ static const char *NpcRoleLabel(NpcRole role) {
         case NPC_HENCHMAN:    return "Henchman";
         case NPC_CRAFTER:     return "Armorer";
         case NPC_SKILL_TRAINER: return "Skill Trainer";
+        case NPC_PROFESSION_CHANGER: return "Profession";
         default:              return NULL;
     }
 }

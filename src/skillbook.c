@@ -65,6 +65,22 @@ bool Skillbook_Buy(int skillId, Profession primary, Profession secondary) {
     return true;
 }
 
+int Skillbook_PickReward(Profession primary, Profession secondary) {
+    // Two passes: anything on the primary's own attribute lines first,
+    // then the secondary's. A quest reward should push the character
+    // further into what they chose to be before it broadens them.
+    for (int pass = 0; pass < 2; pass++) {
+        Profession want = (pass == 0) ? primary : secondary;
+        for (int i = 0; i < g_skillCount; i++) {
+            if (g_unlocked[i] || g_skillDB[i].isElite) continue;
+            if (!Skillbook_IsUsableBy(i, primary, secondary)) continue;
+            if (g_attributeProfession[g_skillDB[i].attribute] != want) continue;
+            return i;
+        }
+    }
+    return -1;
+}
+
 void Skillbook_WriteMask(char *out, int outSize) {
     if (!out || outSize <= 0) return;
     int n = g_skillCount;

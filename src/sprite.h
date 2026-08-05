@@ -17,7 +17,8 @@ typedef enum {
     WPNVIS_SWORD,
     WPNVIS_HAMMER,
     WPNVIS_STAFF,
-    WPNVIS_ROD
+    WPNVIS_ROD,
+    WPNVIS_BOW
 } WeaponVisual;
 
 WeaponVisual Sprite_WeaponVisualOf(const Item *item);

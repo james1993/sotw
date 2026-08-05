@@ -9,6 +9,7 @@
 #include "world.h"
 #include "skill.h"
 #include "skillbook.h"
+#include "character.h"
 #include "ui_font.h"
 #include "ui_theme.h"
 #include "ui_hints.h"
@@ -27,9 +28,31 @@ static int g_dialogNpc = -1;   // entity index, -1 = closed
 static bool g_shopOpen = false;
 static bool g_craftOpen = false;
 static bool g_trainerOpen = false;
+static bool g_professionOpen = false;
 
 static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
-                 g_craftRect, g_skillsRect, g_trainerRect;
+                 g_craftRect, g_skillsRect, g_trainerRect, g_professionRect;
+
+// --- Prophecies pacing for the second profession ---------------------
+//
+// GW1 does two separate things here, a campaign apart, and the gap
+// between them IS the design: you are handed a secondary early, once
+// you've played the primary enough to have an opinion, and you cannot
+// re-choose it until much later. A build you can rewrite on a whim
+// isn't a build, it's a menu.
+//
+// Granted after Ashford's first quest; re-chooseable only out at Piken
+// Watch, and only once you're level 10.
+#define SECONDARY_QUEST "Charr at the Gate"
+#define SECONDARY_CHANGE_LEVEL 10
+
+static bool SecondaryGrantAllowed(void) {
+    return Quests_IsDoneByName(SECONDARY_QUEST);
+}
+
+static bool SecondaryChangeAllowed(const Entity *player) {
+    return player->level >= SECONDARY_CHANGE_LEVEL;
+}
 
 // Which bar slot the skills panel is editing, -1 = none. Click a slot to
 // arm it, then click a known skill to drop it in - two clicks, works
@@ -52,12 +75,37 @@ static const ShopEntry g_shopStock[] = {
 // The Armorer's recipes: gold + Charr Hides in, armor out - GW1's
 // craft-only armor economy. No armor ever drops or sits in a shop.
 typedef struct { Item item; int gold; int hides; } CraftEntry;
-static const CraftEntry g_craftList[] = {
-    { { ITEM_ARMOR, "Monk Raiment (AL 45)", 0, 0, 0, 0, 45, 1, false }, 100, 3 },
-    { { ITEM_ARMOR, "Monk Raiment (AL 60)", 0, 0, 0, 0, 60, 1, false }, 250, 6 },
-};
-#define CRAFT_LIST_COUNT (int)(sizeof(g_craftList) / sizeof(g_craftList[0]))
+#define CRAFT_LIST_COUNT 2
 #define CRAFT_MATERIAL "Charr Hide"
+
+// GW1 armor is per-profession, and the ceiling differs: a Warrior tops
+// out at AL 80, a Ranger at 70, every caster at 60. The armorer stocks
+// two tiers above whatever that profession started in, so the gap
+// between a front-liner and a caster stays the gap GW1 designed.
+static int ArmorBaseFor(Profession p) {
+    switch (p) {
+        case PROF_WARRIOR: return 40;
+        case PROF_RANGER:  return 35;
+        default:           return 30;
+    }
+}
+
+static void BuildCraftList(Profession p, CraftEntry out[CRAFT_LIST_COUNT]) {
+    static const int gold[CRAFT_LIST_COUNT]  = { 100, 250 };
+    static const int hides[CRAFT_LIST_COUNT] = { 3, 6 };
+    int base = ArmorBaseFor(p);
+    for (int i = 0; i < CRAFT_LIST_COUNT; i++) {
+        int al = base + 15 * (i + 1);
+        memset(&out[i], 0, sizeof(out[i]));
+        out[i].item.kind = ITEM_ARMOR;
+        out[i].item.armor = al;
+        out[i].item.count = 1;
+        snprintf(out[i].item.name, sizeof(out[i].item.name), "%s Armour (AL %d)",
+                 Character_ProfessionName(p), al);
+        out[i].gold = gold[i];
+        out[i].hides = hides[i];
+    }
+}
 
 // GW1's kit flow: click a kit to arm it, then click the item to use it
 // on. -1 = no kit armed. Cleared when panels close or the kit is spent.
@@ -84,6 +132,7 @@ void UI_CloseNpcDialog(void) {
     g_shopOpen = false;
     g_craftOpen = false;
     g_trainerOpen = false;
+    g_professionOpen = false;
 }
 
 bool UI_IsInventoryOpen(void) { return g_invOpen; }
@@ -574,11 +623,16 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
         if (click && canUp && CheckCollisionPointRec(mouse, plus)) {
             player->attributeRank[a]++;
             player->attributePoints -= upCost;
+            // Energy Storage IS maximum energy, so the pool has to move
+            // the instant the rank does - that's the feedback that makes
+            // the primary attribute legible.
+            Entity_RecomputeAttributeStats(player);
         }
         if (click && canDown && CheckCollisionPointRec(mouse, minus)) {
             int refund = g_attrCumulativeCost[rank] - g_attrCumulativeCost[rank - 1];
             player->attributeRank[a]--;
             player->attributePoints += refund;
+            Entity_RecomputeAttributeStats(player);
         }
         y += rowH;
     }
@@ -588,15 +642,16 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
 // especially has to be named up front: it's the reward that changes what
 // your character can do, and a player deciding whether a quest is worth
 // the trip needs to see it before they commit, not after.
-static void QuestRewardSummary(const Quest *q, char *out, int outSize) {
+static void QuestRewardSummary(const Quest *q, const Entity *player, char *out, int outSize) {
     int n = snprintf(out, outSize, "%d XP, %dg", q->rewardXP, q->rewardGold);
     if (n < 0 || n >= outSize) return;
     if (q->rewardItem) {
         n += snprintf(out + n, outSize - n, ", %.31s", q->rewardItem->name);
         if (n < 0 || n >= outSize) return;
     }
-    if (q->rewardSkill >= 0 && q->rewardSkill < g_skillCount) {
-        snprintf(out + n, outSize - n, ", %.31s", g_skillDB[q->rewardSkill].name);
+    int taught = Quests_ResolveRewardSkill(q, player);
+    if (taught >= 0 && taught < g_skillCount) {
+        snprintf(out + n, outSize - n, ", %.31s", g_skillDB[taught].name);
     }
 }
 
@@ -829,7 +884,10 @@ static void DrawEquipment(Entity *player, int screenHeight) {
 
 // The Armorer's crafting window: recipes take gold AND Charr Hides,
 // GW1's armor-is-crafted-only economy.
-static void DrawCraft(int screenWidth, int screenHeight) {
+static void DrawCraft(Entity *player, int screenWidth, int screenHeight) {
+    CraftEntry craftList[CRAFT_LIST_COUNT];
+    BuildCraftList(player->primaryProfession, craftList);
+
     float scale = UI_Scale(screenHeight);
     int rowH = (int)(30 * scale);
     int font = (int)(12 * scale);
@@ -856,7 +914,7 @@ static void DrawCraft(int screenWidth, int screenHeight) {
     Vector2 mouse = UI_PointerPos();
 
     for (int i = 0; i < CRAFT_LIST_COUNT; i++) {
-        const CraftEntry *entry = &g_craftList[i];
+        const CraftEntry *entry = &craftList[i];
         Rectangle row = { g_craftRect.x + 4, (float)y - 2, g_craftRect.width - 8, (float)rowH };
         bool canCraft = g_gold >= entry->gold &&
                         Items_CountMaterial(CRAFT_MATERIAL) >= entry->hides &&
@@ -883,6 +941,107 @@ static void DrawCraft(int screenWidth, int screenHeight) {
            x, y, (int)(10 * scale), GRAY);
 }
 
+// Picking a second profession. Every profession but your primary is
+// offered; taking one opens its non-primary attribute lines and its
+// half of the trainer's stock.
+static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int rowH = (int)(34 * scale);
+    int w = (int)(440 * scale);
+    int rows = PROF_COUNT - 1;
+    int h = pad * 3 + font + small + (int)(6 * scale) + rows * rowH + pad;
+
+    g_professionRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale),
+                                    (float)w, (float)h };
+    UIHit_Claim(g_professionRect);
+    UI_ThemePanel(g_professionRect, scale, pad + font + pad / 2);
+
+    if (PanelHeader(g_professionRect, "Second Profession", NULL, NULL, font, pad, scale)) {
+        g_professionOpen = false;
+        return;
+    }
+
+    int x = (int)g_professionRect.x + pad;
+    int y = (int)g_professionRect.y + pad + font + pad;
+
+    UIText("Your primary never changes. This is the other half of your build.",
+           x, y, small, (Color){ 150, 146, 134, 255 });
+    y += small + (int)(6 * scale);
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    for (int p = 0; p < PROF_COUNT; p++) {
+        if (p == (int)player->primaryProfession) continue;
+        bool current = (g_character.secondary == p);
+
+        Rectangle row = { g_professionRect.x + 4, (float)y - 2,
+                          g_professionRect.width - 8, (float)rowH };
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        if (hovered && !current) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+
+        char label[96];
+        snprintf(label, sizeof(label), "%s / %s", Character_ProfessionAbbrev(player->primaryProfession),
+                 Character_ProfessionAbbrev(p));
+        UIText(label, x, y, font, current ? UI_GOLD : RAYWHITE);
+        UIText(Character_ProfessionName(p), x + (int)(64 * scale), y, font,
+               current ? UI_GOLD : RAYWHITE);
+        UIText(Character_ProfessionBlurb(p), x + (int)(64 * scale), y + font + 2, small,
+               (Color){ 150, 146, 134, 255 });
+
+        if (current) {
+            const char *tag = "current";
+            int tw = UITextWidth(tag, small);
+            UIText(tag, (int)(g_professionRect.x + g_professionRect.width) - pad - tw,
+                   y + (font - small) / 2, small, UI_GOLD);
+        }
+
+        if (hovered && click && !current) {
+            // Points sunk into the OLD secondary's lines come back.
+            // GW1 refunds them, and it has to: otherwise changing costs
+            // you a chunk of your character with no way to earn it back.
+            int refunded = 0;
+            for (int a = 0; a < ATTR_COUNT; a++) {
+                if (player->attributeRank[a] <= 0) continue;
+                if (Attribute_Accessible((AttributeKind)a, player->primaryProfession,
+                                         (Profession)p)) continue;
+                refunded += g_attrCumulativeCost[player->attributeRank[a]];
+                player->attributeRank[a] = 0;
+            }
+            player->attributePoints += refunded;
+
+            g_character.secondary = p;
+            player->secondaryProfession = (Profession)p;
+            Character_FormatTitle(&g_character, player->name, sizeof(player->name));
+            Entity_RecomputeAttributeStats(player);
+
+            // A skill on the bar you can no longer use has to come off,
+            // or you'd keep casting something you don't have access to.
+            for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+                int id = player->skillBar[i];
+                if (id >= 0 && !Skillbook_IsUsableBy(id, player->primaryProfession,
+                                                     player->secondaryProfession)) {
+                    player->skillBar[i] = -1;
+                }
+            }
+
+            char msg[96];
+            snprintf(msg, sizeof(msg), "You are now a %.20s / %.20s",
+                     Character_ProfessionName(player->primaryProfession),
+                     Character_ProfessionName(p));
+            UI_Notify(msg);
+            if (refunded > 0) UI_Notify("Attribute points refunded.");
+            Save_Write();
+            g_professionOpen = false;
+            return;
+        }
+        y += rowH;
+    }
+}
+
 static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     Entity *npc = Entity_Get(g_dialogNpc);
     if (!npc || npc->kind != ENT_NPC) { g_dialogNpc = -1; g_shopOpen = false; return; }
@@ -890,8 +1049,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     // Walking away closes the conversation, like GW1.
     float dx = npc->pos.x - player->pos.x, dy = npc->pos.y - player->pos.y;
     if (sqrtf(dx * dx + dy * dy) > DIALOG_WALKAWAY_DISTANCE) {
-        g_dialogNpc = -1;
-        g_shopOpen = false;
+        UI_CloseNpcDialog();
         return;
     }
 
@@ -926,7 +1084,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 UIText(bagFull ? "Your bags are full - make room for your reward."
                                : "You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
                 char rewards[96];
-                QuestRewardSummary(q, rewards, sizeof(rewards));
+                QuestRewardSummary(q, player, rewards, sizeof(rewards));
                 char label[224];
                 snprintf(label, sizeof(label), "Turn in: %.63s (%.95s)", q->name, rewards);
                 if (DialogButton(btn, label, font, !bagFull)) {
@@ -936,7 +1094,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 Quest *q = &g_quests[offer];
                 UIText(q->offerText, x, y, font, LIGHTGRAY);
                 char rewards[96];
-                QuestRewardSummary(q, rewards, sizeof(rewards));
+                QuestRewardSummary(q, player, rewards, sizeof(rewards));
                 char label[224];
                 snprintf(label, sizeof(label), "Accept: %.63s (%.95s)", q->name, rewards);
                 if (DialogButton(btn, label, font, true)) {
@@ -972,6 +1130,40 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                    x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_trainerOpen ? "Close training" : "Learn skills", font, true)) {
                 g_trainerOpen = !g_trainerOpen;
+            }
+            break;
+        }
+        case NPC_PROFESSION_CHANGER: {
+            bool hasSecondary = (g_character.secondary != PROF_NONE);
+            // Two different gates depending on which half of the pacing
+            // this NPC is. Whichever one you don't meet is said out
+            // loud, with the requirement named - an NPC that just
+            // refuses teaches the player nothing.
+            if (!hasSecondary) {
+                if (SecondaryGrantAllowed()) {
+                    UIText("You've bled for Ascalon. Choose a second calling.",
+                           x, y, font, LIGHTGRAY);
+                    if (DialogButton(btn, "Choose a second profession", font, true)) {
+                        g_professionOpen = !g_professionOpen;
+                    }
+                } else {
+                    UIText("Prove yourself first. Osric has work - finish it.",
+                           x, y, font, LIGHTGRAY);
+                    DialogButton(btn, "Requires: " SECONDARY_QUEST, font, false);
+                }
+            } else if (SecondaryChangeAllowed(player)) {
+                UIText("Second thoughts? I can unmake the choice.", x, y, font, LIGHTGRAY);
+                if (DialogButton(btn, g_professionOpen ? "Never mind" : "Change my second profession",
+                                 font, true)) {
+                    g_professionOpen = !g_professionOpen;
+                }
+            } else {
+                char why[96];
+                snprintf(why, sizeof(why), "Requires: level %d (you are %d)",
+                         SECONDARY_CHANGE_LEVEL, player->level);
+                UIText("A calling isn't a coat. Live with it a while longer.",
+                       x, y, font, LIGHTGRAY);
+                DialogButton(btn, why, font, false);
             }
             break;
         }
@@ -1014,8 +1206,9 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (g_skillsOpen) DrawSkillsPanel(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
-    if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(screenWidth, screenHeight);
+    if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(player, screenWidth, screenHeight);
     if (g_trainerOpen && g_dialogNpc >= 0) DrawTrainer(player, screenWidth, screenHeight);
+    if (g_professionOpen && g_dialogNpc >= 0) DrawProfessionPanel(player, screenWidth, screenHeight);
 
     // The open-frame guard only needs to cover the frame the dialog
     // appeared; from the next frame on the pad button confirms.

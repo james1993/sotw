@@ -15,6 +15,10 @@
 #define PORTAL_TRIGGER_RADIUS 40.0f
 #define PORTAL_COOLDOWN 1.5f
 
+// What a level-5 character has banked. GW1 hands out attribute points
+// on a curve reaching 200 at level 20; this is that curve's value here.
+#define STARTING_ATTRIBUTE_POINTS 20
+
 // ---------------------------------------------------------------------
 // Zone content data. A zone is a ZoneDef: name, mode, colors, portals,
 // shrine, decorative props, and a spawn table. Adding a zone = adding
@@ -95,6 +99,10 @@ static const SpawnDef g_campSpawns[] = {
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Master Ilsa", .pos = { 230, 120 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
+    // Prophecies pacing: the second profession is granted here, in the
+    // starting camp, but only after the first quest is behind you.
+    { .kind = SPAWN_NPC, .name = "Sebedoh the Mesmer", .pos = { -350, -80 },
+      .npcRole = NPC_PROFESSION_CHANGER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 // --- Ashford Plains: three static camps spaced beyond each other's
@@ -285,6 +293,11 @@ static const SpawnDef g_pikenSpawns[] = {
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Adept Kerra", .pos = { 210, 90 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
+    // ...and CHANGING it happens out here on the frontier, much later.
+    // GW1 puts a whole campaign between the two, which is the point:
+    // you live with the build you chose long enough for it to matter.
+    { .kind = SPAWN_NPC, .name = "Nicholas the Restless", .pos = { -230, 120 },
+      .npcRole = NPC_PROFESSION_CHANGER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
@@ -446,14 +459,16 @@ static void SpawnVekk(Vector2 pos) {
     hero->primaryProfession = PROF_ELEMENTALIST;
     hero->secondaryProfession = PROF_MONK;
     hero->level = 5;
-    hero->baseMaxHp = 100 + 20 * (hero->level - 1);
-    hero->baseMaxEnergy = 50;
-    Entity_RecomputePenalizedStats(hero);
+    hero->attackRange = 220.0f; // caster keeps distance
+    hero->armor = 30;           // Ascalon-tier robes
+    hero->attributeRank[ATTR_FIRE_MAGIC] = 4;
+    // His pool is 29, not 50: 20 base plus 3 per rank of Energy Storage.
+    // Being an Elementalist doesn't hand out energy, spending points on
+    // the primary attribute does.
+    hero->attributeRank[ATTR_ENERGY_STORAGE] = 3;
+    Entity_RecomputeAttributeStats(hero);
     hero->hp = hero->maxHp;
     hero->energy = hero->maxEnergy;
-    hero->attackRange = 220.0f; // caster keeps distance
-    hero->attributeRank[ATTR_FIRE_MAGIC] = 4;
-    hero->attributeRank[ATTR_ENERGY_STORAGE] = 3;
     hero->skillBar[0] = SK_FIRE_BOLT;
     hero->skillBar[1] = SK_CINDER_STORM;
     hero->skillBar[2] = SK_MIND_SEAR; // energy management
@@ -468,14 +483,12 @@ void World_SetupThomStats(Entity *thom) {
     thom->primaryProfession = PROF_WARRIOR;
     thom->secondaryProfession = PROF_MONK;
     thom->level = 5;
-    thom->baseMaxHp = 100 + 20 * (thom->level - 1);
-    thom->baseMaxEnergy = 20;
-    Entity_RecomputePenalizedStats(thom);
+    thom->attributeRank[ATTR_SWORDSMANSHIP] = 4;
+    thom->attributeRank[ATTR_STRENGTH] = 3;
+    Entity_RecomputeAttributeStats(thom);
     thom->hp = thom->maxHp;
     thom->energy = thom->maxEnergy;
-    thom->armor = 80; // warriors wear heavy armor
-    thom->attributeRank[ATTR_STRENGTH] = 4;
-    thom->attributeRank[ATTR_TACTICS] = 3;
+    thom->armor = 40; // Ascalon-tier Warrior harness, same as the player's
     thom->skillBar[0] = SK_GASH;
     thom->skillBar[1] = SK_RUSH_STRIKE;
     thom->skillBar[2] = SK_BATTLE_CRY;
@@ -500,7 +513,7 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->armor = def->armor;
     m->aggroRange = def->aggro;
     m->leashRange = def->aggro * 2.5f;
-    m->attributeRank[ATTR_STRENGTH] = def->strengthRank;
+    m->attributeRank[ATTR_MONSTROUS] = def->strengthRank;
     m->groupId = def->group;
     m->species = def->species;
     m->isBoss = def->boss;
@@ -656,57 +669,92 @@ void World_Init(void) {
     player->hairColor = g_character.hairColor;
     player->hairStyle = g_character.hairStyle;
     player->level = 5;
-    player->baseMaxHp = 100 + 20 * (player->level - 1); // GW1: +20 HP per level
 
     // Per-profession starting kit. The choice has to change how the
     // character actually plays from the first fight, not just which
-    // word appears on the nameplate: a Warrior soaks hits and has
-    // almost no energy, an Elementalist is the reverse, a Monk sits
-    // between them and heals.
+    // word appears on the nameplate.
     //
-    // Armour is NOT set here - it comes from the armour piece each
-    // profession is issued below, because Items_EquipArmor is the one
-    // place that owns player->armor. A Warrior is tougher because the
-    // harness is AL 40, not because of a number written twice.
+    // Two things deliberately are NOT set per profession, because GW1
+    // doesn't set them per profession either:
+    //
+    //   Energy. Everyone gets the same 20. An Elementalist's famously
+    //   deep pool comes entirely from Energy Storage ranks, which is
+    //   why it's their PRIMARY attribute and why a secondary Ele never
+    //   gets it. Entity_RecomputeAttributeStats derives it below.
+    //
+    //   Armour. It comes from the armour piece each profession is
+    //   issued, because Items_EquipArmor is the one place that owns
+    //   player->armor. A Warrior is tougher because the harness is
+    //   AL 40, not because of a number written twice.
     Skillbook_Reset();
     for (int i = 0; i < SKILL_BAR_SIZE; i++) player->skillBar[i] = -1;
 
     Item startWeapon, startArmor;
     switch (g_character.primary) {
         case PROF_WARRIOR:
-            player->baseMaxEnergy = 20;
-            player->attributeRank[ATTR_STRENGTH] = 4;
-            player->attributeRank[ATTR_TACTICS] = 3;
+            player->attributeRank[ATTR_SWORDSMANSHIP] = 4;
+            player->attributeRank[ATTR_STRENGTH] = 3;
             player->skillBar[0] = SK_GASH;
             startWeapon = (Item){ ITEM_WEAPON, "Ascalon Sword", 13, 20, 28.0f, 1.33f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Warrior Harness (AL 40)", 0, 0, 0, 0, 40, 1, false };
             break;
+        case PROF_RANGER:
+            player->attributeRank[ATTR_MARKSMANSHIP] = 4;
+            player->attributeRank[ATTR_EXPERTISE] = 3;
+            player->skillBar[0] = SK_POWER_SHOT;
+            // A bow: long reach, slow swing, and the only starting
+            // weapon that lets you open a fight before it reaches you.
+            startWeapon = (Item){ ITEM_WEAPON, "Ascalon Longbow", 12, 21, 240.0f, 2.0f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Ranger Leathers (AL 35)", 0, 0, 0, 0, 35, 1, false };
+            break;
+        case PROF_MONK:
+            player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
+            player->attributeRank[ATTR_DIVINE_FAVOR] = 3;
+            player->skillBar[0] = SK_ORISON_OF_HEALING;
+            startWeapon = (Item){ ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            break;
+        case PROF_NECROMANCER:
+            player->attributeRank[ATTR_BLOOD_MAGIC] = 4;
+            player->attributeRank[ATTR_SOUL_REAPING] = 3;
+            player->skillBar[0] = SK_VAMPIRIC_GAZE;
+            startWeapon = (Item){ ITEM_WEAPON, "Bone Idol", 10, 20, 220.0f, 1.75f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Necromancer Vestments (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            break;
+        case PROF_MESMER:
+            player->attributeRank[ATTR_DOMINATION_MAGIC] = 4;
+            player->attributeRank[ATTR_FAST_CASTING] = 3;
+            player->skillBar[0] = SK_ETHER_FEAST;
+            startWeapon = (Item){ ITEM_WEAPON, "Jeweled Wand", 10, 20, 220.0f, 1.75f, 0, 1, false };
+            startArmor  = (Item){ ITEM_ARMOR, "Mesmer Attire (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            break;
         case PROF_ELEMENTALIST:
-            player->baseMaxEnergy = 50;
+        default:
             player->attributeRank[ATTR_FIRE_MAGIC] = 4;
             player->attributeRank[ATTR_ENERGY_STORAGE] = 3;
             player->skillBar[0] = SK_FIRE_BOLT;
             startWeapon = (Item){ ITEM_WEAPON, "Kindling Staff", 11, 22, 220.0f, 1.75f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Elementalist Robes (AL 30)", 0, 0, 0, 0, 30, 1, false };
             break;
-        case PROF_MONK:
-        default:
-            player->baseMaxEnergy = 30;
-            player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
-            player->attributeRank[ATTR_SMITING_PRAYERS] = 3;
-            player->attributeRank[ATTR_DIVINE_FAVOR] = 1;
-            player->skillBar[0] = SK_ORISON_OF_HEALING;
-            startWeapon = (Item){ ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
-            break;
     }
 
-    Entity_RecomputePenalizedStats(player);
+    // Level -> health, Energy Storage -> energy. GW1 derives both; so
+    // does this, in one place, so no kit can quietly disagree.
+    Entity_RecomputeAttributeStats(player);
     player->hp = player->maxHp;
     player->energy = player->maxEnergy;
-    // Level 5 grants 20 attribute points; the ranks above spend most of
-    // them, leaving a few free for the attributes panel (K).
-    player->attributePoints = 3;
+    // A level-5 character has 20 attribute points. Whatever the kit
+    // above already spent is deducted at the real GW1 rate rather than
+    // guessed at, so every profession is left with the same freedom to
+    // retune in the attributes panel (K).
+    {
+        int spent = 0;
+        for (int a = 0; a < ATTR_COUNT; a++) {
+            spent += g_attrCumulativeCost[player->attributeRank[a]];
+        }
+        player->attributePoints = STARTING_ATTRIBUTE_POINTS - spent;
+        if (player->attributePoints < 0) player->attributePoints = 0;
+    }
 
     // A new character knows exactly one skill - their profession's
     // signature. The other seven slots are empty on purpose: filling

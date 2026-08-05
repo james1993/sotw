@@ -28,17 +28,25 @@ const Color g_hairColors[HAIR_COLOR_COUNT] = {
 const char *Character_ProfessionName(int profession) {
     switch (profession) {
         case PROF_WARRIOR:       return "Warrior";
-        case PROF_ELEMENTALIST:  return "Elementalist";
+        case PROF_RANGER:        return "Ranger";
         case PROF_MONK:          return "Monk";
+        case PROF_NECROMANCER:   return "Necromancer";
+        case PROF_MESMER:        return "Mesmer";
+        case PROF_ELEMENTALIST:  return "Elementalist";
         default:                 return "None";
     }
 }
 
+// GW1's own two-letter codes, which is what every nameplate and every
+// build ever written uses ("Me/E", not "Mesmer/Elementalist").
 const char *Character_ProfessionAbbrev(int profession) {
     switch (profession) {
         case PROF_WARRIOR:       return "W";
-        case PROF_ELEMENTALIST:  return "E";
+        case PROF_RANGER:        return "R";
         case PROF_MONK:          return "Mo";
+        case PROF_NECROMANCER:   return "N";
+        case PROF_MESMER:        return "Me";
+        case PROF_ELEMENTALIST:  return "E";
         default:                 return "";
     }
 }
@@ -47,12 +55,32 @@ const char *Character_ProfessionBlurb(int profession) {
     switch (profession) {
         case PROF_WARRIOR:
             return "Heavy armour and adrenaline. Stands in front and stays there.";
-        case PROF_ELEMENTALIST:
-            return "A deep energy pool and ranged fire. Fragile, and hits hardest.";
+        case PROF_RANGER:
+            return "Bow range, cheap attack skills, and the best armour of any caster.";
         case PROF_MONK:
             return "Keeps the party standing, and punishes with smiting prayers.";
+        case PROF_NECROMANCER:
+            return "Trades health for power, and refuels off everything that dies.";
+        case PROF_MESMER:
+            return "Casts faster than anyone and turns a foe's own skills against them.";
+        case PROF_ELEMENTALIST:
+            return "The deepest energy pool in the game, spent on ranged devastation.";
         default:
             return "";
+    }
+}
+
+// The colour of a profession's starting armour. Shared by the creator's
+// preview and World_Init so the figure you picked is the figure you get.
+Color Character_ProfessionColor(int profession) {
+    switch (profession) {
+        case PROF_WARRIOR:      return (Color){ 170,  96,  72, 255 }; // rust plate
+        case PROF_RANGER:       return (Color){  96, 134,  78, 255 }; // forest leather
+        case PROF_MONK:         return (Color){ 205, 190, 150, 255 }; // undyed linen
+        case PROF_NECROMANCER:  return (Color){  86,  74, 104, 255 }; // bruised violet
+        case PROF_MESMER:       return (Color){ 168,  92, 148, 255 }; // court silk
+        case PROF_ELEMENTALIST: return (Color){  80, 120, 200, 255 }; // storm blue
+        default:                return (Color){ 160, 160, 160, 255 };
     }
 }
 

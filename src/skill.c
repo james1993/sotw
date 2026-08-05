@@ -56,6 +56,14 @@ static void AddStep(Skill *s, EffectKind kind, float base, float perRank, int co
     step->perAttributeRank = perRank;
     step->conditionKind = cond;
     step->duration = duration;
+    step->selfTarget = false;
+}
+
+// Same, but the step lands on the caster instead of the skill's target -
+// the "and you gain..." half of a life-steal or energy-steal.
+static void AddSelfStep(Skill *s, EffectKind kind, float base, float perRank) {
+    AddStep(s, kind, base, perRank, 0, 0);
+    if (s->stepCount > 0) s->steps[s->stepCount - 1].selfTarget = true;
 }
 
 // Registration order below must match the SkillId enum in skill.h.
@@ -64,13 +72,13 @@ void SkillDB_Init(void) {
     Skill s;
 
     // --- Warrior-like ("Brute") skills: adrenaline, melee, no cast time ---
-    s = MakeSkill("Gash", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Gash", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
                   0, 25, 0.0f, 4.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 8, 1.5f, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 8.0f);
     RegisterAs(SK_GASH, s);
 
-    s = MakeSkill("Rush Strike", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Rush Strike", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
                   0, 25, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 12, 2.0f, 0, 0);
     RegisterAs(SK_RUSH_STRIKE, s);
@@ -80,7 +88,7 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_ADRENALINE_DELTA, 15, 0, 0, 0);
     RegisterAs(SK_BATTLE_CRY, s);
 
-    s = MakeSkill("Deathblow", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Deathblow", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
                   0, 40, 0.0f, 10.0f, 28.0f, true, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 20, 3.0f, 0, 0);
     AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
@@ -109,7 +117,7 @@ void SkillDB_Init(void) {
     RegisterAs(SK_METEOR, s);
 
     // --- Monster skills ---
-    s = MakeSkill("Claw Swipe", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Claw Swipe", SKILLTYPE_ATTACK_SKILL, ATTR_MONSTROUS,
                   0, 25, 0.0f, 3.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 10, 0, 0, 0);
     RegisterAs(SK_CLAW_SWIPE, s);
@@ -117,7 +125,7 @@ void SkillDB_Init(void) {
     // --- Interrupt: demonstrates cast time actually meaning something -
     // this only has a target to punish because Fire Bolt/Cinder Storm/
     // Feral Howl all have real cast times a player can watch and react to.
-    s = MakeSkill("Distracting Blow", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Distracting Blow", SKILLTYPE_ATTACK_SKILL, ATTR_TACTICS,
                   0, 25, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 5, 1.0f, 0, 0);
     AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
@@ -126,7 +134,7 @@ void SkillDB_Init(void) {
     // Gives the monster a cast-time skill worth interrupting - without
     // this its only skill (Claw Swipe) is instant and has nothing an
     // interrupt could punish.
-    s = MakeSkill("Feral Howl", SKILLTYPE_SPELL, ATTR_STRENGTH,
+    s = MakeSkill("Feral Howl", SKILLTYPE_SPELL, ATTR_MONSTROUS,
                   5, 0, 1.5f, 10.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_HEAL, 30, 0, 0, 0);
     RegisterAs(SK_FERAL_HOWL, s);
@@ -175,12 +183,12 @@ void SkillDB_Init(void) {
     // condition wears you down, a hex makes your own actions expensive.
     s = MakeSkill("Shroud of Doubt", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
                   10, 0, 1.5f, 20.0f, 220.0f, false, TARGET_SINGLE_FOE);
-    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_SHROUD_OF_DOUBT, 10.0f);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_FALTERING, 10.0f);
     RegisterAs(SK_SHROUD_OF_DOUBT, s);
 
     s = MakeSkill("Price of Faith", SKILLTYPE_SPELL, ATTR_SMITING_PRAYERS,
                   15, 0, 2.0f, 25.0f, 220.0f, false, TARGET_SINGLE_FOE);
-    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_PRICE_OF_FAITH, 12.0f);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_BACKLASH, 12.0f);
     RegisterAs(SK_PRICE_OF_FAITH, s);
 
     // --- Cleanses ---
@@ -200,7 +208,7 @@ void SkillDB_Init(void) {
     // --- Monster skills that make cleanses worth a bar slot ---
     // Without something applying afflictions to the party, removal is
     // dead weight; these are what put Crippled and the hexes on YOU.
-    s = MakeSkill("Rending Claws", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Rending Claws", SKILLTYPE_ATTACK_SKILL, ATTR_MONSTROUS,
                   0, 20, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 8, 0, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 10.0f);
@@ -209,9 +217,73 @@ void SkillDB_Init(void) {
 
     // The Devourer's pincers: Crippled is their whole threat, because a
     // halved walk speed is what stops you strolling out of the gully.
-    s = MakeSkill("Hobbling Strike", SKILLTYPE_ATTACK_SKILL, ATTR_STRENGTH,
+    s = MakeSkill("Hobbling Strike", SKILLTYPE_ATTACK_SKILL, ATTR_MONSTROUS,
                   0, 20, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 6, 0, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_CRIPPLED, 8.0f);
     RegisterAs(SK_HOBBLING_STRIKE, s);
+
+    // --- Ranger ------------------------------------------------------
+    // Attack skills at bow range, and priced in ENERGY rather than
+    // adrenaline - that's the whole reason Expertise exists as a primary
+    // attribute, and a Ranger bar that cost nothing would make it inert.
+    s = MakeSkill("Power Shot", SKILLTYPE_ATTACK_SKILL, ATTR_MARKSMANSHIP,
+                  10, 0, 0.0f, 5.0f, 240.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 10, 2.5f, 0, 0);
+    RegisterAs(SK_POWER_SHOT, s);
+
+    s = MakeSkill("Pin Down", SKILLTYPE_ATTACK_SKILL, ATTR_MARKSMANSHIP,
+                  10, 0, 0.0f, 12.0f, 240.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 6, 1.0f, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_CRIPPLED, 10.0f);
+    RegisterAs(SK_PIN_DOWN, s);
+
+    s = MakeSkill("Troll Unguent", SKILLTYPE_SPELL, ATTR_WILDERNESS_SURVIVAL,
+                  5, 0, 3.0f, 10.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_HEAL, 30, 6.0f, 0, 0);
+    RegisterAs(SK_TROLL_UNGUENT, s);
+
+    // --- Necromancer -------------------------------------------------
+    // Life stealing rather than raw damage: the two-step "take from
+    // them, give to you" shape is what a Blood Magic bar is built on.
+    s = MakeSkill("Vampiric Gaze", SKILLTYPE_SPELL, ATTR_BLOOD_MAGIC,
+                  10, 0, 1.0f, 5.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 15, 2.5f, 0, 0);
+    AddSelfStep(&s, FX_HEAL, 15, 2.5f);
+    RegisterAs(SK_VAMPIRIC_GAZE, s);
+
+    s = MakeSkill("Faintheartedness", SKILLTYPE_SPELL, ATTR_CURSES,
+                  10, 0, 1.0f, 12.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_FALTERING, 12.0f);
+    RegisterAs(SK_FAINTHEARTEDNESS, s);
+
+    s = MakeSkill("Barbed Signet", SKILLTYPE_SIGNET, ATTR_CURSES,
+                  0, 0, 2.0f, 12.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 12, 1.5f, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 15.0f);
+    RegisterAs(SK_BARBED_SIGNET, s);
+
+    // --- Mesmer ------------------------------------------------------
+    // Nothing here out-damages an Elementalist. What a Mesmer does is
+    // make the FOE'S turn cost them - drain their energy, punish their
+    // attacks, break their cast - and do it faster than anyone else can
+    // react, which is what Fast Casting pays for.
+    s = MakeSkill("Ether Feast", SKILLTYPE_SPELL, ATTR_INSPIRATION_MAGIC,
+                  5, 0, 1.0f, 8.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_ENERGY_DELTA, -3, -0.5f, 0, 0);
+    AddSelfStep(&s, FX_HEAL, 20, 4.0f);
+    RegisterAs(SK_ETHER_FEAST, s);
+
+    s = MakeSkill("Empathy", SKILLTYPE_SPELL, ATTR_DOMINATION_MAGIC,
+                  10, 0, 1.0f, 10.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_BACKLASH, 12.0f);
+    RegisterAs(SK_EMPATHY, s);
+
+    // The Mesmer's answer to a cast bar. Short activation on purpose:
+    // an interrupt you can't get out in time isn't an interrupt.
+    s = MakeSkill("Shatter Delusions", SKILLTYPE_SPELL, ATTR_DOMINATION_MAGIC,
+                  10, 0, 0.25f, 8.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
+    AddStep(&s, FX_DAMAGE, 12, 2.0f, 0, 0);
+    RegisterAs(SK_SHATTER_DELUSIONS, s);
 }

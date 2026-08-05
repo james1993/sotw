@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "attributes.h"
 
-#define MAX_SKILLS 32
+#define MAX_SKILLS 48
 #define MAX_STEPS_PER_SKILL 3
 
 // Stable names for every skill in the DB. SkillDB_Init registers in
@@ -34,6 +34,18 @@ typedef enum {
     SK_SMITE_HEX,
     SK_RENDING_CLAWS,
     SK_HOBBLING_STRIKE,
+    // Ranger
+    SK_POWER_SHOT,
+    SK_PIN_DOWN,
+    SK_TROLL_UNGUENT,
+    // Necromancer
+    SK_VAMPIRIC_GAZE,
+    SK_FAINTHEARTEDNESS,
+    SK_BARBED_SIGNET,
+    // Mesmer
+    SK_ETHER_FEAST,
+    SK_EMPATHY,
+    SK_SHATTER_DELUSIONS,
     SK_COUNT
 } SkillId;
 
@@ -86,6 +98,10 @@ typedef struct {
     // FX_REMOVE_*: how many effects to strip.
     int conditionKind;
     float duration;
+    // Applies to the CASTER rather than the skill's target. This is what
+    // life-stealing and energy-stealing skills are made of: one step
+    // takes from the foe, the next gives to you, in a single skill.
+    bool selfTarget;
 } EffectStep;
 
 typedef struct {

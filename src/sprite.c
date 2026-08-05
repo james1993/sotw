@@ -1,6 +1,7 @@
 #include "sprite.h"
 #include "character.h"
 #include "skill.h"
+#include "fx.h"
 #include "raylib.h"
 #include <math.h>
 #include <string.h>
@@ -12,7 +13,9 @@ WeaponVisual Sprite_WeaponVisualOf(const Item *item) {
     if (strstr(item->name, "Sword") || strstr(item->name, "Blade")) return WPNVIS_SWORD;
     if (strstr(item->name, "Hammer")) return WPNVIS_HAMMER;
     if (strstr(item->name, "Staff")) return WPNVIS_STAFF;
-    if (strstr(item->name, "Rod") || strstr(item->name, "Wand")) return WPNVIS_ROD;
+    if (strstr(item->name, "Rod") || strstr(item->name, "Wand") ||
+        strstr(item->name, "Idol")) return WPNVIS_ROD;
+    if (strstr(item->name, "Bow")) return WPNVIS_BOW;
     return WPNVIS_SWORD;
 }
 
@@ -29,8 +32,11 @@ static WeaponVisual WeaponFor(const Entity *e) {
         // Profession-appropriate gear for anyone without an inventory:
         // heroes, henchmen, and the character-creation preview.
         switch (e->primaryProfession) {
+            case PROF_RANGER:       return WPNVIS_BOW;
             case PROF_ELEMENTALIST: return WPNVIS_STAFF;
+            case PROF_NECROMANCER:  return WPNVIS_STAFF;
             case PROF_MONK:         return WPNVIS_ROD;
+            case PROF_MESMER:       return WPNVIS_ROD;
             default:                return WPNVIS_SWORD;
         }
     }
@@ -39,14 +45,9 @@ static WeaponVisual WeaponFor(const Entity *e) {
 
 // School color for cast glows, matching the FX system's language.
 static Color AttrColor(AttributeKind a) {
-    switch (a) {
-        case ATTR_FIRE_MAGIC:      return (Color){ 255, 140, 50, 255 };
-        case ATTR_ENERGY_STORAGE:  return (Color){ 150, 120, 255, 255 };
-        case ATTR_HEALING_PRAYERS: return (Color){ 120, 240, 140, 255 };
-        case ATTR_SMITING_PRAYERS: return (Color){ 255, 220, 110, 255 };
-        case ATTR_DIVINE_FAVOR:    return (Color){ 220, 240, 255, 255 };
-        default:                   return (Color){ 200, 200, 210, 255 };
-    }
+    // The cast glow reads the same school colours the FX system uses -
+    // one palette, so a Fire spell looks like Fire wherever it's drawn.
+    return Fx_AttrColor(a);
 }
 
 static Color Darken(Color c, float f) {
@@ -61,13 +62,29 @@ static Color Lighten(Color c, float f) {
     return (Color){ (unsigned char)r, (unsigned char)g, (unsigned char)b, c.a };
 }
 
+// The colour of the focus on a staff or rod. A caster's weapon should
+// look like the magic they cast, not like everyone else's - a
+// Necromancer holding a blue Elementalist orb reads as the wrong
+// profession before a single word is on screen.
+static Color FocusColor(Profession p) {
+    switch (p) {
+        case PROF_NECROMANCER:  return (Color){ 150, 220, 120, 255 }; // bone green
+        case PROF_MESMER:       return (Color){ 235, 140, 220, 255 };
+        case PROF_MONK:         return (Color){ 255, 215, 120, 255 };
+        case PROF_ELEMENTALIST:
+        default:                return (Color){ 120, 190, 255, 255 };
+    }
+}
+
 // The weapon in a hand at `hand`, pointing along `angle` (radians,
-// 0 = right). Length/shape by type; sx flips with facing.
-static void DrawWeapon(WeaponVisual w, Vector2 hand, float angle, float r) {
+// 0 = right). Length/shape by type; sx flips with facing. `focus` tints
+// the head of a staff or rod.
+static void DrawWeapon(WeaponVisual w, Vector2 hand, float angle, float r, Color focus) {
     if (w == WPNVIS_NONE) return;
     float len = (w == WPNVIS_STAFF) ? r * 2.6f
               : (w == WPNVIS_HAMMER) ? r * 1.7f
-              : (w == WPNVIS_ROD) ? r * 1.2f : r * 1.9f;
+              : (w == WPNVIS_ROD) ? r * 1.2f
+              : (w == WPNVIS_BOW) ? r * 1.6f : r * 1.9f;
     Vector2 tip = { hand.x + cosf(angle) * len, hand.y + sinf(angle) * len };
 
     switch (w) {
@@ -94,13 +111,30 @@ static void DrawWeapon(WeaponVisual w, Vector2 hand, float angle, float r) {
         case WPNVIS_STAFF: {
             Vector2 base = { hand.x - cosf(angle) * r * 0.8f, hand.y - sinf(angle) * r * 0.8f };
             DrawLineEx(base, tip, r * 0.18f, (Color){ 130, 95, 60, 255 });
-            DrawCircleV(tip, r * 0.32f, (Color){ 120, 190, 255, 255 });
-            DrawCircleLines((int)tip.x, (int)tip.y, r * 0.32f, (Color){ 60, 90, 140, 255 });
+            DrawCircleV(tip, r * 0.32f, focus);
+            DrawCircleLines((int)tip.x, (int)tip.y, r * 0.32f,
+                            (Color){ (unsigned char)(focus.r / 2), (unsigned char)(focus.g / 2),
+                                     (unsigned char)(focus.b / 2), 255 });
             break;
         }
         case WPNVIS_ROD: {
             DrawLineEx(hand, tip, r * 0.18f, (Color){ 150, 120, 80, 255 });
-            DrawCircleV(tip, r * 0.24f, (Color){ 255, 215, 120, 255 });
+            DrawCircleV(tip, r * 0.24f, focus);
+            break;
+        }
+        case WPNVIS_BOW: {
+            // A bow reads by its silhouette: the limbs bow AWAY from the
+            // string, so it's drawn as two arcs off the grip with the
+            // string as the straight chord between the tips.
+            Vector2 perp = { -sinf(angle), cosf(angle) };
+            Vector2 grip = { hand.x + cosf(angle) * r * 0.35f, hand.y + sinf(angle) * r * 0.35f };
+            Vector2 t1 = { grip.x + perp.x * len * 0.5f, grip.y + perp.y * len * 0.5f };
+            Vector2 t2 = { grip.x - perp.x * len * 0.5f, grip.y - perp.y * len * 0.5f };
+            Vector2 belly = { grip.x + cosf(angle) * r * 0.42f, grip.y + sinf(angle) * r * 0.42f };
+            Color wood = { 138, 100, 62, 255 };
+            DrawLineEx(t1, belly, r * 0.16f, wood);
+            DrawLineEx(belly, t2, r * 0.16f, wood);
+            DrawLineEx(t1, t2, r * 0.06f, (Color){ 220, 214, 196, 255 });
             break;
         }
         default: break;
@@ -205,7 +239,8 @@ static void DrawHumanoid(const Entity *e, double now) {
                              ? e->skinTone : 1];
     DrawLineEx(shoulder, hand, r * 0.2f, Darken(robe, 0.7f));
     DrawCircleV(hand, r * 0.16f, skin);
-    DrawWeapon(WeaponFor(e), hand, casting ? -1.57f : armAngle, r);
+    DrawWeapon(WeaponFor(e), hand, casting ? -1.57f : armAngle, r,
+               FocusColor(e->primaryProfession));
 
     // Off arm
     Vector2 shoulder2 = { p.x - sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
@@ -433,7 +468,9 @@ void Sprite_DrawItemDrop(const Item *item, Vector2 pos) {
                 DrawLineEx((Vector2){ pos.x, pos.y - r * 0.9f }, (Vector2){ pos.x, pos.y + r * 0.9f },
                            1.5f, (Color){ 90, 70, 110, 255 });
             } else {
-                DrawWeapon(w, (Vector2){ pos.x - r * 0.5f, pos.y + r * 0.5f }, -0.9f, r);
+                // A dropped weapon has no owner, so it keeps the neutral focus.
+                DrawWeapon(w, (Vector2){ pos.x - r * 0.5f, pos.y + r * 0.5f }, -0.9f, r,
+                           FocusColor(PROF_ELEMENTALIST));
             }
             break;
         }
