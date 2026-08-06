@@ -35,6 +35,9 @@ add_executable(sotw_demake
     src/main.c
     src/character.c
     src/gwmath.c
+    src/ui_icons.c
+    src/assets.c
+    src/ground.c
     src/ui_create.c
     src/entity.c
     src/attributes.c

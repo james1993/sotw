@@ -22,6 +22,8 @@
 #include "ui_create.h"
 #include "character.h"
 #include "ui_font.h"
+#include "ui_icons.h"
+#include "ground.h"
 #include "ui_world.h"
 #include "ui_hints.h"
 #include "render.h"
@@ -80,6 +82,8 @@ int main(void) {
     SetExitKey(KEY_NULL);
 
     UIFont_Init();
+    UIIcons_Init();
+    Ground_Init();
     SkillDB_Init();
     // A sane character exists from the first frame, so Continue on a
     // save written before creation existed still has something valid.
@@ -287,6 +291,8 @@ int main(void) {
     // game) - quitting from the X button loses nothing, like GW1.
     Save_Write();
 
+    UIIcons_Unload();
+    Ground_Unload();
     CloseWindow();
     return 0;
 }

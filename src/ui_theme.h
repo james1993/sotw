@@ -67,6 +67,10 @@ void UI_TextShadow(const char *text, int x, int y, int size, Color color);
 // Same, horizontally centered on x.
 void UI_TextShadowCentered(const char *text, int cx, int y, int size, Color color);
 
+// The same, in the display face (ui_font.h) - titles and window headers.
+void UI_TextDisplayShadow(const char *text, int x, int y, int size, Color color);
+void UI_TextDisplayShadowCentered(const char *text, int cx, int y, int size, Color color);
+
 // A small key/button badge - "F", "X", "Esc" - in a rounded dark chip
 // with gold trim. Returns the width drawn, so callers can lay out text
 // after it. Pass draw=false to measure without drawing.

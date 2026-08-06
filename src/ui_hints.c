@@ -100,8 +100,8 @@ void UI_DrawZoneTitle(int screenWidth, int screenHeight, float dt) {
     // The small persistent zone label lives top-center always; the big
     // card only rides on top of it for a few seconds after arriving.
     int smallFont = (int)(16 * scale);
-    UI_TextShadowCentered(zone, screenWidth / 2, (int)(14 * scale), smallFont,
-                          (Color){ 222, 210, 178, 235 });
+    UI_TextDisplayShadowCentered(zone, screenWidth / 2, (int)(14 * scale), smallFont,
+                                 (Color){ 222, 210, 178, 235 });
 
     if (g_titleTimer <= 0.0f) return;
     g_titleTimer -= dt;
@@ -111,7 +111,7 @@ void UI_DrawZoneTitle(int screenWidth, int screenHeight, float dt) {
     if (alpha < 0.0f) alpha = 0.0f;
 
     int bigFont = (int)(38 * scale);
-    int tw = UITextWidth(zone, bigFont);
+    int tw = UITextDisplayWidth(zone, bigFont);
     int cx = screenWidth / 2;
     int y = (int)(screenHeight * 0.17f);
 
@@ -123,7 +123,7 @@ void UI_DrawZoneTitle(int screenWidth, int screenHeight, float dt) {
     DrawRectangle(cx - tw / 2 - ruleGap - ruleW, ruleY, ruleW, (int)(2 * scale), rule);
     DrawRectangle(cx + tw / 2 + ruleGap, ruleY, ruleW, (int)(2 * scale), rule);
 
-    UI_TextShadowCentered(zone, cx, y, bigFont, Fade((Color){ 240, 226, 186, 255 }, alpha));
+    UI_TextDisplayShadowCentered(zone, cx, y, bigFont, Fade((Color){ 240, 226, 186, 255 }, alpha));
 
     const char *sub = (World_GetMode() == MODE_OUTPOST) ? "Outpost" : "Explorable";
     int subFont = (int)(13 * scale);

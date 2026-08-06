@@ -1,4 +1,5 @@
 #include "ui_theme.h"
+#include "ui_icons.h"
 #include "ui_font.h"
 #include "ui_cursor.h"
 #include "skill.h"
@@ -140,6 +141,16 @@ void UI_TextShadowCentered(const char *text, int cx, int y, int size, Color colo
     UI_TextShadow(text, cx - UITextWidth(text, size) / 2, y, size, color);
 }
 
+void UI_TextDisplayShadow(const char *text, int x, int y, int size, Color color) {
+    Color shadow = { 0, 0, 0, (unsigned char)(color.a * 0.72f) };
+    UITextDisplay(text, x + 1, y + 1, size, shadow);
+    UITextDisplay(text, x, y, size, color);
+}
+
+void UI_TextDisplayShadowCentered(const char *text, int cx, int y, int size, Color color) {
+    UI_TextDisplayShadow(text, cx - UITextDisplayWidth(text, size) / 2, y, size, color);
+}
+
 int UI_KeyBadge(const char *label, int x, int y, int size, bool draw) {
     int textW = UITextWidth(label, size);
     int padX = size / 2;
@@ -156,20 +167,50 @@ int UI_KeyBadge(const char *label, int x, int y, int size, bool draw) {
 }
 
 // ---------------------------------------------------------------------
-// Procedural skill icons. GW1 gives every skill a painted icon; here
-// each gets a school-colored tile and a small vector glyph that hints
-// at what it does, so the bar is readable at a glance.
+// Skill icons: a school-coloured tile with the skill's glyph on top.
+// The glyphs are real art now (game-icons.net, packed into an atlas by
+// tools/build_icon_atlas.py) rather than hand-authored vector shapes -
+// thirty-one hand-drawn switch cases neither scaled to new skills nor
+// looked like a painted GW1 icon.
 
+// Tile colour per attribute line. Deliberately muted and darker than
+// fx.c's palette: these sit behind a white glyph and under a gold frame
+// all the way along the bar, where the FX colours are single flashes
+// against a dark field and can afford to be loud.
 static Color SchoolColor(AttributeKind a) {
     switch (a) {
-        case ATTR_FIRE_MAGIC:      return (Color){ 200, 92, 40, 255 };
-        case ATTR_ENERGY_STORAGE:  return (Color){ 120, 95, 200, 255 };
-        case ATTR_HEALING_PRAYERS: return (Color){ 62, 150, 92, 255 };
-        case ATTR_SMITING_PRAYERS: return (Color){ 185, 155, 70, 255 };
-        case ATTR_DIVINE_FAVOR:    return (Color){ 120, 155, 195, 255 };
-        case ATTR_STRENGTH:        return (Color){ 150, 90, 70, 255 };
-        case ATTR_TACTICS:         return (Color){ 110, 110, 130, 255 };
-        default:                   return (Color){ 100, 100, 110, 255 };
+        // Warrior: iron and rust.
+        case ATTR_SWORDSMANSHIP:      return (Color){ 150,  90,  70, 255 };
+        case ATTR_STRENGTH:           return (Color){ 132,  82,  64, 255 };
+        case ATTR_TACTICS:            return (Color){ 110, 110, 130, 255 };
+        // Ranger: field green.
+        case ATTR_MARKSMANSHIP:       return (Color){  92, 130,  72, 255 };
+        case ATTR_WILDERNESS_SURVIVAL:return (Color){  78, 118,  78, 255 };
+        case ATTR_BEAST_MASTERY:      return (Color){ 108, 128,  66, 255 };
+        case ATTR_EXPERTISE:          return (Color){  84, 116,  84, 255 };
+        // Monk: cloth, gold and sky.
+        case ATTR_HEALING_PRAYERS:    return (Color){  62, 150,  92, 255 };
+        case ATTR_PROTECTION_PRAYERS: return (Color){  74, 142, 130, 255 };
+        case ATTR_SMITING_PRAYERS:    return (Color){ 185, 155,  70, 255 };
+        case ATTR_DIVINE_FAVOR:       return (Color){ 120, 155, 195, 255 };
+        // Necromancer: blood, bone and bruise.
+        case ATTR_BLOOD_MAGIC:        return (Color){ 148,  52,  62, 255 };
+        case ATTR_DEATH_MAGIC:        return (Color){  92, 128,  82, 255 };
+        case ATTR_CURSES:             return (Color){ 104,  74, 132, 255 };
+        case ATTR_SOUL_REAPING:       return (Color){ 118,  92, 148, 255 };
+        // Mesmer: court silk.
+        case ATTR_DOMINATION_MAGIC:   return (Color){ 168,  74, 142, 255 };
+        case ATTR_ILLUSION_MAGIC:     return (Color){ 146,  82, 160, 255 };
+        case ATTR_INSPIRATION_MAGIC:  return (Color){ 178, 100, 154, 255 };
+        case ATTR_FAST_CASTING:       return (Color){ 158,  88, 150, 255 };
+        // Elementalist: the four schools.
+        case ATTR_FIRE_MAGIC:         return (Color){ 200,  92,  40, 255 };
+        case ATTR_WATER_MAGIC:        return (Color){  60, 122, 176, 255 };
+        case ATTR_AIR_MAGIC:          return (Color){ 118, 150, 186, 255 };
+        case ATTR_EARTH_MAGIC:        return (Color){ 140, 112,  62, 255 };
+        case ATTR_ENERGY_STORAGE:     return (Color){ 120,  95, 200, 255 };
+        // Monster skills: no profession, no identity colour.
+        default:                      return (Color){ 100, 100, 110, 255 };
     }
 }
 
@@ -177,186 +218,31 @@ void UI_DrawSkillIcon(int skillId, Rectangle r) {
     if (skillId < 0 || skillId >= g_skillCount) return;
     const Skill *s = &g_skillDB[skillId];
 
+    // The school-coloured tile is still drawn here rather than baked into
+    // the art: it means the palette can change without regenerating the
+    // atlas, and a skill reads as "Fire" from its colour before you've
+    // even parsed the glyph.
     Color school = SchoolColor(s->attribute);
     Color dark = (Color){ (unsigned char)(school.r / 3), (unsigned char)(school.g / 3),
                           (unsigned char)(school.b / 3), 255 };
     DrawRectangleGradientV((int)r.x, (int)r.y, (int)r.width, (int)r.height, school, dark);
 
-    float cx = r.x + r.width / 2.0f;
-    float cy = r.y + r.height / 2.0f;
-    float u = r.width / 56.0f; // glyphs authored against a 56px tile
+    // The glyph is a white silhouette tinted on the way down, so the
+    // atlas stays one greyscale sheet (ui_icons.c).
     Color ink = (Color){ 245, 240, 225, 255 };
-    Color glow = (Color){ 255, 255, 255, 90 };
-
-    switch (skillId) {
-        case SK_GASH:
-            // Two parallel cuts.
-            DrawLineEx((Vector2){ cx - 12 * u, cy - 10 * u }, (Vector2){ cx + 6 * u, cy + 12 * u }, 3 * u, ink);
-            DrawLineEx((Vector2){ cx - 2 * u, cy - 12 * u }, (Vector2){ cx + 13 * u, cy + 6 * u }, 3 * u, (Color){ 220, 90, 80, 255 });
-            break;
-        case SK_RUSH_STRIKE:
-            // Forward chevrons: momentum.
-            for (int i = 0; i < 2; i++) {
-                float ox = (i - 0.5f) * 12 * u;
-                DrawLineEx((Vector2){ cx + ox - 5 * u, cy - 10 * u }, (Vector2){ cx + ox + 5 * u, cy }, 3 * u, ink);
-                DrawLineEx((Vector2){ cx + ox + 5 * u, cy }, (Vector2){ cx + ox - 5 * u, cy + 10 * u }, 3 * u, ink);
-            }
-            break;
-        case SK_BATTLE_CRY:
-        case SK_FERAL_HOWL: {
-            // A mouth-dot with sound arcs; the howl's arcs run hostile red.
-            Color arc = (skillId == SK_FERAL_HOWL) ? (Color){ 230, 110, 90, 255 } : ink;
-            DrawCircleV((Vector2){ cx - 8 * u, cy }, 4 * u, ink);
-            for (int i = 1; i <= 3; i++) {
-                DrawRing((Vector2){ cx - 8 * u, cy }, (4 + i * 5) * u - 1.2f * u, (4 + i * 5) * u,
-                         -50, 50, 12, Fade(arc, 1.0f - i * 0.22f));
-            }
-            break;
-        }
-        case SK_DEATHBLOW:
-            // A blade driven straight down.
-            DrawLineEx((Vector2){ cx, cy - 13 * u }, (Vector2){ cx, cy + 8 * u }, 3.5f * u, ink);
-            DrawLineEx((Vector2){ cx - 7 * u, cy - 8 * u }, (Vector2){ cx + 7 * u, cy - 8 * u }, 2.5f * u, ink);
-            DrawTriangle((Vector2){ cx - 4 * u, cy + 7 * u }, (Vector2){ cx + 4 * u, cy + 7 * u },
-                         (Vector2){ cx, cy + 14 * u }, (Color){ 220, 90, 80, 255 });
-            break;
-        case SK_FIRE_BOLT:
-            // A single flame tongue.
-            DrawTriangle((Vector2){ cx, cy - 13 * u }, (Vector2){ cx - 9 * u, cy + 10 * u },
-                         (Vector2){ cx + 9 * u, cy + 10 * u }, (Color){ 255, 170, 60, 255 });
-            DrawTriangle((Vector2){ cx, cy - 5 * u }, (Vector2){ cx - 4 * u, cy + 9 * u },
-                         (Vector2){ cx + 4 * u, cy + 9 * u }, (Color){ 255, 240, 160, 255 });
-            break;
-        case SK_CINDER_STORM:
-            // Embers raining in.
-            for (int i = 0; i < 3; i++) {
-                float ox = (i - 1) * 9 * u;
-                DrawLineEx((Vector2){ cx + ox + 4 * u, cy - 12 * u + i * 3 * u },
-                           (Vector2){ cx + ox, cy - 2 * u + i * 3 * u }, 2 * u, (Color){ 255, 200, 120, 200 });
-                DrawCircleV((Vector2){ cx + ox, cy + i * 3 * u }, 3 * u, (Color){ 255, 150, 60, 255 });
-            }
-            break;
-        case SK_MIND_SEAR:
-            // A jagged arc of raw energy.
-            DrawLineEx((Vector2){ cx - 11 * u, cy - 11 * u }, (Vector2){ cx + 2 * u, cy - 2 * u }, 3 * u, ink);
-            DrawLineEx((Vector2){ cx + 2 * u, cy - 2 * u }, (Vector2){ cx - 4 * u, cy + 3 * u }, 3 * u, ink);
-            DrawLineEx((Vector2){ cx - 4 * u, cy + 3 * u }, (Vector2){ cx + 10 * u, cy + 12 * u }, 3 * u, (Color){ 200, 170, 255, 255 });
-            break;
-        case SK_METEOR:
-            // Falling rock with a bright tail.
-            DrawLineEx((Vector2){ cx + 12 * u, cy - 12 * u }, (Vector2){ cx - 3 * u, cy + 4 * u }, 4 * u, (Color){ 255, 190, 110, 180 });
-            DrawCircleV((Vector2){ cx - 5 * u, cy + 6 * u }, 7 * u, (Color){ 150, 90, 60, 255 });
-            DrawCircleV((Vector2){ cx - 7 * u, cy + 4 * u }, 3 * u, glow);
-            break;
-        case SK_CLAW_SWIPE:
-        case SK_RENDING_CLAWS:
-            // Three raking claws; the rending version drips.
-            for (int i = 0; i < 3; i++) {
-                float ox = (i - 1) * 8 * u;
-                DrawLineEx((Vector2){ cx + ox - 4 * u, cy - 11 * u }, (Vector2){ cx + ox + 4 * u, cy + 11 * u },
-                           2.5f * u, (Color){ 230, 120, 90, 255 });
-                if (skillId == SK_RENDING_CLAWS) {
-                    DrawCircleV((Vector2){ cx + ox + 5 * u, cy + 14 * u }, 2.0f * u,
-                                (Color){ 208, 70, 70, 255 });
-                }
-            }
-            break;
-        case SK_HOBBLING_STRIKE: {
-            // A shackle round an ankle - Crippled made literal.
-            DrawRing((Vector2){ cx, cy + 3 * u }, 7 * u, 10 * u, 0, 360, 20,
-                     (Color){ 190, 190, 200, 255 });
-            DrawLineEx((Vector2){ cx, cy - 7 * u }, (Vector2){ cx, cy - 14 * u }, 3 * u,
-                       (Color){ 150, 150, 160, 255 });
-            DrawCircleV((Vector2){ cx, cy - 15 * u }, 3.5f * u, (Color){ 190, 190, 200, 255 });
-            break;
-        }
-        case SK_SHROUD_OF_DOUBT: {
-            // A veil drawn over the target, with the weight of it
-            // dragging downward - the hex that slows what you do.
-            DrawCircleSector((Vector2){ cx, cy + 2 * u }, 12 * u, 180, 360, 16,
-                             (Color){ 150, 110, 200, 255 });
-            DrawRectangle((int)(cx - 12 * u), (int)(cy + 1 * u), (int)(24 * u), (int)(5 * u),
-                          (Color){ 120, 86, 168, 255 });
-            for (int i = -1; i <= 1; i++) {
-                float ox = i * 7 * u;
-                DrawLineEx((Vector2){ cx + ox - 3 * u, cy + 7 * u },
-                           (Vector2){ cx + ox, cy + 13 * u }, 2 * u, ink);
-                DrawLineEx((Vector2){ cx + ox, cy + 13 * u },
-                           (Vector2){ cx + ox + 3 * u, cy + 7 * u }, 2 * u, ink);
-            }
-            break;
-        }
-        case SK_PRICE_OF_FAITH: {
-            // A hex diamond with the cost being drawn out of it.
-            DrawPoly((Vector2){ cx, cy - 3 * u }, 4, 11 * u, 45, (Color){ 150, 110, 200, 255 });
-            DrawPolyLines((Vector2){ cx, cy - 3 * u }, 4, 11 * u, 45, ink);
-            DrawLineEx((Vector2){ cx, cy + 2 * u }, (Vector2){ cx, cy + 13 * u }, 3 * u, ink);
-            DrawTriangle((Vector2){ cx - 5 * u, cy + 10 * u }, (Vector2){ cx + 5 * u, cy + 10 * u },
-                         (Vector2){ cx, cy + 16 * u }, (Color){ 220, 90, 80, 255 });
-            break;
-        }
-        case SK_MEND_AILMENT: {
-            // The healer's cross lifting an affliction clear of a body.
-            DrawRectangle((int)(cx - 2.5f * u), (int)(cy - 4 * u), (int)(5 * u), (int)(18 * u), ink);
-            DrawRectangle((int)(cx - 9 * u), (int)(cy + 1.5f * u), (int)(18 * u), (int)(5 * u), ink);
-            // The condition coming off the top.
-            DrawCircleV((Vector2){ cx + 8 * u, cy - 11 * u }, 4 * u, (Color){ 208, 90, 80, 220 });
-            DrawLineEx((Vector2){ cx + 4 * u, cy - 15 * u }, (Vector2){ cx + 12 * u, cy - 7 * u },
-                       2 * u, (Color){ 255, 245, 225, 255 });
-            break;
-        }
-        case SK_SMITE_HEX: {
-            // A hex diamond struck apart by a bolt of smiting light.
-            DrawPolyLines((Vector2){ cx, cy }, 4, 12 * u, 45, (Color){ 150, 110, 200, 255 });
-            DrawPolyLines((Vector2){ cx, cy }, 4, 9 * u, 45, (Color){ 120, 86, 168, 200 });
-            DrawLineEx((Vector2){ cx - 10 * u, cy - 13 * u }, (Vector2){ cx + 3 * u, cy + 1 * u },
-                       3.5f * u, (Color){ 255, 240, 180, 255 });
-            DrawLineEx((Vector2){ cx + 3 * u, cy + 1 * u }, (Vector2){ cx - 2 * u, cy + 4 * u },
-                       3.5f * u, (Color){ 255, 240, 180, 255 });
-            DrawLineEx((Vector2){ cx - 2 * u, cy + 4 * u }, (Vector2){ cx + 10 * u, cy + 14 * u },
-                       3.5f * u, (Color){ 255, 240, 180, 255 });
-            break;
-        }
-        case SK_DISTRACTING_BLOW:
-            // A starburst - the interrupt's "smack".
-            for (int i = 0; i < 4; i++) {
-                float a = i * 0.785f;
-                DrawLineEx((Vector2){ cx - cosf(a) * 12 * u, cy - sinf(a) * 12 * u },
-                           (Vector2){ cx + cosf(a) * 12 * u, cy + sinf(a) * 12 * u }, 2.5f * u, ink);
-            }
-            DrawCircleV((Vector2){ cx, cy }, 4 * u, (Color){ 255, 220, 120, 255 });
-            break;
-        case SK_ORISON_OF_HEALING:
-            // The healer's cross.
-            DrawRectangle((int)(cx - 3 * u), (int)(cy - 12 * u), (int)(6 * u), (int)(24 * u), ink);
-            DrawRectangle((int)(cx - 12 * u), (int)(cy - 3 * u), (int)(24 * u), (int)(6 * u), ink);
-            break;
-        case SK_BANISH:
-            // Radiant holy light.
-            DrawCircleV((Vector2){ cx, cy }, 6 * u, (Color){ 255, 245, 200, 255 });
-            for (int i = 0; i < 8; i++) {
-                float a = i * 0.785f;
-                DrawLineEx((Vector2){ cx + cosf(a) * 8 * u, cy + sinf(a) * 8 * u },
-                           (Vector2){ cx + cosf(a) * 14 * u, cy + sinf(a) * 14 * u }, 2 * u, ink);
-            }
-            break;
-        case SK_SMITE:
-            // A bolt of judgement from above.
-            DrawTriangle((Vector2){ cx - 6 * u, cy - 13 * u }, (Vector2){ cx + 6 * u, cy - 13 * u },
-                         (Vector2){ cx, cy + 6 * u }, (Color){ 255, 235, 150, 255 });
-            DrawCircleV((Vector2){ cx, cy + 8 * u }, 5 * u, glow);
-            DrawCircleV((Vector2){ cx, cy + 8 * u }, 3 * u, (Color){ 255, 250, 210, 255 });
-            break;
-        case SK_BANE_SIGNET: {
-            // A signet ring stamp.
-            DrawRing((Vector2){ cx, cy }, 8 * u, 11 * u, 0, 360, 24, ink);
-            DrawCircleV((Vector2){ cx, cy }, 4 * u, (Color){ 220, 200, 140, 255 });
-            break;
-        }
-        default:
-            // Unmapped skill: a plain diamond, still school-colored.
-            DrawPoly((Vector2){ cx, cy }, 4, 10 * u, 45, ink);
-            break;
+    float inset = r.width * 0.12f;
+    Rectangle glyph = { r.x + inset, r.y + inset, r.width - inset * 2, r.height - inset * 2 };
+    if (UIIcons_Ready()) {
+        // A dropped shadow one pixel down: the art is a flat silhouette
+        // and needs the separation to read against a bright tile.
+        UIIcons_Draw(skillId, (Rectangle){ glyph.x, glyph.y + 2, glyph.width, glyph.height },
+                     (Color){ 0, 0, 0, 110 });
+        UIIcons_Draw(skillId, glyph, ink);
+    } else {
+        // No atlas: a plain diamond, still school-coloured. Same policy
+        // as the font falling back to raylib's built-in.
+        DrawPoly((Vector2){ r.x + r.width / 2.0f, r.y + r.height / 2.0f }, 4,
+                 r.width * 0.18f, 45, ink);
     }
 
     // Tile edge: dark seat + a whisper of gold, matching the panels.

@@ -68,9 +68,9 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     {
         const char *title = "GUILD WARS - 2D DEMAKE";
         int titleFont = (int)(36 * scale);
-        int tw = UITextWidth(title, titleFont);
-        UIText(title, (screenWidth - tw) / 2, (int)(screenHeight * 0.22f),
-               titleFont, (Color){ 220, 200, 140, 255 });
+        int tw = UITextDisplayWidth(title, titleFont);
+        UITextDisplay(title, (screenWidth - tw) / 2, (int)(screenHeight * 0.22f),
+                      titleFont, (Color){ 220, 200, 140, 255 });
 
         const char *sub = "a raylib prototype";
         int subFont = (int)(14 * scale);
@@ -122,6 +122,27 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     int hintFont = (int)(11 * scale);
     int hw = UITextWidth(hint, hintFont);
     UIText(hint, (screenWidth - hw) / 2, y + (int)(6 * scale), hintFont, GRAY);
+
+    // Asset attribution, on the title screen because that is exactly what
+    // CC BY asks a video game for: a credit the player can reach. The
+    // fonts are OFL and the ground is CC0 (no attribution required), but
+    // naming them here costs a line and is the decent thing to do. The
+    // full breakdown, per icon, is in assets/CREDITS.md.
+    {
+        const char *credits[] = {
+            "Skill icons by Lorc and Delapouite - game-icons.net - CC BY 3.0",
+            "Cinzel and Alegreya Sans under the SIL Open Font License",
+            "Ground textures by Kenney - kenney.nl - CC0",
+        };
+        int creditFont = (int)(10 * scale);
+        int cy = screenHeight - (int)(14 * scale) - creditFont * 3 - (int)(8 * scale);
+        for (int i = 0; i < 3; i++) {
+            int cw = UITextWidth(credits[i], creditFont);
+            UIText(credits[i], (screenWidth - cw) / 2, cy, creditFont,
+                   (Color){ 120, 116, 108, 255 });
+            cy += creditFont + (int)(4 * scale);
+        }
+    }
 
     return result;
 }

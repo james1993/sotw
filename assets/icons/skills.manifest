@@ -1,0 +1,43 @@
+# Skill bar icons, one line per SkillId, IN SkillId ORDER (src/skill.h).
+#
+#   <SkillId>  <author>/<icon>
+#
+# Art from https://game-icons.net, CC BY 3.0 - the author half of each
+# path is the person to credit, which is why the attribution in
+# assets/CREDITS.md is generated from this file rather than typed out.
+#
+# Rebuild the atlas with:  python3 tools/build_icon_atlas.py
+# The script refuses to run if this list and the SkillId enum disagree,
+# so an icon can never silently end up on the wrong skill.
+
+SK_GASH                 lorc/sword-wound
+SK_RUSH_STRIKE          delapouite/sword-brandish
+SK_BATTLE_CRY           lorc/shouting
+SK_DEATHBLOW            lorc/blade-fall
+SK_FIRE_BOLT            lorc/fireball
+SK_CINDER_STORM         lorc/burning-embers
+SK_MIND_SEAR            lorc/energise
+SK_METEOR               lorc/meteor-impact
+SK_CLAW_SWIPE           lorc/claw-slashes
+SK_DISTRACTING_BLOW     delapouite/shield-bash
+SK_FERAL_HOWL           lorc/wolf-howl
+SK_ORISON_OF_HEALING    delapouite/healing
+SK_BANISH               lorc/sunbeams
+SK_SMITE                lorc/sun-radiations
+SK_BANE_SIGNET          lorc/wax-seal
+SK_HEALING_LIGHT        lorc/prayer
+SK_SHROUD_OF_DOUBT      delapouite/fog
+SK_PRICE_OF_FAITH       lorc/life-in-the-balance
+SK_MEND_AILMENT         lorc/bandage-roll
+SK_SMITE_HEX            lorc/shatter
+SK_RENDING_CLAWS        delapouite/claws
+SK_HOBBLING_STRIKE      lorc/foot-trip
+SK_POWER_SHOT           lorc/arrow-flights
+SK_PIN_DOWN             lorc/pierced-body
+SK_TROLL_UNGUENT        delapouite/herbs-bundle
+SK_VAMPIRIC_GAZE        lorc/bleeding-eye
+SK_FAINTHEARTEDNESS     lorc/broken-heart
+SK_BARBED_SIGNET        lorc/skull-signet
+SK_ETHER_FEAST          lorc/marrow-drain
+SK_EMPATHY              lorc/psychic-waves
+SK_SHATTER_DELUSIONS    lorc/brain-freeze

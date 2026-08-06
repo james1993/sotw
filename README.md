@@ -39,11 +39,18 @@ confirm the architecture actually compiles and works: skill activation,
 resource costs, recharge timers, cast bars, and AI-driven combat were
 all exercised and visually verified.
 
-Presentation is procedural, no image assets: characters are layered-
-shape sprites with movement-driven walk cycles, swing and cast
-animations, and in-hand weapons matching what's equipped (robe color
-tracks armor tier); combat plays slash arcs, school-colored bursts,
-heal sparkles, AoE rings, and knockdown stars (`sprite.c`, `fx.c`).
+Characters are procedural, not sprite sheets: layered shapes with
+movement-driven walk cycles, swing and cast animations, and in-hand
+weapons matching what's equipped (robe color tracks profession and
+armor tier); combat plays slash arcs, school-colored bursts, heal
+sparkles, AoE rings, and knockdown stars (`sprite.c`, `fx.c`). That
+stays procedural on purpose — it's what lets equipment and appearance
+drive the figure instead of a fixed frame doing it.
+
+Where a *fixed* image is the right answer, the game uses real
+open-source art rather than hand-drawn vector approximations: skill
+icons, two display/body typefaces, and tiled ground textures. See
+[Assets](#assets) below, and `assets/CREDITS.md` for who made what.
 
 Attacks use a shared anticipation curve rather than a symmetric ease —
 the body winds *back*, snaps forward far faster than it withdrew, then
@@ -76,6 +83,57 @@ common `UI_Row` / `UI_Button` / `UI_Tabs` widgets. One implementation of
 "a list row" means the merchant, the trainer, the bags and the skill
 list all *behave* identically, which is most of what makes an interface
 feel finished.
+
+### Assets
+
+All bundled art is open-source and credited in `assets/CREDITS.md`, with
+the licence text alongside each pack. The title screen carries a short
+credit too, because that's what CC BY asks a game for.
+
+**Skill icons** — [game-icons.net](https://game-icons.net), CC BY 3.0.
+Thirty-one hand-authored vector glyphs in a `switch` used to draw the
+skill bar; that neither scaled to new skills (nine of them had no glyph
+at all) nor looked like a painted GW1 icon. Now `tools/build_icon_atlas.py`
+reads `assets/icons/skills.manifest`, rasterises each source SVG to a
+white silhouette and packs them into one 1024×512 atlas, which the game
+**tints** per skill — so one greyscale sheet serves every school colour
+instead of shipping the same picture eight times.
+
+The atlas is indexed by `SkillId`, and the script parses the enum out of
+`src/skill.h` and refuses to run if the two disagree, naming the slot
+that drifted. The generated atlas is committed, so building the game
+needs no Python, no network and no SVG rasteriser — same deal as the
+bundled font. Regenerate with:
+
+```bash
+python3 tools/build_icon_atlas.py          # from the committed SVGs
+python3 tools/build_icon_atlas.py --fetch  # download any that are missing
+```
+
+**Fonts** — [Cinzel](https://fonts.google.com/specimen/Cinzel) and
+[Alegreya Sans](https://fonts.google.com/specimen/Alegreya+Sans), both
+SIL OFL. Cinzel is a Roman capital serif and carries titles, window
+headers and zone names — the places GW1 sets its own display type. It is
+deliberately *not* available to body text: what makes it good at 40px is
+what makes it unreadable at 11px. Alegreya Sans **Medium** does the dense
+work; Regular was tried first and measurably lost against DejaVu in the
+HUD, which is the kind of thing you only find by looking at a screenshot
+of the actual hint bar. DejaVu stays as the fallback.
+
+**Ground** — [Kenney](https://kenney.nl) Pattern Pack, CC0. The world was
+a flat fill plus a lattice of grid lines, which read as a level editor.
+Two seamless patterns now tile the surface — laid stone inside a
+settlement, broken ground outside it — stored as alpha masks and tinted
+with the zone's own ground colour, so the zone table stays the single
+source of what a place looks like. The grid survived at about half its
+old weight: it still gives distance a scale you can count, but with the
+surface carrying the detail, the lattice is the one that should yield.
+
+Deliberately *not* imported: character sprite sheets. LPC would fit the
+layered-equipment model, but it's CC BY-SA (share-alike on derived art)
+and fixed frames would replace the procedural animation and the
+appearance system the character creator previews live. That's trading a
+working system for art.
 
 ### Build
 

@@ -9,6 +9,7 @@
 #include "ui_theme.h"
 #include "sprite.h"
 #include "fx.h"
+#include "ground.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -244,14 +245,23 @@ void Render_World(Camera2D camera) {
 
     // Ground tint sells the zone: packed dirt in the camp, green grass
     // out in the plains. Per-zone data (world.c).
-    //
-    // The grid is deliberately faint and every fourth line is a touch
-    // stronger. A uniform bright lattice read as a debug overlay; at
-    // this weight it's ground texture you stop noticing, which is the
-    // point - it should suggest terrain, not label it.
     Color gridColor = World_GetGridColor();
-    Color minor = { gridColor.r, gridColor.g, gridColor.b, 70 };
-    Color major = { gridColor.r, gridColor.g, gridColor.b, 130 };
+
+    // The surface itself: laid stone inside a settlement, broken ground
+    // outside it, tinted with the zone's own colour (ground.c). Drawn
+    // first, so everything below sits on top of it.
+    Ground_Draw((Rectangle){ (float)startX, (float)startY,
+                             (float)(endX - startX), (float)(endY - startY) },
+                gridColor, World_GetMode() == MODE_OUTPOST);
+
+    // The grid is deliberately faint and every fourth line is a touch
+    // stronger. It survived the ground texture because it still does a
+    // job the texture can't: it gives distance a scale you can count.
+    // Now that the surface carries the detail, though, it's pulled back
+    // to roughly half its old weight - two textures competing read as
+    // noise, and the lattice is the one that should yield.
+    Color minor = { gridColor.r, gridColor.g, gridColor.b, 34 };
+    Color major = { gridColor.r, gridColor.g, gridColor.b, 66 };
     for (int x = startX; x <= endX; x += gridSpacing) {
         bool isMajor = (((x / gridSpacing) % 4) == 0);
         DrawLine(x, startY, x, endY, isMajor ? major : minor);

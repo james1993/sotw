@@ -150,7 +150,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
     int small = UI_FontSize(scale, UI_TEXT_SM);
     int tiny = UI_FontSize(scale, UI_TEXT_XS);
 
-    UI_TextShadowCentered("CREATE YOUR CHARACTER", screenWidth / 2,
+    UI_TextDisplayShadowCentered("CREATE YOUR CHARACTER", screenWidth / 2,
                           (int)(screenHeight * 0.05f), titleFont, UI_GOLD);
 
     // Three columns: choose (left), see (middle), adjust (right). The
@@ -172,7 +172,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         int x = (int)leftCol.x + UI_SP(scale, 4);
         int y = (int)leftCol.y + UI_SP(scale, 4);
         int innerW = colW - UI_SP(scale, 8);
-        UI_TextShadow("Profession", x, y, headFont, UI_GOLD);
+        UI_TextDisplayShadow("Profession", x, y, headFont, UI_GOLD);
         y += headFont + UI_SP(scale, 3);
 
         // Six buttons in two columns. A single column of six would push
@@ -265,7 +265,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         int x = (int)rightCol.x + UI_SP(scale, 4);
         int y = (int)rightCol.y + UI_SP(scale, 4);
         int innerW = colW - UI_SP(scale, 8);
-        UI_TextShadow("Appearance", x, y, headFont, UI_GOLD);
+        UI_TextDisplayShadow("Appearance", x, y, headFont, UI_GOLD);
         y += headFont + UI_SP(scale, 4);
 
         int rowH = (int)(30 * scale);

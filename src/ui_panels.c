@@ -182,12 +182,14 @@ static bool PanelHeader(Rectangle rect, const char *title, const char *hotkey,
                         const char *padkey, int font, int pad, float scale) {
     int x = (int)rect.x + pad;
     int y = (int)rect.y + pad;
-    UIText(title, x, y, font, UI_GOLD);
+    // Window headers get the display face, body rows don't - that split
+    // is what keeps a serif from turning a dense list into mush.
+    UITextDisplay(title, x, y, font, UI_GOLD);
 
     // Binding badge: pad glyph when a controller is present, key otherwise.
     const char *badge = (IsGamepadAvailable(0) && padkey) ? padkey : hotkey;
     if (badge) {
-        int tw = UITextWidth(title, font);
+        int tw = UITextDisplayWidth(title, font);
         UI_KeyBadge(badge, x + tw + (int)(8 * scale), y - (int)(3 * scale),
                     (int)(font * 0.85f), true);
     }

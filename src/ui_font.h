@@ -9,9 +9,16 @@
 // after InitWindow.
 void UIFont_Init(void);
 
-// DrawText/MeasureText replacements that use the loaded font.
+// DrawText/MeasureText replacements that use the loaded body font.
 void UIText(const char *text, int x, int y, int size, Color color);
 int UITextWidth(const char *text, int size);
+
+// The DISPLAY face - a Roman capital serif, for titles, window headers
+// and zone names only. Deliberately not available to body text: the
+// thing that makes it good at 40px is what makes it bad at 11px.
+// Falls back to the body font when the display face is missing.
+void UITextDisplay(const char *text, int x, int y, int size, Color color);
+int UITextDisplayWidth(const char *text, int size);
 
 // The one shared UI scale factor: screenHeight relative to an 800px
 // reference window, clamped so tiny windows stay usable and huge ones
