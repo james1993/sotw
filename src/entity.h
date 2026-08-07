@@ -46,7 +46,8 @@ typedef enum {
     NPC_HENCHMAN,
     NPC_CRAFTER, // armorer: crafts armor for gold + materials (GW1: armor is craft-only)
     NPC_SKILL_TRAINER, // sells non-elite skills for a skill point + gold
-    NPC_PROFESSION_CHANGER // grants, then later re-chooses, your second profession
+    NPC_PROFESSION_CHANGER, // grants, then later re-chooses, your second profession
+    NPC_COLLECTOR  // trades a fixed count of one trophy for a fixed item
 } NpcRole;
 
 typedef enum {
@@ -87,8 +88,10 @@ typedef struct {
     // holds both so a character has a single, bounded effect budget.
     int kind;
     float remaining;
-    float tickDamage; // > 0 for DoT-style effects (bleeding/burning/hexes)
-    float tickAccum;
+    // Health degeneration in GW1's PIPS, not health per second - one pip
+    // is 2 health a second, and the whole point of the unit is that
+    // every source stacks into one capped total (see Combat_UpdateEntity).
+    float degenPips;
 } ActiveEffect;
 
 
@@ -136,11 +139,16 @@ typedef struct Entity {
     int energyRegenPips;
     float energyRegenAccum;
     float hpRegenAccum;
+    float degenAccum; // fractional health owed to degeneration
     // Soul Reaping's rolling throttle: at most 3 triggers per 15s.
     float soulReapingWindow;
     int soulReapingTriggers;
     float timeSinceCombat; // seconds since this entity last dealt or took damage
-    int adrenaline; // simplified 0-100 shared pool (GW1 tracks this per adrenaline skill)
+    // Adrenaline, per bar slot, in GW1's points (25 = one strike). One
+    // shared pool is the wrong shape: GW1 charges every adrenal skill
+    // together and drains the others when one is spent, and that
+    // cross-drain is what stops a bar of adrenal skills firing at once.
+    int adrenaline[SKILL_BAR_SIZE];
 
     bool isHenchman; // hired help - dismissible in outposts, unlike heroes
 
@@ -318,6 +326,29 @@ float Entity_AttackInterval(const Entity *e);
 
 // Outgoing attack damage after Weakness.
 int Entity_ScaleOutgoingDamage(const Entity *e, int damage);
+
+// An attribute rank as it is USED, after Weakness. GW1's Weakness drops
+// every attribute by 1 - except ranks already at 0, which stay there -
+// and that is half of what makes the condition worth applying.
+//
+// Deliberately NOT used for the derived maximums (Energy Storage's
+// energy pool, Soul Reaping's return): those are recomputed only when
+// ranks actually change, and driving them from a condition would make a
+// character's maximum energy flicker as Weakness came and went. Every
+// USE-time read goes through here.
+int Entity_EffectiveRank(const Entity *e, AttributeKind attr);
+
+// One landed strike: every adrenal skill on the bar gains 25 points.
+void Entity_GainAdrenalineStrike(Entity *e);
+
+// Spending: the fired slot empties and every other adrenal skill loses
+// a strike's worth. GW1's rule, and the reason a bar of adrenal skills
+// can't all be charged at once.
+void Entity_SpendAdrenaline(Entity *e, int slot);
+
+// Raw points onto every adrenal slot - what a skill that "grants
+// adrenaline" does. Negative strips it.
+void Entity_AddAdrenalinePoints(Entity *e, int points);
 
 // Display name / color for an active effect, shared by every readout.
 const char *Entity_EffectName(const ActiveEffect *fx);

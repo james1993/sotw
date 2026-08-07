@@ -367,6 +367,15 @@ party, and party members wait near the gate while you wander the outpost
 instead of trailing you around town - they only fall in behind you out
 in the field.
 
+**Collectors** stand out in the field, GW1-style, and take trophies
+rather than gold: five Skale Fins to Farmer Hamnet in Lakeside for a
+buckler, four Grawl Necklaces to Sentry Wallin in Green Hills for a
+hauberk, five Charr Carvings to Quartermaster Ferrick in the Northlands
+for Ascalon steel. They give things the merchant doesn't stock, which is
+what makes a trophy worth carrying instead of vendoring on sight — and
+they cost nothing but the hunting, which is how a broke character arms
+itself.
+
 **Armour is five pieces, not one item.** GW1 dresses you in head,
 chest, arms, legs and feet, and that is the whole reason armour is a
 collection game: you upgrade a set a piece at a time. Your armour level
@@ -594,7 +603,7 @@ Quests are per-giver, GW1-style: Prince Rurik's chain in Ascalon City
 marker points at the Northlands), Duke Barradin's pair in Regent Valley
 (*Bandit Raid*, then *Unnatural Growths*), and Warmaster Riga's book in
 Piken Square — *Hold the Square*, and the collect quest *Hides for the
-Watch*, which consumes 4 Charr Hides on turn-in and tracks your bag
+Watch*, which consumes 4 Charr Carvings on turn-in and tracks your bag
 live. Abbot Ciglo's *Tithe for Ashford Abbey* does the same with 3
 Skale Fins. Item rewards need a free bag slot, and each giver's green
 "!" only lights for their own work.

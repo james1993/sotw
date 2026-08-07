@@ -419,3 +419,36 @@ gives being right any weight.
 - [Skill Hunter – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Skill_Hunter)
 - [Guide to Hero Basics and Optimization – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Guide_to_Hero_Basics_and_Optimization)
 - [Hero behavior – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Hero_behavior)
+
+
+## Audit corrections (combat)
+
+Three numbers the implementation had wrong, found by auditing the code
+against the wiki rather than against this document:
+
+- **Degeneration was ~3x too weak.** The pip is the unit, not the health:
+  one pip is **2 health per second**, so Bleeding (-3) is **6/s** and
+  Burning (-7) is **14/s**. The code returned the pip NUMBER as health
+  per second, so Bleeding ticked 2 and Burning 5. It also ticked each
+  condition separately, which made GW1's **-10 pip cap** (20 health a
+  second, no matter how many sources) impossible to express. Sources are
+  now summed into one capped total.
+  ([Health degeneration](https://wiki.guildwars.com/wiki/Health_degeneration))
+
+- **Weakness was 25%, not 66%.** GW1's Weakness takes **66% off the
+  weapon's base damage** - not off bonus damage from attack skills - and
+  additionally drops **every non-zero attribute by 1**. The attribute
+  half was missing entirely.
+  ([Weakness](https://wiki.guildwars.com/wiki/Weakness))
+
+- **Adrenaline was one shared pool.** GW1 gives **every adrenal skill its
+  own pool**, counts in **strikes worth 25 points**, and - the part that
+  matters - **drains 25 from every other adrenal skill when one is
+  spent**. A single shared pool silently removed the constraint the whole
+  Warrior bar is built around: you could charge once and fire everything.
+  ([Adrenaline](https://wiki.guildwars.com/wiki/Adrenaline))
+
+Still simplified, deliberately: no critical hits, no per-body-part armour
+hit location, no blocking/blind miss chance, and attributes are not
+reduced for the derived maximums (Energy Storage's pool) - only for
+use-time reads, so Weakness can't make maximum energy flicker.

@@ -89,7 +89,7 @@ void SkillDB_Init(void) {
     RegisterAs(SK_BATTLE_CRY, s);
 
     s = MakeSkill("Deathblow", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
-                  0, 40, 0.0f, 10.0f, 28.0f, true, TARGET_SINGLE_FOE);
+                  0, 50, 0.0f, 10.0f, 28.0f, true, TARGET_SINGLE_FOE); // 2 strikes
     AddStep(&s, FX_DAMAGE, 20, 3.0f, 0, 0);
     AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
     RegisterAs(SK_DEATHBLOW, s);
@@ -209,7 +209,7 @@ void SkillDB_Init(void) {
     // Without something applying afflictions to the party, removal is
     // dead weight; these are what put Crippled and the hexes on YOU.
     s = MakeSkill("Rending Claws", SKILLTYPE_ATTACK_SKILL, ATTR_MONSTROUS,
-                  0, 20, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE);
+                  0, 25, 0.0f, 6.0f, 28.0f, false, TARGET_SINGLE_FOE); // 1 strike
     AddStep(&s, FX_DAMAGE, 8, 0, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 10.0f);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_WEAKNESS, 8.0f);
@@ -218,7 +218,7 @@ void SkillDB_Init(void) {
     // The Devourer's pincers: Crippled is their whole threat, because a
     // halved walk speed is what stops you strolling out of the gully.
     s = MakeSkill("Hobbling Strike", SKILLTYPE_ATTACK_SKILL, ATTR_MONSTROUS,
-                  0, 20, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE);
+                  0, 25, 0.0f, 8.0f, 28.0f, false, TARGET_SINGLE_FOE); // 1 strike
     AddStep(&s, FX_DAMAGE, 6, 0, 0, 0);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_CRIPPLED, 8.0f);
     RegisterAs(SK_HOBBLING_STRIKE, s);

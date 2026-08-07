@@ -124,6 +124,23 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
                               (Color){ 255, 240, 190, 220 });
             }
 
+            // Adrenaline charge, on the slot that owns it. GW1 shows a
+            // skill's own charge on its icon, which is the only place it
+            // can go now that each adrenal skill has its own pool - one
+            // shared bar could not say WHICH skill was ready.
+            if (s->adrenalineCost > 0) {
+                float charge = (float)player->adrenaline[i] / (float)s->adrenalineCost;
+                if (charge > 1.0f) charge = 1.0f;
+                int fillH = (int)(L.slotSize * charge);
+                DrawRectangle(x, L.y + (L.slotSize - fillH), (int)(4 * L.scale), fillH,
+                              (Color){ 226, 176, 60, 230 });
+                if (charge >= 1.0f) {
+                    // Ready: a full gold edge, so a charged skill reads
+                    // at a glance in a fight.
+                    DrawRectangleLinesEx(slotRect, 2.0f, (Color){ 236, 196, 90, 255 });
+                }
+            }
+
             if (player->skillRecharge[i] > 0.0f) {
                 float pct = player->skillRecharge[i] / s->recharge;
                 if (pct > 1.0f) pct = 1.0f;
@@ -252,22 +269,4 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
         }
     }
 
-    // Adrenaline is a Warrior mechanic; a Monk bar has no adrenaline
-    // skills, so only show the strip when something equipped uses it.
-    bool anyAdrenalineSkill = false;
-    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
-        int idx = player->skillBar[i];
-        if (idx >= 0 && idx < g_skillCount && g_skillDB[idx].adrenalineCost > 0) {
-            anyAdrenalineSkill = true;
-            break;
-        }
-    }
-    if (anyAdrenalineSkill) {
-        int adrH = (int)(8 * L.scale);
-        int adrY = barY - adrH - 4;
-        float pct = player->adrenaline / 100.0f;
-        DrawRectangle(hpX, adrY, barW, adrH, (Color){ 30, 30, 30, 255 });
-        DrawRectangle(hpX, adrY, (int)(barW * pct), adrH, GOLD);
-        DrawRectangleLines(hpX, adrY, barW, adrH, BLACK);
-    }
 }

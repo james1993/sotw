@@ -36,6 +36,37 @@
 // rate from energy, which is a detail that trips people up.
 #define GW_HEALTH_PER_PIP 2.0f
 
+// Degeneration is measured in the same pips, and GW1 caps the total at
+// 10 in either direction: 20 health a second, no matter how many
+// sources are stacked on you. Without the cap, three conditions and a
+// hex simply delete a character, which is the reason the cap exists.
+#define GW_MAX_DEGEN_PIPS 10.0f
+
+// GW1's condition degeneration, in pips. Bleeding is -3, which is SIX
+// health a second, not three - the pip is the unit, not the health.
+#define GW_PIPS_BLEEDING 3.0f
+#define GW_PIPS_BURNING  7.0f
+#define GW_PIPS_POISON   4.0f
+
+// Weakness cuts weapon damage by 66% (bonus damage from attack skills
+// is untouched) and drops every non-zero attribute by 1.
+#define GW_WEAKNESS_DAMAGE_SCALE 0.34f
+
+// --- Adrenaline ------------------------------------------------------
+// GW1 counts adrenaline in STRIKES, worth 25 points each, and every
+// adrenal skill carries its OWN pool. Landing a hit gives one strike to
+// every adrenal skill on the bar; losing 1% of your maximum health
+// gives one more point.
+//
+// The part that matters for play is what happens when you SPEND: the
+// skill you fired empties, and every other adrenal skill on the bar
+// loses 25 points. That is precisely why you cannot charge four adrenal
+// skills and dump them together, and modelling adrenaline as one shared
+// pool - as this did - quietly removed the constraint the whole
+// Warrior bar is built around.
+#define GW_ADRENALINE_PER_STRIKE 25
+#define GW_ADRENALINE_CROSS_DRAIN 25
+
 // --- Level -----------------------------------------------------------
 // +20 maximum health per level, on top of a 100 base at level 1.
 #define GW_BASE_HEALTH 100

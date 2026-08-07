@@ -9,7 +9,7 @@
 // fraction of the target's armor to ignore.
 static float AttackPenetration(const Entity *caster, const Skill *skill) {
     if (skill->type != SKILLTYPE_ATTACK_SKILL) return 0.0f;
-    return GW_STRENGTH_PENETRATION_PER_RANK * (float)caster->attributeRank[ATTR_STRENGTH];
+    return GW_STRENGTH_PENETRATION_PER_RANK * (float)Entity_EffectiveRank(caster, ATTR_STRENGTH);
 }
 
 // Divine Favor fires on Monk SPELLS cast on an ally - not on signets,
@@ -18,26 +18,28 @@ static float AttackPenetration(const Entity *caster, const Skill *skill) {
 static int DivineFavorBonus(const Entity *caster, const Skill *skill) {
     if (skill->type != SKILLTYPE_SPELL) return 0;
     if (g_attributeProfession[skill->attribute] != PROF_MONK) return 0;
-    return GW_DivineFavorBonus(caster->attributeRank[ATTR_DIVINE_FAVOR]);
+    return GW_DivineFavorBonus(Entity_EffectiveRank(caster, ATTR_DIVINE_FAVOR));
 }
 
 static float RankScaledValue(const EffectStep *step, const Entity *caster, AttributeKind attr) {
-    int rank = (attr >= 0 && attr < ATTR_COUNT) ? caster->attributeRank[attr] : 0;
+    int rank = Entity_EffectiveRank(caster, attr);
     return step->baseValue + step->perAttributeRank * (float)rank;
 }
 
-// Per-second health loss for the afflictions that degenerate. GW1 calls
-// these "degeneration pips"; keeping the numbers in one table means a
-// hex and a condition that both tick are balanced against each other
-// rather than against whatever the skill author happened to type.
-static float AfflictionTickDamage(EffectCategory category, int kind) {
+// Health degeneration in GW1's PIPS. This used to return health per
+// second and hand back the pip NUMBER - so Bleeding ticked 2 a second
+// instead of its real 6, and Burning 5 instead of 14. Conditions were
+// roughly a third as dangerous as GW1's, which is most of the reason
+// they read as ignorable. One pip is two health a second; that
+// conversion lives in Combat_UpdateEntity, once.
+static float AfflictionDegenPips(EffectCategory category, int kind) {
     if (category == EFFECT_HEX) {
         return ((HexKind)kind == HEX_FALTERING) ? 1.0f : 0.0f;
     }
     switch ((ConditionKind)kind) {
-        case COND_BLEEDING: return 2.0f;
-        case COND_BURNING:  return 5.0f;
-        default:            return 0.0f; // Crippled/Weakness impair, not damage
+        case COND_BLEEDING: return GW_PIPS_BLEEDING;
+        case COND_BURNING:  return GW_PIPS_BURNING;
+        default:            return 0.0f; // Crippled/Weakness impair, not degenerate
     }
 }
 
@@ -59,8 +61,7 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind, f
     free->category = category;
     free->kind = kind;
     free->remaining = duration;
-    free->tickAccum = 0.0f;
-    free->tickDamage = AfflictionTickDamage(category, kind);
+    free->degenPips = AfflictionDegenPips(category, kind);
 }
 
 static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectStep *step, Entity *target) {
@@ -139,9 +140,9 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             break;
         }
         case FX_ADRENALINE_DELTA: {
-            target->adrenaline += (int)step->baseValue;
-            if (target->adrenaline > 100) target->adrenaline = 100;
-            if (target->adrenaline < 0) target->adrenaline = 0;
+            // Points, spread across every adrenal skill on the bar - the
+            // same way a landed strike charges them all.
+            Entity_AddAdrenalinePoints(target, (int)step->baseValue);
             break;
         }
         case FX_KNOCKDOWN: {

@@ -18,6 +18,7 @@
 #include "ui_tooltip.h"
 #include "titles.h"
 #include "builds.h"
+#include "collectors.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,10 +34,11 @@ static bool g_craftOpen = false;
 static bool g_trainerOpen = false;
 static bool g_professionOpen = false;
 static bool g_titlesOpen = false;
+static bool g_collectorOpen = false;
 
 static Rectangle g_invRect, g_dialogRect, g_shopRect,
                  g_craftRect, g_skillsRect, g_trainerRect, g_professionRect,
-                 g_titlesRect;
+                 g_titlesRect, g_collectorRect;
 
 // --- Prophecies pacing for the second profession ---------------------
 //
@@ -102,11 +104,11 @@ static const ShopEntry g_shopStock[] = {
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
 
-// The Armorer's recipes: gold + Charr Hides in, armor out - GW1's
+// The Armorer's recipes: gold + Charr Carvings in, armor out - GW1's
 // craft-only armor economy. No armor ever drops or sits in a shop.
 typedef struct { Item item; int gold; int hides; } CraftEntry;
 #define CRAFT_LIST_COUNT 10  // two tiers x five pieces
-#define CRAFT_MATERIAL "Charr Hide"
+#define CRAFT_MATERIAL "Charr Carving"
 
 // GW1 armor is per-profession, and the ceiling differs: a Warrior tops
 // out at AL 80, a Ranger at 70, every caster at 60. The armorer stocks
@@ -171,6 +173,7 @@ void UI_CloseNpcDialog(void) {
     g_craftOpen = false;
     g_trainerOpen = false;
     g_professionOpen = false;
+    g_collectorOpen = false;
 }
 
 bool UI_IsInventoryOpen(void) { return g_invOpen; }
@@ -921,6 +924,83 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
 // GW1's title screen, with the one track pre-Searing has. A title is
 // worn, not just collected, so the panel's real job is the toggle: the
 // point of Legendary Defender of Ascalon is that everyone can see it.
+
+// The collector's trade: one offer, taken or not. Deliberately not a
+// shop - GW1's collectors have exactly one thing they want and one
+// thing they give, and that flatness is what makes them read as people
+// standing in a field rather than as vendors.
+static void DrawCollector(Entity *player, int screenWidth, int screenHeight) {
+    const Entity *npc = Entity_Get(g_dialogNpc);
+    const CollectorOffer *offer = npc ? Collectors_OfferFor(npc->name) : NULL;
+    if (!offer) { g_collectorOpen = false; return; }
+
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int w = (int)(430 * scale);
+    int h = pad * 4 + font * 4 + (int)(40 * scale);
+
+    g_collectorRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(110 * scale),
+                                   (float)w, (float)h };
+    UIHit_Claim(g_collectorRect);
+    UI_ThemePanel(g_collectorRect, scale, pad + font + pad / 2);
+
+    if (PanelHeader(g_collectorRect, "Collector", NULL, NULL, font, pad, scale)) {
+        g_collectorOpen = false;
+        return;
+    }
+
+    int x = (int)g_collectorRect.x + pad;
+    int y = (int)g_collectorRect.y + pad + font + pad;
+
+    int have = Items_CountMaterial(offer->material);
+    bool enough = have >= offer->count;
+    bool room = g_inventoryCount < Items_Capacity();
+
+    char want[96];
+    snprintf(want, sizeof(want), "Wants:  %d x %s   (you have %d)",
+             offer->count, offer->material, have);
+    UIText(want, x, y, font, enough ? UI_POSITIVE : UI_TEXT_PRIMARY);
+    y += font + (int)(6 * scale);
+
+    char gives[96];
+    if (offer->reward.kind == ITEM_ARMOR) {
+        snprintf(gives, sizeof(gives), "Gives:  %s", offer->reward.name);
+    } else if (offer->reward.kind == ITEM_OFFHAND) {
+        snprintf(gives, sizeof(gives), "Gives:  %s  (+%d AL)", offer->reward.name, offer->reward.armor);
+    } else {
+        snprintf(gives, sizeof(gives), "Gives:  %s  %d-%d", offer->reward.name,
+                 offer->reward.dmgMin, offer->reward.dmgMax);
+    }
+    UIText(gives, x, y, font, UI_GOLD);
+    y += font + (int)(6 * scale);
+
+    UIText("Collectors ask for trophies, never gold.", x, y, small, UI_TEXT_MUTED);
+    y += small + (int)(8 * scale);
+
+    bool canTrade = enough && room;
+    Rectangle btn = { (float)x, (float)y, g_collectorRect.width - pad * 2, (float)(30 * scale) };
+    bool focused = UIFocus_Item();
+    const char *label = !enough ? "Not enough yet"
+                      : !room ? "No room in your bags"
+                              : "Make the trade";
+    if (focused) DrawRectangleLinesEx((Rectangle){ btn.x - 2, btn.y - 2,
+                                                   btn.width + 4, btn.height + 4 }, 2.0f, UI_GOLD);
+    if ((UI_Button(btn, label, font, canTrade, canTrade || focused) ||
+         (focused && canTrade && UIFocus_Confirm())) && canTrade) {
+        if (Items_ConsumeMaterial(offer->material, offer->count)) {
+            Items_AddToInventory(offer->reward);
+            Audio_Play(SFX_UI_CONFIRM);
+            char msg[96];
+            snprintf(msg, sizeof(msg), "Received:  %.40s", offer->reward.name);
+            UI_Notify(msg);
+            Save_Write();
+        }
+    }
+    (void)player;
+}
+
 static void DrawTitles(Entity *player, int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int font = (int)(12 * scale);
@@ -1216,7 +1296,7 @@ static void DrawShop(int screenWidth, int screenHeight) {
 // where" is never a mystery. E toggles it; the pad's Y opens it with
 // the inventory.
 
-// The Armorer's crafting window: recipes take gold AND Charr Hides,
+// The Armorer's crafting window: recipes take gold AND Charr Carvings,
 // GW1's armor-is-crafted-only economy.
 static void DrawCraft(Entity *player, int screenWidth, int screenHeight) {
     CraftEntry craftList[CRAFT_LIST_COUNT];
@@ -1474,6 +1554,20 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             }
             break;
         }
+        case NPC_COLLECTOR: {
+            const CollectorOffer *offer = Collectors_OfferFor(npc->name);
+            if (!offer) {
+                UIText("I've nothing to trade just now.", x, y, font, LIGHTGRAY);
+                break;
+            }
+            UIText(offer->flavour, x, y, font, LIGHTGRAY);
+            if (DialogButton(btn, g_collectorOpen ? "Step away" : "Look at the trade",
+                             font, true)) {
+                g_collectorOpen = !g_collectorOpen;
+                UIFocus_Clear();
+            }
+            break;
+        }
         case NPC_SKILL_TRAINER: {
             UIText("Skills are earned, not given. Points and coin, and I'll teach.",
                    x, y, font, LIGHTGRAY);
@@ -1568,6 +1662,7 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
     if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(player, screenWidth, screenHeight);
     if (g_trainerOpen && g_dialogNpc >= 0) DrawTrainer(player, screenWidth, screenHeight);
+    if (g_collectorOpen && g_dialogNpc >= 0) DrawCollector(player, screenWidth, screenHeight);
     if (g_professionOpen && g_dialogNpc >= 0) DrawProfessionPanel(player, screenWidth, screenHeight);
 
     if (focusList) {
@@ -1575,8 +1670,10 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
         // Back closes whatever is deepest, so a pad can always retreat
         // without needing the mouse to find a close box.
         if (UIFocus_Cancel()) {
-            if (g_shopOpen || g_craftOpen || g_trainerOpen || g_professionOpen) {
+            if (g_shopOpen || g_craftOpen || g_trainerOpen || g_professionOpen ||
+                g_collectorOpen) {
                 g_shopOpen = g_craftOpen = g_trainerOpen = g_professionOpen = false;
+                g_collectorOpen = false;
                 UIFocus_Clear();
                 Audio_Play(SFX_UI_CLOSE);
             } else {

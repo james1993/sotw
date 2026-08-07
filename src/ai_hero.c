@@ -147,7 +147,7 @@ static void UpdateMonster(int index) {
             // a GW1 monster that's leashed back to its spawn.
             self->hp = self->maxHp;
             self->energy = self->maxEnergy;
-            self->adrenaline = 0;
+            for (int a = 0; a < SKILL_BAR_SIZE; a++) self->adrenaline[a] = 0;
             for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) self->effects[i].active = false;
         }
 
@@ -169,7 +169,7 @@ static void UpdateMonster(int index) {
             // nearest waypoint (GW1 leash-regen, condensed).
             self->hp = self->maxHp;
             self->energy = self->maxEnergy;
-            self->adrenaline = 0;
+            for (int a = 0; a < SKILL_BAR_SIZE; a++) self->adrenaline[a] = 0;
             for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) self->effects[i].active = false;
             self->patrolDir = (Dist(self->pos, self->patrolB) < Dist(self->pos, self->patrolA)) ? +1 : -1;
             self->moveTarget = (self->patrolDir >= 0) ? self->patrolB : self->patrolA;

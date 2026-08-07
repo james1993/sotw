@@ -2,6 +2,7 @@
 #include "attributes.h"
 #include "entity.h"
 #include "skill.h"
+#include "gwmath.h"
 #include "ui_font.h"
 #include "ui_theme.h"
 #include <stdio.h>
@@ -184,8 +185,11 @@ void UITooltip_Skill(int skillIndex, const Entity *viewer,
     // --- Footer: GW1's energy / activation / recharge row ---
     char footer[80];
     if (s->adrenalineCost > 0) {
+        // GW1 prices adrenal skills in STRIKES, not points - "5 adrenaline"
+        // on a GW1 skill means five landed hits.
+        int strikes = (s->adrenalineCost + GW_ADRENALINE_PER_STRIKE - 1) / GW_ADRENALINE_PER_STRIKE;
         snprintf(footer, sizeof(footer), "%d adrenaline    %.0fs cast    %.0fs recharge",
-                 s->adrenalineCost, s->castTime, s->recharge);
+                 strikes, s->castTime, s->recharge);
     } else {
         snprintf(footer, sizeof(footer), "%d energy    %.1fs cast    %.0fs recharge",
                  s->energyCost, s->castTime, s->recharge);

@@ -27,9 +27,13 @@ static const Item g_rewardIdKit = { .kind = ITEM_KIT_ID, .name = "Identification
 
 Quest g_quests[QUEST_COUNT] = {
     // --- Ashford Abbey ---
-    // Abbot Ciglo's tithe. "Tithe for Ashford Abbey" is a real
-    // pre-Searing quest; the abbot standing in for its giver is the
-    // demake's choice (docs/research/pre-searing.md #6).
+    // Abbot Ciglo's tithe. A real pre-Searing quest name; the abbot
+    // standing in for its giver is the demake's choice.
+    //
+    // Canon names are used where the CONTENT matches too. "Further
+    // Adventures" is a real pre-Searing quest, but it happens in
+    // Lakeside and has nothing to do with a tithe - borrowing the name
+    // for this would be canon on the label and invented underneath.
     {
         .name = "Tithe for Ashford Abbey",
         .objective = "Bring 3 Skale Fins to Ashford Abbey",
@@ -68,9 +72,12 @@ Quest g_quests[QUEST_COUNT] = {
     },
 
     // --- Ascalon City: Prince Rurik ---
+    // GW1's pre-Searing primary chain, in its own order and under its
+    // own names: A Second Profession, Unsettling Rumors, The Path to
+    // Glory, and finally Ascalon Academy, which ends the campaign.
     {
-        .name = "Charr in the Catacombs",
-        .objective = "Clear the undead from the Catacombs",
+        .name = "Unsettling Rumors",
+        .objective = "Find out what walks in the Catacombs",
         .offerText = "Scouts say something stirs beneath the abbey - and worse, that "
                      "the Charr have been seen going down there. Find out what walks "
                      "in the Catacombs.",
@@ -86,7 +93,7 @@ Quest g_quests[QUEST_COUNT] = {
         .prereq = -1,
     },
     {
-        .name = "Charr at the Gate",
+        .name = "The Path to Glory",
         .objective = "Drive the Charr back in the Northlands",
         .offerText = "The Charr have crossed into the Northlands. Come with me and "
                      "we'll send them back over the wall.",
@@ -157,7 +164,7 @@ Quest g_quests[QUEST_COUNT] = {
     // and the Charr come. In GW1 this is the point of no return, which
     // is why it needs every other thread finished first.
     {
-        .name = "The Ascalon Academy",
+        .name = "Ascalon Academy",
         .objective = "Take Sir Tydus' trial at the Ascalon Academy",
         .offerText = "You've done enough for Ascalon to be asked properly. Take the "
                      "trial at the Academy and you'll wear the Guards' colours. "
@@ -170,19 +177,19 @@ Quest g_quests[QUEST_COUNT] = {
         .rewardGold = 400,
         .rewardSkill = -1,
         .state = QUEST_AVAILABLE,
-        .prereq = 3, // after Charr at the Gate - the whole city thread
+        .prereq = 3, // after The Path to Glory - the whole city thread
         .endsCampaign = true,
     },
 
     {
         .name = "Hides for the Watch",
-        .objective = "Bring 4 Charr Hides to Piken Square",
+        .objective = "Bring 4 Charr Carvings to Piken Square",
         .offerText = "Winter comes early this far north. Four Charr hides for the "
                      "wall-watchers and I'll see you paid.",
         .giverName = "Warmaster Riga",
         .type = QTYPE_COLLECT,
         .killsRequired = 4,
-        .collectMaterial = "Charr Hide",
+        .collectMaterial = "Charr Carving",
         .rewardXP = 400,
         .rewardGold = 300,
         .rewardSkill = -1,

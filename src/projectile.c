@@ -53,8 +53,7 @@ static void Impact(Projectile *p) {
     Entity_ApplyDamage(target, p->damage, shooter);
     Fx_Burst(target->pos, p->color);
     if (shooter && shooter->alive) {
-        shooter->adrenaline += 4; // landed hits build adrenaline, as in melee
-        if (shooter->adrenaline > 100) shooter->adrenaline = 100;
+        Entity_GainAdrenalineStrike(shooter); // a landed shot is a strike too
         if (target->kind == ENT_MONSTER && !target->aggroed) {
             // A landed ranged hit wakes a sleeping monster - the wand
             // pull - and its whole group answers, GW1-style.

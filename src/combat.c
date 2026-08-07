@@ -46,11 +46,11 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     // which is the only reason a Ranger can afford to press one every
     // few seconds off a 20-energy pool.
     int energyCost = GW_SkillEnergyCost(skill->energyCost,
-                                        caster->attributeRank[ATTR_EXPERTISE],
+                                        Entity_EffectiveRank(caster, ATTR_EXPERTISE),
                                         skill->type == SKILLTYPE_ATTACK_SKILL);
 
     if (energyCost > 0 && caster->energy < energyCost) return false;
-    if (skill->adrenalineCost > 0 && caster->adrenaline < skill->adrenalineCost) return false;
+    if (skill->adrenalineCost > 0 && caster->adrenaline[slot] < skill->adrenalineCost) return false;
 
     Entity *target = Entity_Get(targetIndex);
     if (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) {
@@ -78,8 +78,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     }
 
     caster->energy -= energyCost;
-    caster->adrenaline -= skill->adrenalineCost;
-    if (caster->adrenaline < 0) caster->adrenaline = 0;
+    if (skill->adrenalineCost > 0) Entity_SpendAdrenaline(caster, slot);
 
     // Which skill the target panel shows as "current/recent" - set here so
     // it covers both branches below, not just cast-time skills.
@@ -90,7 +89,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     // 2^(-rank/15) - rank 15 halves it. Signets and attack skills are
     // untouched, which is why a Mesmer bar is spells almost end to end.
     float castTime = GW_SkillCastTime(skill->castTime,
-                                      caster->attributeRank[ATTR_FAST_CASTING],
+                                      Entity_EffectiveRank(caster, ATTR_FAST_CASTING),
                                       skill->type == SKILLTYPE_SPELL);
 
     if (castTime > 0.0f) {
@@ -197,18 +196,32 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         }
     }
 
-    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
-        ActiveEffect *fx = &e->effects[i];
-        if (!fx->active) continue;
-        fx->remaining -= dt;
-        if (fx->tickDamage > 0.0f) {
-            fx->tickAccum += dt;
-            if (fx->tickAccum >= 1.0f) {
-                fx->tickAccum -= 1.0f;
-                Entity_ApplyDamage(e, (int)fx->tickDamage, NULL);
-            }
+    // Degeneration, GW1's way: every source contributes PIPS, the pips
+    // are summed, the total is capped at 10, and only then does it
+    // become health. Ticking each condition separately (as this used to)
+    // both got the rate wrong and made the cap impossible to express -
+    // and the cap is the whole reason a stack of conditions wears you
+    // down instead of deleting you.
+    {
+        float pips = 0.0f;
+        for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+            ActiveEffect *fx = &e->effects[i];
+            if (!fx->active) continue;
+            fx->remaining -= dt;
+            pips += fx->degenPips;
+            if (fx->remaining <= 0.0f) fx->active = false;
         }
-        if (fx->remaining <= 0.0f) fx->active = false;
+        if (pips > GW_MAX_DEGEN_PIPS) pips = GW_MAX_DEGEN_PIPS;
+        if (pips > 0.0f) {
+            // Continuous, not one-second lumps: GW1's health bar slides.
+            e->degenAccum += pips * GW_HEALTH_PER_PIP * dt;
+            while (e->degenAccum >= 1.0f && e->alive) {
+                e->degenAccum -= 1.0f;
+                Entity_ApplyDamage(e, 1, NULL);
+            }
+        } else {
+            e->degenAccum = 0.0f;
+        }
     }
 
     if (Entity_IsCasting(e)) {
@@ -297,8 +310,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         // Group members join in, GW1-style.
                         Entity_WakeMonsterGroup(target, Entity_RefOf((int)(e - g_entities)));
                     }
-                    e->adrenaline += 4; // basic attacks also build adrenaline in GW1
-                    if (e->adrenaline > 100) e->adrenaline = 100;
+                    Entity_GainAdrenalineStrike(e); // one strike, GW1's unit
                 }
                 e->attackTimer = Entity_AttackInterval(e); // slowed while hexed
             }

@@ -162,6 +162,12 @@ static const SpawnDef g_lakesideSpawns[] = {
       .level = 2, .hp = 110, .armor = 25, .aggro = 115.0f, .strengthRank = 4,
       .species = SPECIES_SKALE, .group = 1 },
 
+    // A collector, out in the field where GW1 puts them: not in the
+    // safety of an outpost, but far enough in that reaching one is
+    // itself a small errand.
+    { .kind = SPAWN_NPC, .name = "Farmer Hamnet", .pos = { 140, 250 },
+      .npcRole = NPC_COLLECTOR, .npcColor = { 176, 154, 96, 255 } },
+
     // Moa wander and won't start anything - the tutorial's way of
     // teaching that not everything on the field is a fight.
     { .kind = SPAWN_MONSTER_PATROL, .name = "Moa Bird", .pos = { -200, -150 },
@@ -245,6 +251,9 @@ static const SpawnDef g_greenHillsSpawns[] = {
     { .kind = SPAWN_NPC, .name = "Lady Althea", .pos = { -440, 10 },
       .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_MESMER,
       .npcColor = { 168, 92, 148, 255 } },
+
+    { .kind = SPAWN_NPC, .name = "Sentry Wallin", .pos = { -320, -120 },
+      .npcRole = NPC_COLLECTOR, .npcColor = { 150, 160, 176, 255 } },
 
     { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 120, -60 },
       .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
@@ -459,6 +468,9 @@ static const SpawnDef g_northSpawns[] = {
     { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 120, 20 },
       .level = 6, .hp = 190, .armor = 45, .aggro = 135.0f, .strengthRank = 8,
       .caster = true, .species = SPECIES_CHARR, .group = 1 },
+
+    { .kind = SPAWN_NPC, .name = "Quartermaster Ferrick", .pos = { -300, -160 },
+      .npcRole = NPC_COLLECTOR, .npcColor = { 168, 132, 96, 255 } },
 
     { .kind = SPAWN_MONSTER_PATROL, .name = "Grawl", .pos = { -280, 120 },
       .posB = { 100, 220 }, .level = 4, .hp = 160, .armor = 35, .aggro = 125.0f,
@@ -894,7 +906,7 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     p->lastCastSkillSlot = -1;
     p->postCastDisplayTimer = 0.0f;
     p->interruptFlashTimer = 0.0f;
-    p->adrenaline = 0;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) p->adrenaline[i] = 0;
     p->alive = true;
     p->deathPenalty = 0;
     Entity_RecomputePenalizedStats(p);

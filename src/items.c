@@ -31,8 +31,9 @@ static const Item g_weaponTable[] = {
 
 // The crafting material Charr leave behind - the Armorer turns these
 // (plus gold) into armor, GW1's craft-only armor economy in miniature.
-static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Hide", .count = 1 };
+static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Carving", .count = 1 };
 static const Item g_skaleFin  = { .kind = ITEM_MATERIAL, .name = "Skale Fin",  .count = 1 };
+static const Item g_grawlNecklace = { .kind = ITEM_MATERIAL, .name = "Grawl Necklace", .count = 1 };
 
 const char *Items_SlotName(EquipSlot slot) {
     switch (slot) {
@@ -343,6 +344,7 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
         const Item *material = NULL;
         if (species == SPECIES_CHARR) material = &g_charrHide;
         else if (species == SPECIES_SKALE) material = &g_skaleFin;
+        else if (species == SPECIES_GRAWL) material = &g_grawlNecklace;
 
         if (material && GetRandomValue(1, 100) <= 55 && DropIsMine(party)) {
             d = FindFreeDrop();

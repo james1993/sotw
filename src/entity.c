@@ -19,7 +19,16 @@ int g_entityCount = 0;
 unsigned g_entityGen[MAX_ENTITIES];
 
 int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color color) {
-    if (g_entityCount >= MAX_ENTITIES) return -1;
+    if (g_entityCount >= MAX_ENTITIES) {
+        // Callers all handle the -1 by skipping the spawn, so a full
+        // array degrades into a zone that is quietly missing NPCs or
+        // monsters. Say so: silently absent content is far harder to
+        // diagnose than a crash. (Worst zone today is 9 spawns plus a
+        // 3-strong party, so this is headroom, not a limit being hit.)
+        TraceLog(LOG_WARNING, "ENTITY: array full (%d) - '%s' was not spawned",
+                 MAX_ENTITIES, name ? name : "?");
+        return -1;
+    }
 
     int idx = g_entityCount++;
     g_entityGen[idx]++; // this slot now holds a different entity; stale refs die here
@@ -43,7 +52,7 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->energy = e->maxEnergy = e->baseMaxEnergy = GW_BASE_ENERGY;
     e->energyRegenPips = GW_BASE_ENERGY_PIPS;
     e->deathPenalty = 0;
-    e->adrenaline = 0;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) e->adrenaline[i] = 0;
     e->armor = 60; // neutral AL - no bonus, no penalty
     e->level = 1;
     // -1 means "never chose hair at creation", which is everyone except
@@ -305,11 +314,63 @@ float Entity_AttackInterval(const Entity *e) {
 
 int Entity_ScaleOutgoingDamage(const Entity *e, int damage) {
     if (!e) return damage;
+    // GW1's Weakness takes 66% off the WEAPON's damage - not the 25%
+    // this used to apply, and not the bonus damage an attack skill adds
+    // on top, which is why this only wraps basic attacks.
     if (Entity_HasCondition(e, COND_WEAKNESS)) {
-        damage = (int)(damage * 0.75f);
+        damage = (int)((float)damage * GW_WEAKNESS_DAMAGE_SCALE);
         if (damage < 1) damage = 1;
     }
     return damage;
+}
+
+// Only adrenal skills charge, so a bar with none of them never
+// accumulates anything - which is exactly right: adrenaline is a
+// Warrior mechanic, not a universal resource.
+static bool SlotIsAdrenal(const Entity *e, int slot) {
+    if (slot < 0 || slot >= SKILL_BAR_SIZE) return false;
+    int id = e->skillBar[slot];
+    return id >= 0 && id < g_skillCount && g_skillDB[id].adrenalineCost > 0;
+}
+
+void Entity_GainAdrenalineStrike(Entity *e) {
+    if (!e) return;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        if (!SlotIsAdrenal(e, i)) continue;
+        int cap = g_skillDB[e->skillBar[i]].adrenalineCost;
+        e->adrenaline[i] += GW_ADRENALINE_PER_STRIKE;
+        // Charge caps at the skill's cost: GW1 doesn't bank surplus
+        // adrenaline against the next use.
+        if (e->adrenaline[i] > cap) e->adrenaline[i] = cap;
+    }
+}
+
+void Entity_AddAdrenalinePoints(Entity *e, int points) {
+    if (!e) return;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        if (!SlotIsAdrenal(e, i)) continue;
+        int cap = g_skillDB[e->skillBar[i]].adrenalineCost;
+        e->adrenaline[i] += points;
+        if (e->adrenaline[i] > cap) e->adrenaline[i] = cap;
+        if (e->adrenaline[i] < 0) e->adrenaline[i] = 0;
+    }
+}
+
+void Entity_SpendAdrenaline(Entity *e, int slot) {
+    if (!e || slot < 0 || slot >= SKILL_BAR_SIZE) return;
+    e->adrenaline[slot] = 0;
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        if (i == slot || !SlotIsAdrenal(e, i)) continue;
+        e->adrenaline[i] -= GW_ADRENALINE_CROSS_DRAIN;
+        if (e->adrenaline[i] < 0) e->adrenaline[i] = 0;
+    }
+}
+
+int Entity_EffectiveRank(const Entity *e, AttributeKind attr) {
+    if (!e || attr < 0 || attr >= ATTR_COUNT) return 0;
+    int rank = e->attributeRank[attr];
+    if (rank > 0 && Entity_HasCondition(e, COND_WEAKNESS)) rank--;
+    return rank;
 }
 
 const char *Entity_EffectName(const ActiveEffect *fx) {

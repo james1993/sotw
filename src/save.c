@@ -429,9 +429,16 @@ bool Save_LoadAndApply(void) {
             it.count = ClampInt(it.count, 1, 9999);
             strncpy(it.name, val + consumed, sizeof(it.name) - 1);
             Items_AddToInventory(it);
+        } else if (strcmp(key, "version") != 0 && strcmp(key, "itemCount") != 0) {
+            // The writer and the reader are two hand-maintained lists of
+            // the same keys, and nothing makes them agree. When they
+            // drift, the symptom is silent: a field saves fine and comes
+            // back as its default. (That is exactly how "name=" was
+            // written for a while while the loader only ever read
+            // "charName=".) Naming the orphan turns a silent data loss
+            // into a line in the log.
+            TraceLog(LOG_WARNING, "SAVE: no loader for key '%s' - writer and reader have drifted", key);
         }
-        // "version" / "itemCount" are informational; unknown keys are
-        // skipped so older builds tolerate newer saves.
     }
     fclose(f);
 
