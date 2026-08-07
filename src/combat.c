@@ -1,4 +1,5 @@
 #include "combat.h"
+#include "audio.h"
 #include "gwmath.h"
 #include "skill.h"
 #include "effect.h"
@@ -74,6 +75,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     // Which skill the target panel shows as "current/recent" - set here so
     // it covers both branches below, not just cast-time skills.
     caster->lastCastSkillSlot = slot;
+    Audio_PlaySkill(skill);
 
     // Fast Casting (Mesmer primary) multiplies SPELL activation by
     // 2^(-rank/15) - rank 15 halves it. Signets and attack skills are
@@ -253,6 +255,20 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     Fx_Burst(e->pos, (Color){ 178, 118, 220, 255 });
                 }
                 e->attackAnimTimer = ATTACK_ANIM_DURATION; // the visible swing (sprite.c)
+                {
+                    // Ranged does NOT mean bow: an Elementalist's staff
+                    // and a Charr shaman's ranged attack are bolts of
+                    // magic, and a bowstring on either sounds wrong. Only
+                    // an actual archer gets the string.
+                    Entity *player = Entity_Get(0);
+                    float dx = player ? e->pos.x - player->pos.x : 0.0f;
+                    SoundId id = SFX_SWING;
+                    if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
+                        id = (e->primaryProfession == PROF_RANGER) ? SFX_BOW
+                                                                   : SFX_CAST_ARCANE;
+                    }
+                    Audio_PlayAt(id, dx);
+                }
                 if (e->attackRange > RANGED_ATTACK_THRESHOLD) {
                     // Ranged: a visible bolt flies to where the target is
                     // standing NOW; adrenaline/aggro/damage resolve on

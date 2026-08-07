@@ -33,7 +33,8 @@ typedef enum {
     PAUSE_OPEN_ATTRIBUTES,
     PAUSE_OPEN_MAP,
     PAUSE_QUIT_TO_MENU,
-    PAUSE_QUIT_GAME
+    PAUSE_QUIT_GAME,
+    PAUSE_VOLUME   // cycles master volume; the menu stays open
 } PauseAction;
 
 PauseAction UI_DrawPauseMenu(int screenWidth, int screenHeight);

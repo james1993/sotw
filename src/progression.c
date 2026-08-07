@@ -1,4 +1,5 @@
 #include "progression.h"
+#include "audio.h"
 #include "entity.h"
 #include "skillbook.h"
 #include "ui_hints.h"
@@ -34,6 +35,7 @@ void Progression_AwardXP(Entity *player, int amount) {
         char msg[64];
         snprintf(msg, sizeof(msg), "Level %d  -  +1 skill point", player->level);
         UI_Notify(msg);
+        Audio_Play(SFX_LEVEL_UP);
     }
     if (player->level >= MAX_LEVEL) player->xp = 0;
 }

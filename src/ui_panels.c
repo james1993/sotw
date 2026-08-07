@@ -13,6 +13,7 @@
 #include "ui_font.h"
 #include "ui_theme.h"
 #include "ui_hints.h"
+#include "audio.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -117,6 +118,7 @@ static int g_armedKit = -1;
 static bool g_dialogOpenedThisFrame = false;
 
 void UI_OpenNpcDialog(int entityIndex) {
+    if (g_dialogNpc != entityIndex) Audio_Play(SFX_UI_OPEN);
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
     g_craftOpen = false;
@@ -128,6 +130,7 @@ bool UI_IsNpcDialogOpen(void) {
 }
 
 void UI_CloseNpcDialog(void) {
+    if (g_dialogNpc >= 0) Audio_Play(SFX_UI_CLOSE);
     g_dialogNpc = -1;
     g_shopOpen = false;
     g_craftOpen = false;
@@ -549,6 +552,7 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
 
         if (hovered && click && affordable) {
             if (Skillbook_Buy(i, player->primaryProfession, player->secondaryProfession)) {
+                Audio_Play(SFX_UI_CONFIRM);
                 char msg[96];
                 snprintf(msg, sizeof(msg), "Skill learned:  %.31s", s->name);
                 UI_Notify(msg);
@@ -1030,6 +1034,7 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
                 }
             }
 
+            Audio_Play(SFX_UI_CONFIRM);
             char msg[96];
             snprintf(msg, sizeof(msg), "You are now a %.20s / %.20s",
                      Character_ProfessionName(player->primaryProfession),

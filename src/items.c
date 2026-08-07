@@ -1,4 +1,5 @@
 #include "items.h"
+#include "audio.h"
 #include "entity.h"
 #include "raylib.h"
 #include <math.h>
@@ -215,9 +216,11 @@ void Items_UpdatePickup(Entity *player) {
         if (d->gold > 0) {
             g_gold += d->gold;
             d->active = false;
+            Audio_Play(SFX_LOOT);
         } else if (d->item.kind != ITEM_NONE) {
             if (Items_AddToInventory(d->item)) {
                 d->active = false;
+                Audio_Play(SFX_LOOT);
             }
             // Inventory full: leave it on the ground.
         }

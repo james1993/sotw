@@ -1,4 +1,5 @@
 #include "entity.h"
+#include "audio.h"
 #include "gwmath.h"
 #include "items.h"
 #include "progression.h"
@@ -168,10 +169,18 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
 }
 
 void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorPenetration) {
-    (void)attacker; // kills award party-wide XP regardless of who landed the blow
     if (!e->alive) return;
 
     int finalDamage = GW_ArmorScaledDamage(amount, e->armor, armorPenetration);
+
+    // Only struck blows are audible. Condition ticks pass attacker=NULL
+    // and would otherwise fire an impact every second, per affliction,
+    // per character.
+    if (attacker) {
+        Entity *player = Entity_Get(PLAYER_INDEX);
+        float dx = player ? e->pos.x - player->pos.x : 0.0f;
+        Audio_PlayAt(finalDamage >= 25 ? SFX_HIT_HEAVY : SFX_HIT, dx);
+    }
 
     e->hp -= finalDamage;
     Entity_MarkInCombat(e);
@@ -180,6 +189,10 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
         e->alive = false;
         e->hasMoveTarget = false;
         e->castingSlot = -1;
+        {
+            Entity *player = Entity_Get(PLAYER_INDEX);
+            Audio_PlayAt(SFX_DEATH, player ? e->pos.x - player->pos.x : 0.0f);
+        }
 
         // Every death feeds nearby Soul Reaping, whichever side it was
         // on - GW1 makes no distinction, and that's what makes a

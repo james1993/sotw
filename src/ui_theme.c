@@ -1,5 +1,6 @@
 #include "ui_theme.h"
 #include "ui_icons.h"
+#include "audio.h"
 #include "ui_font.h"
 #include "ui_cursor.h"
 #include "skill.h"
@@ -82,6 +83,9 @@ bool UI_Row(Rectangle rect, UIRowState state, bool hovered) {
     } else if (hovered && state == UI_ROW_NORMAL) {
         DrawRectangleRec(rect, UI_SURFACE_HOVER);
     }
+    if (hovered && UI_PointerClicked()) {
+        Audio_Play(state == UI_ROW_DISABLED ? SFX_UI_DENY : SFX_UI_CLICK);
+    }
     return hovered && state != UI_ROW_DISABLED && UI_PointerClicked();
 }
 
@@ -101,6 +105,13 @@ bool UI_Button(Rectangle rect, const char *label, int font, bool enabled, bool h
     UI_TextShadow(label, (int)(rect.x + (rect.width - tw) / 2),
                   (int)(rect.y + (rect.height - font) / 2), font,
                   enabled ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
+
+    // Every button in the game comes through here, so one hook covers
+    // the whole interface - and a click on a DISABLED button still makes
+    // a sound, because "nothing happened" needs feedback most of all.
+    if (CheckCollisionPointRec(UI_PointerPos(), rect) && UI_PointerClicked()) {
+        Audio_Play(enabled ? SFX_UI_CLICK : SFX_UI_DENY);
+    }
     return hovered && UI_PointerClicked();
 }
 

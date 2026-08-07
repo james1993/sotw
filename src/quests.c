@@ -1,4 +1,5 @@
 #include "quests.h"
+#include "audio.h"
 #include "entity.h"
 #include "progression.h"
 #include "items.h"
@@ -189,6 +190,7 @@ bool Quests_TurnIn(Entity *player, int index) {
         UI_Notify(msg);
     }
 
+    Audio_Play(SFX_QUEST_DONE);
     Progression_AwardXP(player, q->rewardXP);
     g_gold += q->rewardGold;
     Save_Write();

@@ -1,4 +1,6 @@
 #include "ui_menu.h"
+#include "audio.h"
+#include <stdio.h>
 #include "ui_font.h"
 #include "ui_theme.h"
 #include "raylib.h"
@@ -164,6 +166,10 @@ static const PauseEntry g_pauseEntries[] = {
     { "Attributes",        "K",   PAUSE_OPEN_ATTRIBUTES },
     { "Region Map",        "M",   PAUSE_OPEN_MAP },
     { NULL,                NULL,  PAUSE_NONE }, // separator
+    // The label is rewritten each frame with the live value, so the row
+    // shows the current volume rather than just offering to change it.
+    { "Sound",             NULL,  PAUSE_VOLUME },
+    { NULL,                NULL,  PAUSE_NONE }, // separator
     { "Quit to Main Menu", NULL,  PAUSE_QUIT_TO_MENU },
     { "Quit Game",         NULL,  PAUSE_QUIT_GAME },
 };
@@ -236,7 +242,16 @@ PauseAction UI_DrawPauseMenu(int screenWidth, int screenHeight) {
         Rectangle r = { (float)x, (float)y, (float)btnW, (float)btnH };
         if (mouseMoved && CheckCollisionPointRec(mouse, r)) g_pauseSelected = i;
         bool selected = (i == g_pauseSelected);
-        if (UI_Button(r, entry->label, font, true, selected)) result = entry->action;
+
+        const char *label = entry->label;
+        char volumeLabel[48];
+        if (entry->action == PAUSE_VOLUME) {
+            int v = Audio_GetVolume();
+            if (v <= 0) snprintf(volumeLabel, sizeof(volumeLabel), "Sound:  off");
+            else        snprintf(volumeLabel, sizeof(volumeLabel), "Sound:  %d%%", v);
+            label = volumeLabel;
+        }
+        if (UI_Button(r, label, font, true, selected)) result = entry->action;
 
         // The keyboard shortcut sits right-aligned inside the row, so the
         // menu teaches its own bindings instead of hiding them.

@@ -8,6 +8,7 @@
 #include "skillbook.h"
 #include "attributes.h"
 #include "progression.h"
+#include "audio.h"
 #include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,6 +107,10 @@ bool Save_Write(void) {
         fprintf(f, "skill%d=%d\n", i, p->skillBar[i]);
     }
     fprintf(f, "gold=%d\n", g_gold);
+    // A setting rather than character state, but there is one save
+    // file and one player, and a volume that resets every launch is
+    // worse than a slightly impure schema.
+    fprintf(f, "volume=%d\n", Audio_GetVolume());
     // Which skills the character owns - the collection is the character,
     // as much as their level or their gear.
     {
@@ -224,6 +229,8 @@ bool Save_LoadAndApply(void) {
         } else if (sscanf(key, "skill%d", &idx) == 1 && idx >= 0 && idx < SKILL_BAR_SIZE) {
             int s = atoi(val);
             p->skillBar[idx] = (s >= -1 && s < g_skillCount) ? s : -1;
+        } else if (strcmp(key, "volume") == 0) {
+            Audio_SetVolume(ClampInt(atoi(val), 0, 100));
         } else if (strcmp(key, "gold") == 0) {
             g_gold = ClampInt(atoi(val), 0, 1000000000);
         } else if (strcmp(key, "skillsKnown") == 0) {

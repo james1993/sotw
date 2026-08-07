@@ -24,6 +24,7 @@
 #include "ui_font.h"
 #include "ui_icons.h"
 #include "ground.h"
+#include "audio.h"
 #include "ui_world.h"
 #include "ui_hints.h"
 #include "render.h"
@@ -84,6 +85,7 @@ int main(void) {
     UIFont_Init();
     UIIcons_Init();
     Ground_Init();
+    Audio_Init();
     SkillDB_Init();
     // A sane character exists from the first frame, so Continue on a
     // save written before creation existed still has something valid.
@@ -105,6 +107,7 @@ int main(void) {
 
     while (!WindowShouldClose() && !quitRequested) {
         float dt = GetFrameTime();
+        Audio_Update(dt);
         int screenWidth = GetScreenWidth();
         int screenHeight = GetScreenHeight();
 
@@ -250,6 +253,18 @@ int main(void) {
                     UI_OpenMapOverlay();
                     paused = false;
                     break;
+                case PAUSE_VOLUME: {
+                    // Steps 0 -> 25 -> 50 -> 75 -> 100 -> 0, snapping to
+                    // the grid rather than adding 25 to whatever was
+                    // loaded - otherwise a saved 70 walks off to 95. A
+                    // single control that reaches silence is worth more
+                    // here than a slider nobody can drag with a gamepad.
+                    int v = (Audio_GetVolume() / 25 + 1) * 25;
+                    Audio_SetVolume(v > 100 ? 0 : v);
+                    Audio_Play(SFX_UI_CLICK); // audition the new level
+                    Save_Write();
+                    break; // stays paused, unlike every other entry
+                }
                 case PAUSE_QUIT_TO_MENU:
                     Save_Write();
                     paused = false;
@@ -293,6 +308,7 @@ int main(void) {
 
     UIIcons_Unload();
     Ground_Unload();
+    Audio_Unload();
     CloseWindow();
     return 0;
 }
