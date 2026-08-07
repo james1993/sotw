@@ -23,10 +23,10 @@ static const HintEntry g_hints[] = {
     { "Space", "A",      "Attack" },
     { "Tab",   "R1",     "Next foe" },
     { "F",     "X",      "Talk" },
-    { "L",     NULL,     "Skills" },
+    { "L",     NULL,     "Build" },
     { "I",     NULL,     "Bags" },
     { "E",     NULL,     "Gear" },
-    { "K",     NULL,     "Attributes" },
+    { "T",     NULL,     "Titles" },
     { "M",     "Select", "Map" },
     { "P",     "Start",  "Menu" },
 };

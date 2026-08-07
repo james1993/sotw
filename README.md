@@ -215,11 +215,24 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   NPC works too (and walks you over if you're out of range).
 - **1–8** activate whatever you've slotted on your skill bar. Cynn, the
   hero companion, fights automatically the same way a GW1 hero does.
-- **L** opens the **skills panel** — your eight-slot bar on top, every
-  skill you've learned underneath. Click a slot to arm it, then click a
-  skill to place it (click the armed slot again to empty it). Like GW1,
-  the bar can only be rearranged **in an outpost**: you commit to a
-  build before you head out and live with it in the field.
+- **L** (or **K**) opens **Skills & Attributes**, one screen the way GW1
+  has it: your eight-slot bar on top, your attribute lines on the left,
+  every skill you've learned on the right. They belong together because
+  they are one decision — a skill's numbers come from a rank, and
+  choosing either in isolation is guesswork. Click a slot to arm it,
+  then click a skill to place it (click the armed slot again to empty
+  it). Like GW1, the bar and the ranks can only be changed **in an
+  outpost**: you commit to a build before you head out and live with it
+  in the field.
+- The same screen carries four **templates**, GW1's save/load for a
+  whole build. A template stores the bar *and* the attribute spread,
+  because saving one without the other isn't the build you saved. Name
+  them by clicking the field and typing; an unnamed one names itself
+  after the professions and the line it leans on hardest. Loading fits
+  the spread to whatever point budget the character actually has —
+  shaving the shallowest lines first, so a template saved at 20 and
+  loaded at 12 keeps its shape — and drops any skill the character
+  hasn't learned rather than silently equipping it.
 - **I** toggles the inventory (walk over drops to pick them up; click an
   item to equip it). **E** toggles the equipment screen - both slots
   with their numbers, plus a character summary; click a slot to cycle

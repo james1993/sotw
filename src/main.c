@@ -29,6 +29,7 @@
 #include "ui_hints.h"
 #include "ui_tooltip.h"
 #include "titles.h"
+#include "builds.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -48,6 +49,7 @@ static void StartGame(bool loadSave, Camera2D *camera) {
     Items_Reset();
     Quests_Reset();
     Titles_Reset();
+    Builds_Reset();
     g_entityCount = 0; // generation counters keep climbing, killing stale refs
 
     World_Init();

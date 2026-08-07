@@ -3,6 +3,7 @@
 #include "items.h"
 #include "quests.h"
 #include "titles.h"
+#include "builds.h"
 #include "world.h"
 #include "skill.h"
 #include "character.h"
@@ -98,6 +99,18 @@ bool Save_Write(void) {
             g_character.hairColor, g_character.hairStyle);
     fprintf(f, "reforged=%d\n", g_character.reforged ? 1 : 0);
     fprintf(f, "titleWorn=%d\n", Titles_Displayed());
+
+    // Skill templates: name, bar, spread. Written one line per slot so a
+    // save from before templates existed simply has none.
+    for (int i = 0; i < BUILD_SLOT_COUNT; i++) {
+        const BuildTemplate *b = Builds_Slot(i);
+        if (!b || !b->used) continue;
+        fprintf(f, "build%d=%s|", i, b->name);
+        for (int k = 0; k < SKILL_BAR_SIZE; k++) fprintf(f, "%d%s", b->skillBar[k], k + 1 < SKILL_BAR_SIZE ? "," : "");
+        fprintf(f, "|");
+        for (int a = 0; a < ATTR_COUNT; a++) fprintf(f, "%d%s", b->attributeRank[a], a + 1 < ATTR_COUNT ? "," : "");
+        fprintf(f, "\n");
+    }
     fprintf(f, "charName=%s\n", g_character.name);
     fprintf(f, "outpost=%d\n", (int)World_GetLastOutpostId());
     fprintf(f, "level=%d\n", p->level);
@@ -246,6 +259,29 @@ bool Save_LoadAndApply(void) {
             g_skillPoints = ClampInt(atoi(val), 0, 999);
         } else if (strcmp(key, "skillsBought") == 0) {
             g_skillsPurchased = ClampInt(atoi(val), 0, 999);
+        } else if (sscanf(key, "build%d", &idx) == 1 && idx >= 0 && idx < BUILD_SLOT_COUNT) {
+            BuildTemplate *b = Builds_Slot(idx);
+            char *bars = strchr(val, '|');
+            char *ranks = bars ? strchr(bars + 1, '|') : NULL;
+            if (b && bars && ranks) {
+                *bars = '\0';
+                *ranks = '\0';
+                snprintf(b->name, sizeof(b->name), "%s", val);
+                const char *p2 = bars + 1;
+                for (int k = 0; k < SKILL_BAR_SIZE; k++) {
+                    b->skillBar[k] = (int)strtol(p2, (char **)&p2, 10);
+                    if (*p2 == ',') p2++;
+                }
+                p2 = ranks + 1;
+                for (int a = 0; a < ATTR_COUNT; a++) {
+                    long r = strtol(p2, (char **)&p2, 10);
+                    if (r < 0) r = 0;
+                    if (r > ATTRIBUTE_RANK_CAP) r = ATTRIBUTE_RANK_CAP;
+                    b->attributeRank[a] = (unsigned char)r;
+                    if (*p2 == ',') p2++;
+                }
+                b->used = true;
+            }
         } else if (strcmp(key, "titleWorn") == 0) {
             // Applied after the player's level is restored, below - the
             // setter refuses a title that isn't earned yet, and at this

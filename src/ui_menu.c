@@ -165,10 +165,9 @@ typedef struct {
 
 static const PauseEntry g_pauseEntries[] = {
     { "Resume",            NULL,  PAUSE_RESUME },
-    { "Skills & Build",    "L",   PAUSE_OPEN_SKILLS },
+    { "Skills & Attributes", "L", PAUSE_OPEN_SKILLS },
     { "Equipment",         "E",   PAUSE_OPEN_EQUIPMENT },
     { "Inventory",         "I",   PAUSE_OPEN_INVENTORY },
-    { "Attributes",        "K",   PAUSE_OPEN_ATTRIBUTES },
     { "Titles",            "T",   PAUSE_OPEN_TITLES },
     { "Region Map",        "M",   PAUSE_OPEN_MAP },
     { NULL,                NULL,  PAUSE_NONE }, // separator

@@ -17,6 +17,7 @@
 #include "ui_focus.h"
 #include "ui_tooltip.h"
 #include "titles.h"
+#include "builds.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,7 +26,6 @@
 #define DIALOG_WALKAWAY_DISTANCE 130.0f
 
 static bool g_invOpen = false;
-static bool g_attrOpen = false;
 static bool g_equipOpen = false;
 static bool g_skillsOpen = false;
 static int g_dialogNpc = -1;   // entity index, -1 = closed
@@ -35,7 +35,7 @@ static bool g_trainerOpen = false;
 static bool g_professionOpen = false;
 static bool g_titlesOpen = false;
 
-static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
+static Rectangle g_invRect, g_dialogRect, g_shopRect, g_equipRect,
                  g_craftRect, g_skillsRect, g_trainerRect, g_professionRect,
                  g_titlesRect;
 
@@ -73,6 +73,11 @@ static bool SecondaryChangeAllowed(const Entity *player) {
 // arm it, then click a known skill to drop it in - two clicks, works
 // identically with the mouse and with the pad's menu cursor.
 static int g_armedBarSlot = -1;
+
+// Which template slot's name is being typed into, -1 = none. While one
+// is armed the panel hotkeys are suppressed, or typing "L" would close
+// the window you are typing in.
+static int g_editingBuild = -1;
 
 // The merchant's stock: fixed-power items at fixed prices, in GW1's
 // spirit where the merchant sells the basics and rarity is cosmetic.
@@ -151,7 +156,11 @@ void UI_CloseNpcDialog(void) {
 }
 
 bool UI_IsInventoryOpen(void) { return g_invOpen; }
-bool UI_IsAttributesOpen(void) { return g_attrOpen; }
+// Attributes live on the build screen now; the old separate window is
+// gone, so "are attributes open" is the same question as "is the build
+// screen open". Kept as its own name because input.c asks it while
+// deciding whether a menu owns the pad.
+bool UI_IsAttributesOpen(void) { return g_skillsOpen; }
 bool UI_IsEquipmentOpen(void) { return g_equipOpen; }
 bool UI_IsSkillsOpen(void) { return g_skillsOpen; }
 bool UI_IsTitlesOpen(void) { return g_titlesOpen; }
@@ -168,7 +177,7 @@ void UI_OpenPanel(PanelId panel) {
         case PANEL_SKILLS:     g_skillsOpen = true; g_armedBarSlot = -1; break;
         case PANEL_EQUIPMENT:  g_equipOpen = true; break;
         case PANEL_INVENTORY:  g_invOpen = true; break;
-        case PANEL_ATTRIBUTES: g_attrOpen = true; break;
+        case PANEL_ATTRIBUTES: g_skillsOpen = true; break; // merged into the build screen
         case PANEL_TITLES:     g_titlesOpen = true; break;
     }
 }
@@ -183,7 +192,6 @@ void UI_ToggleBags(void) {
 
 void UI_ClosePanels(void) {
     g_invOpen = false;
-    g_attrOpen = false;
     g_equipOpen = false;
     g_skillsOpen = false;
     g_titlesOpen = false;
@@ -339,31 +347,50 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
     int slot = (int)(46 * scale);
     int gap = (int)(5 * scale);
     int rowH = (int)(26 * scale);
-    int w = SKILL_BAR_SIZE * slot + (SKILL_BAR_SIZE - 1) * gap + pad * 2;
+    int attrRowH = (int)(26 * scale);
+    int tmplRowH = (int)(26 * scale);
 
     bool canEdit = (World_GetMode() == MODE_OUTPOST);
 
-    // Count what the character owns so the window hugs the list.
+    // Count both columns so the window hugs the taller of them.
     int known = 0;
     for (int i = 0; i < g_skillCount; i++) {
         if (Skillbook_IsUnlocked(i) &&
             Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) known++;
     }
-    if (known == 0) known = 1; // room for the "nothing yet" line
+    int accessible = 0;
+    for (int a = 0; a < ATTR_COUNT; a++) {
+        if (Attribute_Accessible((AttributeKind)a, player->primaryProfession,
+                                 player->secondaryProfession)) accessible++;
+    }
+    int listRows = known > 0 ? known : 1;
 
-    int h = pad * 3 + font + slot + (int)(14 * scale) + small + known * rowH + pad;
+    int barW = SKILL_BAR_SIZE * slot + (SKILL_BAR_SIZE - 1) * gap;
+    int w = (int)(740 * scale);
+    if (w < barW + pad * 2) w = barW + pad * 2;
 
-    g_skillsRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(110 * scale),
+    int attrColW = (int)(300 * scale);
+    int skillColW = w - attrColW - pad * 3;
+
+    int colRows = (accessible > listRows) ? accessible : listRows;
+    int columnsH = small + (int)(4 * scale) + colRows * rowH;
+    int templatesH = small + (int)(4 * scale) + BUILD_SLOT_COUNT * tmplRowH;
+    int h = pad * 2 + font + pad + slot + (int)(8 * scale) + small + (int)(8 * scale)
+          + columnsH + (int)(10 * scale) + templatesH + pad;
+
+    g_skillsRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(70 * scale),
                                 (float)w, (float)h };
     UIHit_Claim(g_skillsRect);
     UI_ThemePanel(g_skillsRect, scale, pad + font + pad / 2);
 
-    char title[80];
-    snprintf(title, sizeof(title), "Skills   %d known   %d skill point%s",
-             Skillbook_UnlockedCount(), g_skillPoints, g_skillPoints == 1 ? "" : "s");
+    char title[112];
+    snprintf(title, sizeof(title), "Skills & Attributes   %d known   %d skill point%s   %d attribute point%s",
+             Skillbook_UnlockedCount(), g_skillPoints, g_skillPoints == 1 ? "" : "s",
+             player->attributePoints, player->attributePoints == 1 ? "" : "s");
     if (PanelHeader(g_skillsRect, title, "L", NULL, font, pad, scale)) {
         g_skillsOpen = false;
         g_armedBarSlot = -1;
+        g_editingBuild = -1;
         return;
     }
 
@@ -406,7 +433,6 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
         if (id >= 0 && CheckCollisionPointRec(mouse, r)) UITooltip_Request(id, r);
 
         if (hovered && click) {
-            // Clicking the armed slot again empties it; otherwise arm it.
             if (g_armedBarSlot == i) {
                 player->skillBar[i] = -1;
                 player->skillRecharge[i] = 0.0f;
@@ -422,22 +448,89 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
     const char *hint;
     Color hintColor;
     if (!canEdit) {
-        hint = "Skills can only be changed in an outpost.";
+        hint = "Skills and attributes can only be changed in an outpost.";
         hintColor = (Color){ 214, 150, 128, 255 };
     } else if (g_armedBarSlot >= 0) {
-        hint = "Pick a skill below, or click the slot again to clear it.";
+        hint = "Pick a skill on the right, or click the slot again to clear it.";
         hintColor = UI_GOLD;
     } else {
         hint = "Click a slot, then a skill, to build your bar.";
         hintColor = (Color){ 150, 146, 134, 255 };
     }
     UIText(hint, x, y, small, hintColor);
-    y += small + (int)(6 * scale);
+    y += small + (int)(8 * scale);
 
-    // --- Everything you've learned ---
+    int colTop = y;
+    int attrX = x;
+    int skillX = x + attrColW + pad;
+
+    // --- Left column: attributes ---
+    // On the same screen as the bar because they are one decision. GW1
+    // puts them together for the same reason: a skill's numbers come
+    // from a rank, and choosing either in isolation is guesswork.
+    UIText("ATTRIBUTES", attrX, y, small, UI_GOLD_DIM);
+    int ay = y + small + (int)(4 * scale);
+    int btn = (int)(20 * scale);
+
+    for (int a = 0; a < ATTR_COUNT; a++) {
+        if (!Attribute_Accessible((AttributeKind)a, player->primaryProfession,
+                                  player->secondaryProfession)) continue;
+
+        int rank = player->attributeRank[a];
+        char label[64];
+        snprintf(label, sizeof(label), "%s", g_attributeNames[a]);
+        UIText(label, attrX, ay, font, g_attributeIsPrimary[a] ? UI_GOLD : RAYWHITE);
+
+        Rectangle plus  = { (float)(attrX + attrColW - btn), (float)ay - 2, (float)btn, (float)btn };
+        Rectangle minus = { plus.x - btn - 6, (float)ay - 2, (float)btn, (float)btn };
+
+        int upCost = (rank < ATTRIBUTE_RANK_CAP)
+            ? g_attrCumulativeCost[rank + 1] - g_attrCumulativeCost[rank] : 0;
+        bool canUp = canEdit && rank < ATTRIBUTE_RANK_CAP && player->attributePoints >= upCost;
+        bool canDown = canEdit && rank > 0;
+
+        // Rank, then the cost of the next one - the two numbers you need
+        // to decide, side by side.
+        char rankStr[24];
+        if (rank < ATTRIBUTE_RANK_CAP) snprintf(rankStr, sizeof(rankStr), "%d   (+%d)", rank, upCost);
+        else snprintf(rankStr, sizeof(rankStr), "%d   max", rank);
+        int rw = UITextWidth(rankStr, small);
+        UIText(rankStr, (int)minus.x - rw - (int)(8 * scale), ay + (font - small) / 2, small,
+               rank > 0 ? UI_TEXT_SECOND : UI_TEXT_MUTED);
+
+        if (click && !canUp && CheckCollisionPointRec(mouse, plus)) Audio_Play(SFX_UI_DENY);
+        DrawRectangleRec(plus, canUp ? (Color){ 60, 100, 60, 255 } : (Color){ 45, 45, 45, 255 });
+        DrawRectangleLinesEx(plus, 1, LIGHTGRAY);
+        UIText("+", (int)plus.x + btn / 3, (int)plus.y + 2, font, RAYWHITE);
+
+        DrawRectangleRec(minus, canDown ? (Color){ 100, 60, 60, 255 } : (Color){ 45, 45, 45, 255 });
+        DrawRectangleLinesEx(minus, 1, LIGHTGRAY);
+        UIText("-", (int)minus.x + btn / 3, (int)minus.y + 2, font, RAYWHITE);
+
+        if (click && canUp && CheckCollisionPointRec(mouse, plus)) {
+            Audio_Play(SFX_UI_CLICK);
+            player->attributeRank[a]++;
+            player->attributePoints -= upCost;
+            Entity_RecomputeAttributeStats(player);
+            Save_Write();
+        }
+        if (click && canDown && CheckCollisionPointRec(mouse, minus)) {
+            Audio_Play(SFX_UI_CLICK);
+            int refund = g_attrCumulativeCost[rank] - g_attrCumulativeCost[rank - 1];
+            player->attributeRank[a]--;
+            player->attributePoints += refund;
+            Entity_RecomputeAttributeStats(player);
+            Save_Write();
+        }
+        ay += attrRowH;
+    }
+
+    // --- Right column: everything you've learned ---
+    UIText("SKILLS", skillX, colTop, small, UI_GOLD_DIM);
+    int sy = colTop + small + (int)(4 * scale);
+
     if (Skillbook_UnlockedCount() == 0) {
-        UIText("(no skills yet - try a quest giver or a trainer)", x, y, font, GRAY);
-        return;
+        UIText("(none yet - try a quest giver)", skillX, sy, font, GRAY);
     }
 
     for (int i = 0; i < g_skillCount; i++) {
@@ -446,42 +539,29 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
 
         const Skill *s = &g_skillDB[i];
 
-        // Already on the bar? Show it as such rather than letting the
-        // player silently slot the same skill twice.
         int onBar = -1;
         for (int b = 0; b < SKILL_BAR_SIZE; b++) {
             if (player->skillBar[b] == i) onBar = b;
         }
 
-        Rectangle row = { g_skillsRect.x + 4, (float)y - 2, g_skillsRect.width - 8, (float)rowH };
+        Rectangle row = { (float)skillX - 4, (float)sy - 2, (float)skillColW + 8, (float)rowH };
         bool selectable = canEdit && g_armedBarSlot >= 0 && onBar < 0;
         bool hovered = CheckCollisionPointRec(mouse, row);
         if (hovered && selectable) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
 
-        // A small icon makes the list scan the same way the bar does.
-        Rectangle icon = { (float)x, (float)y - 1, (float)(rowH - 4), (float)(rowH - 4) };
+        Rectangle icon = { (float)skillX, (float)sy - 1, (float)(rowH - 4), (float)(rowH - 4) };
         UI_DrawSkillIcon(i, icon);
 
         char label[96];
-        if (s->energyCost > 0) {
-            snprintf(label, sizeof(label), "%.31s   %dE   %.0fs recharge",
-                     s->name, s->energyCost, (double)s->recharge);
-        } else if (s->adrenalineCost > 0) {
-            snprintf(label, sizeof(label), "%.31s   %d adrenaline", s->name, s->adrenalineCost);
-        } else {
-            snprintf(label, sizeof(label), "%.31s   free   %.0fs recharge", s->name, (double)s->recharge);
-        }
+        snprintf(label, sizeof(label), "%.31s", s->name);
         Color c = s->isElite ? UI_GOLD : (onBar >= 0 ? SKYBLUE : RAYWHITE);
-        int textX = x + (int)icon.width + (int)(8 * scale);
-        UIText(label, textX, y, font, c);
+        UIText(label, skillX + (int)icon.width + (int)(8 * scale), sy, font, c);
 
-        // Right-aligned status: which slot it occupies, or its line.
         char right[40];
         if (onBar >= 0) snprintf(right, sizeof(right), "slot %d", onBar + 1);
-        else snprintf(right, sizeof(right), "%.31s", g_attributeNames[s->attribute]);
+        else snprintf(right, sizeof(right), "%.20s", g_attributeNames[s->attribute]);
         int rw = UITextWidth(right, small);
-        UIText(right, (int)(g_skillsRect.x + g_skillsRect.width) - pad - rw,
-               y + (font - small) / 2, small,
+        UIText(right, skillX + skillColW - rw, sy + (font - small) / 2, small,
                onBar >= 0 ? SKYBLUE : (Color){ 150, 146, 134, 255 });
 
         if (hovered) UITooltip_Request(i, row);
@@ -492,7 +572,112 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
             g_armedBarSlot = -1;
             Save_Write();
         }
-        y += rowH;
+        sy += rowH;
+    }
+
+    // --- Templates: GW1's save/load for a whole build ---
+    // A bar and an attribute spread are one thing, so they are saved as
+    // one thing. Loading half a build is worse than loading none.
+    int ty = colTop + columnsH + (int)(10 * scale);
+    DrawLineEx((Vector2){ g_skillsRect.x + pad, (float)ty - (int)(5 * scale) },
+               (Vector2){ g_skillsRect.x + g_skillsRect.width - pad, (float)ty - (int)(5 * scale) },
+               1.0f, UI_GOLD_DIM);
+    UIText("TEMPLATES", x, ty, small, UI_GOLD_DIM);
+    ty += small + (int)(4 * scale);
+
+    int nameW = (int)(240 * scale);
+    int actW = (int)(60 * scale);
+    for (int i = 0; i < BUILD_SLOT_COUNT; i++) {
+        BuildTemplate *b = Builds_Slot(i);
+        bool editing = (g_editingBuild == i);
+
+        Rectangle nameBox = { (float)x, (float)ty, (float)nameW, (float)(tmplRowH - 4) };
+        bool nameHover = CheckCollisionPointRec(mouse, nameBox);
+        DrawRectangleRec(nameBox, editing ? (Color){ 46, 50, 68, 255 }
+                                : nameHover ? UI_SURFACE_HOVER : UI_SURFACE_RAISE);
+        DrawRectangleLinesEx(nameBox, 1.0f, editing ? UI_GOLD : UI_GOLD_DIM);
+
+        char shown[BUILD_NAME_LEN + 8];
+        if (b->name[0]) snprintf(shown, sizeof(shown), "%s%s", b->name, editing ? "_" : "");
+        else snprintf(shown, sizeof(shown), "%s", editing ? "_" : (b->used ? "(unnamed)" : "empty"));
+        UIText(shown, (int)nameBox.x + (int)(6 * scale),
+               (int)nameBox.y + (tmplRowH - 4 - font) / 2, font,
+               b->used || editing ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
+
+        if (nameHover && click) {
+            g_editingBuild = editing ? -1 : i;
+            Audio_Play(SFX_UI_CLICK);
+        }
+
+        // Save / Load / Clear.
+        struct { const char *label; int kind; bool enabled; } acts[3] = {
+            { "Save",  0, canEdit },
+            { "Load",  1, canEdit && b->used },
+            { "Clear", 2, b->used },
+        };
+        for (int k = 0; k < 3; k++) {
+            Rectangle btnR = { nameBox.x + nameBox.width + (float)pad + (float)(k * (actW + 6)),
+                               (float)ty, (float)actW, (float)(tmplRowH - 4) };
+            bool bh = CheckCollisionPointRec(mouse, btnR);
+            DrawRectangleRec(btnR, !acts[k].enabled ? (Color){ 30, 31, 38, 255 }
+                                 : bh ? UI_SURFACE_HOVER : UI_SURFACE_RAISE);
+            DrawRectangleLinesEx(btnR, 1.0f, acts[k].enabled ? UI_GOLD_DIM : (Color){ 58, 56, 52, 255 });
+            int lw = UITextWidth(acts[k].label, small);
+            UIText(acts[k].label, (int)(btnR.x + (btnR.width - lw) / 2),
+                   (int)(btnR.y + (tmplRowH - 4 - small) / 2), small,
+                   acts[k].enabled ? RAYWHITE : UI_TEXT_MUTED);
+
+            if (bh && click) {
+                if (!acts[k].enabled) {
+                    Audio_Play(SFX_UI_DENY);
+                } else if (acts[k].kind == 0) {
+                    Builds_SaveFrom(i, player);
+                    Audio_Play(SFX_UI_CONFIRM);
+                    UI_Notify("Build saved");
+                    Save_Write();
+                } else if (acts[k].kind == 1) {
+                    Builds_LoadInto(i, player);
+                    g_armedBarSlot = -1;
+                    Audio_Play(SFX_UI_CONFIRM);
+                    UI_Notify("Build loaded");
+                    Save_Write();
+                } else {
+                    Builds_Clear(i);
+                    if (g_editingBuild == i) g_editingBuild = -1;
+                    Audio_Play(SFX_UI_CLICK);
+                    Save_Write();
+                }
+            }
+        }
+        ty += tmplRowH;
+    }
+
+    // Typing into the armed name field. Handled last so a click that
+    // just armed a different field doesn't also eat this frame's keys.
+    if (g_editingBuild >= 0) {
+        BuildTemplate *b = Builds_Slot(g_editingBuild);
+        if (b) {
+            int c = GetCharPressed();
+            while (c > 0) {
+                int len = (int)strlen(b->name);
+                // '|' and '=' are the save file's own delimiters, so a name
+                // containing one would come back mangled on load.
+                if (c >= 32 && c <= 126 && c != '|' && c != '=' &&
+                    len < BUILD_NAME_LEN - 1) {
+                    b->name[len] = (char)c;
+                    b->name[len + 1] = '\0';
+                }
+                c = GetCharPressed();
+            }
+            if (IsKeyPressed(KEY_BACKSPACE)) {
+                int len = (int)strlen(b->name);
+                if (len > 0) b->name[len - 1] = '\0';
+            }
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER)) {
+                g_editingBuild = -1;
+                Save_Write();
+            }
+        }
     }
 }
 
@@ -704,88 +889,6 @@ static void DrawTitles(Entity *player, int screenWidth, int screenHeight) {
     }
 }
 
-static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
-    float scale = UI_Scale(screenHeight);
-    int rowH = (int)(28 * scale);
-    int font = (int)(12 * scale);
-    int pad = (int)(10 * scale);
-    int w = (int)(360 * scale);
-
-    int accessible = 0;
-    for (int a = 0; a < ATTR_COUNT; a++) {
-        if (Attribute_Accessible((AttributeKind)a, player->primaryProfession, player->secondaryProfession)) accessible++;
-    }
-    int h = pad * 3 + font + (accessible + 1) * rowH;
-
-    g_attrRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(140 * scale), (float)w, (float)h };
-    UIHit_Claim(g_attrRect);
-    UI_ThemePanel(g_attrRect, scale, pad + font + pad / 2);
-
-    int x = (int)g_attrRect.x + pad;
-    int y = (int)g_attrRect.y + pad;
-    char title[64];
-    snprintf(title, sizeof(title), "Attributes   %d free", player->attributePoints);
-    if (PanelHeader(g_attrRect, title, "K", NULL, font, pad, scale)) {
-        g_attrOpen = false;
-        return;
-    }
-    y += font + pad;
-
-    bool click = UI_PointerClicked();
-    Vector2 mouse = UI_PointerPos();
-    int btn = (int)(20 * scale);
-
-    for (int a = 0; a < ATTR_COUNT; a++) {
-        if (!Attribute_Accessible((AttributeKind)a, player->primaryProfession, player->secondaryProfession)) continue;
-
-        int rank = player->attributeRank[a];
-        char label[64];
-        snprintf(label, sizeof(label), "%s: %d", g_attributeNames[a], rank);
-        UIText(label, x, y, font, g_attributeIsPrimary[a] ? GOLD : RAYWHITE);
-
-        // "+" button: costs the GW1 incremental amount for the next rank.
-        Rectangle plus = { g_attrRect.x + g_attrRect.width - pad - btn, (float)y - 2, (float)btn, (float)btn };
-        Rectangle minus = { plus.x - btn - 6, (float)y - 2, (float)btn, (float)btn };
-
-        int upCost = (rank < ATTRIBUTE_RANK_CAP)
-            ? g_attrCumulativeCost[rank + 1] - g_attrCumulativeCost[rank] : 0;
-
-        bool canUp = rank < ATTRIBUTE_RANK_CAP && player->attributePoints >= upCost;
-        if (click && !canUp && CheckCollisionPointRec(mouse, plus)) Audio_Play(SFX_UI_DENY);
-        DrawRectangleRec(plus, canUp ? (Color){ 60, 100, 60, 255 } : (Color){ 45, 45, 45, 255 });
-        DrawRectangleLinesEx(plus, 1, LIGHTGRAY);
-        UIText("+", (int)plus.x + btn / 3, (int)plus.y + 2, font, RAYWHITE);
-
-        bool canDown = rank > 0;
-        DrawRectangleRec(minus, canDown ? (Color){ 100, 60, 60, 255 } : (Color){ 45, 45, 45, 255 });
-        DrawRectangleLinesEx(minus, 1, LIGHTGRAY);
-        UIText("-", (int)minus.x + btn / 3, (int)minus.y + 2, font, RAYWHITE);
-
-        if (rank < ATTRIBUTE_RANK_CAP) {
-            char cost[24];
-            snprintf(cost, sizeof(cost), "next: %d", upCost);
-            UIText(cost, (int)minus.x - (int)(70 * scale), y, font, GRAY);
-        }
-
-        if (click && canUp && CheckCollisionPointRec(mouse, plus)) {
-            Audio_Play(SFX_UI_CLICK);
-            player->attributeRank[a]++;
-            player->attributePoints -= upCost;
-            // Energy Storage IS maximum energy, so the pool has to move
-            // the instant the rank does - that's the feedback that makes
-            // the primary attribute legible.
-            Entity_RecomputeAttributeStats(player);
-        }
-        if (click && canDown && CheckCollisionPointRec(mouse, minus)) {
-            Audio_Play(SFX_UI_CLICK);
-            int refund = g_attrCumulativeCost[rank] - g_attrCumulativeCost[rank - 1];
-            player->attributeRank[a]--;
-            player->attributePoints += refund;
-            Entity_RecomputeAttributeStats(player);
-        }
-        y += rowH;
-    }
-}
 
 // "300 XP, 150g, Bane Signet" - the full payout on one line. The skill
 // especially has to be named up front: it's the reward that changes what
@@ -1397,13 +1500,17 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     if (!player) return;
 
+    if (g_editingBuild < 0) {
     if (IsKeyPressed(KEY_I)) g_invOpen = !g_invOpen;
-    if (IsKeyPressed(KEY_K)) g_attrOpen = !g_attrOpen;
+    // K used to open a separate attributes window. Attributes are now
+    // part of the build screen, so both keys land on the same place.
+    if (IsKeyPressed(KEY_K)) g_skillsOpen = !g_skillsOpen;
     if (IsKeyPressed(KEY_E)) g_equipOpen = !g_equipOpen;
     if (IsKeyPressed(KEY_T)) g_titlesOpen = !g_titlesOpen;
     if (IsKeyPressed(KEY_L)) {
         g_skillsOpen = !g_skillsOpen;
         g_armedBarSlot = -1;
+    }
     }
     // Focus navigation covers the NPC dialog and the windows it opens -
     // the parts of the game that are a list of choices. Only run while
@@ -1413,7 +1520,6 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
 
     if (g_invOpen) DrawInventory(player, screenHeight);
     if (g_equipOpen) DrawEquipment(player, screenHeight);
-    if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);
     if (g_skillsOpen) DrawSkillsPanel(player, screenWidth, screenHeight);
     if (g_titlesOpen) DrawTitles(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);

@@ -67,6 +67,7 @@ add_executable(sotw_demake
     src/ui_theme.c
     src/ui_tooltip.c
     src/titles.c
+    src/builds.c
     src/ui_world.c
     src/ui_hints.c
     src/skillbook.c
