@@ -340,6 +340,22 @@ party, and party members wait near the gate while you wander the outpost
 instead of trailing you around town - they only fall in behind you out
 in the field.
 
+**Armour is five pieces, not one item.** GW1 dresses you in head,
+chest, arms, legs and feet, and that is the whole reason armour is a
+collection game: you upgrade a set a piece at a time. Your armour level
+is the five pieces together, so a missing piece is a real hole. On top
+of that there's an **offhand** slot for a shield or focus — usable only
+when your weapon isn't two-handed, and taking up a hammer, bow or staff
+puts the shield away.
+
+**I** (or **E**) opens the **character screen**: the seven worn slots on
+the left, your bags on the right, in one window. They were two separate
+panels, which meant you could never see the hole in a set next to the
+piece in your bag that would fill it. Click a bag slot to equip, click
+a worn row to take it off. **Bags** are equipment too — a Belt Pouch or
+Large Bag adds slots to the twenty you start with, and the header shows
+what you're carrying against what you can.
+
 **Armor is crafted, never looted** - GW1's rule. Charr drop **Charr
 Hides** and skale drop **Skale Fins** (both stack), and the armorers
 turn hides plus gold into raiment. The merchant deals in weapons and

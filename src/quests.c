@@ -20,8 +20,10 @@
 
 // Item rewards, GW1-style "take this for your trouble" gear. Static so
 // quests can point at them; turn-in copies them into the inventory.
-static const Item g_rewardWarhammer = { ITEM_WEAPON, "Warmaster's Hammer", 22, 38, 30.0f, 1.75f, 0, 1, false };
-static const Item g_rewardIdKit = { ITEM_KIT_ID, "Identification Kit", 0, 0, 0, 0, 0, 25, false };
+static const Item g_rewardWarhammer = { .kind = ITEM_WEAPON, .name = "Warmaster's Hammer",
+                                        .dmgMin = 22, .dmgMax = 38, .range = 30.0f,
+                                        .attackInterval = 1.75f, .count = 1, .twoHanded = true };
+static const Item g_rewardIdKit = { .kind = ITEM_KIT_ID, .name = "Identification Kit", .count = 25 };
 
 Quest g_quests[QUEST_COUNT] = {
     // --- Ashford Abbey ---

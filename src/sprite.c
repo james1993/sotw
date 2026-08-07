@@ -23,8 +23,9 @@ WeaponVisual Sprite_WeaponVisualOf(const Item *item) {
 // profession-flavored gear for heroes, nothing for NPCs and beasts.
 static WeaponVisual WeaponFor(const Entity *e) {
     if (e == &g_entities[PLAYER_INDEX]) {
-        if (g_equippedWeapon >= 0 && g_equippedWeapon < g_inventoryCount) {
-            return Sprite_WeaponVisualOf(&g_inventory[g_equippedWeapon]);
+        int wep = g_equipped[EQUIP_WEAPON];
+        if (wep >= 0 && wep < g_inventoryCount) {
+            return Sprite_WeaponVisualOf(&g_inventory[wep]);
         }
         return WPNVIS_NONE;
     }

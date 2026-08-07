@@ -26,7 +26,6 @@
 #define DIALOG_WALKAWAY_DISTANCE 130.0f
 
 static bool g_invOpen = false;
-static bool g_equipOpen = false;
 static bool g_skillsOpen = false;
 static int g_dialogNpc = -1;   // entity index, -1 = closed
 static bool g_shopOpen = false;
@@ -35,7 +34,7 @@ static bool g_trainerOpen = false;
 static bool g_professionOpen = false;
 static bool g_titlesOpen = false;
 
-static Rectangle g_invRect, g_dialogRect, g_shopRect, g_equipRect,
+static Rectangle g_invRect, g_dialogRect, g_shopRect,
                  g_craftRect, g_skillsRect, g_trainerRect, g_professionRect,
                  g_titlesRect;
 
@@ -82,20 +81,31 @@ static int g_editingBuild = -1;
 // The merchant's stock: fixed-power items at fixed prices, in GW1's
 // spirit where the merchant sells the basics and rarity is cosmetic.
 typedef struct { Item item; int price; } ShopEntry;
+// Designated initialisers, because Item grew a slot and a two-handed
+// flag: a positional literal would silently mean something else.
 static const ShopEntry g_shopStock[] = {
-    { { ITEM_WEAPON, "Long Sword",  15, 22, 28.0f,  1.33f, 0, 1, false }, 80 },
-    { { ITEM_WEAPON, "War Hammer",  19, 35, 30.0f,  1.75f, 0, 1, false }, 120 },
-    { { ITEM_WEAPON, "Fire Staff",  11, 22, 220.0f, 1.75f, 0, 1, false }, 100 },
+    { { .kind = ITEM_WEAPON, .name = "Long Sword", .dmgMin = 15, .dmgMax = 22,
+        .range = 28.0f, .attackInterval = 1.33f, .count = 1 }, 80 },
+    { { .kind = ITEM_WEAPON, .name = "War Hammer", .dmgMin = 19, .dmgMax = 35,
+        .range = 30.0f, .attackInterval = 1.75f, .count = 1, .twoHanded = true }, 120 },
+    { { .kind = ITEM_WEAPON, .name = "Fire Staff", .dmgMin = 11, .dmgMax = 22,
+        .range = 220.0f, .attackInterval = 1.75f, .count = 1, .twoHanded = true }, 100 },
+    // An offhand and a bag, so the two new slots have somewhere to come
+    // from without waiting on a drop table.
+    { { .kind = ITEM_OFFHAND, .name = "Ascalon Shield", .armor = 8, .count = 1 }, 140 },
+    { { .kind = ITEM_OFFHAND, .name = "Bone Focus", .armor = 3, .count = 1 }, 90 },
+    { { .kind = ITEM_BAG, .name = "Belt Pouch", .count = 5 }, 100 },
+    { { .kind = ITEM_BAG, .name = "Large Bag", .count = 10 }, 250 },
     // GW1's two workhorse kits, at GW1's merchant price point.
-    { { ITEM_KIT_SALVAGE, "Salvage Kit", 0, 0, 0, 0, 0, 25, false }, 100 },
-    { { ITEM_KIT_ID, "Identification Kit", 0, 0, 0, 0, 0, 25, false }, 100 },
+    { { .kind = ITEM_KIT_SALVAGE, .name = "Salvage Kit", .count = 25 }, 100 },
+    { { .kind = ITEM_KIT_ID, .name = "Identification Kit", .count = 25 }, 100 },
 };
 #define SHOP_STOCK_COUNT (int)(sizeof(g_shopStock) / sizeof(g_shopStock[0]))
 
 // The Armorer's recipes: gold + Charr Hides in, armor out - GW1's
 // craft-only armor economy. No armor ever drops or sits in a shop.
 typedef struct { Item item; int gold; int hides; } CraftEntry;
-#define CRAFT_LIST_COUNT 2
+#define CRAFT_LIST_COUNT 10  // two tiers x five pieces
 #define CRAFT_MATERIAL "Charr Hide"
 
 // GW1 armor is per-profession, and the ceiling differs: a Warrior tops
@@ -110,20 +120,28 @@ static int ArmorBaseFor(Profession p) {
     }
 }
 
+// Two tiers, five pieces each. GW1's armourer sells a SET a piece at a
+// time, which is the whole reason armour is a collection: you upgrade
+// the chest first because it protects the most, and finish the set when
+// you can afford to.
 static void BuildCraftList(Profession p, CraftEntry out[CRAFT_LIST_COUNT]) {
-    static const int gold[CRAFT_LIST_COUNT]  = { 100, 250 };
-    static const int hides[CRAFT_LIST_COUNT] = { 3, 6 };
+    static const int tierGold[2]  = { 30, 70 };
+    static const int tierHides[2] = { 1, 2 };
     int base = ArmorBaseFor(p);
-    for (int i = 0; i < CRAFT_LIST_COUNT; i++) {
-        int al = base + 15 * (i + 1);
-        memset(&out[i], 0, sizeof(out[i]));
-        out[i].item.kind = ITEM_ARMOR;
-        out[i].item.armor = al;
-        out[i].item.count = 1;
-        snprintf(out[i].item.name, sizeof(out[i].item.name), "%s Armour (AL %d)",
-                 Character_ProfessionName(p), al);
-        out[i].gold = gold[i];
-        out[i].hides = hides[i];
+    int n = 0;
+    for (int tier = 0; tier < 2; tier++) {
+        int al = base + 15 * (tier + 1);
+        for (int piece = EQUIP_HEAD; piece <= EQUIP_FEET && n < CRAFT_LIST_COUNT; piece++, n++) {
+            memset(&out[n], 0, sizeof(out[n]));
+            out[n].item.kind = ITEM_ARMOR;
+            out[n].item.armor = al;
+            out[n].item.count = 1;
+            out[n].item.slot = (EquipSlot)piece;
+            snprintf(out[n].item.name, sizeof(out[n].item.name), "%.14s %s (AL %d)",
+                     Character_ProfessionName(p), Items_SlotName((EquipSlot)piece), al);
+            out[n].gold = tierGold[tier];
+            out[n].hides = tierHides[tier];
+        }
     }
 }
 
@@ -161,7 +179,10 @@ bool UI_IsInventoryOpen(void) { return g_invOpen; }
 // screen open". Kept as its own name because input.c asks it while
 // deciding whether a menu owns the pad.
 bool UI_IsAttributesOpen(void) { return g_skillsOpen; }
-bool UI_IsEquipmentOpen(void) { return g_equipOpen; }
+// Gear and bags are one screen now, so "is equipment open" and "is
+// inventory open" are the same question. Both names survive because
+// input.c and the pause hub each ask in their own words.
+bool UI_IsEquipmentOpen(void) { return g_invOpen; }
 bool UI_IsSkillsOpen(void) { return g_skillsOpen; }
 bool UI_IsTitlesOpen(void) { return g_titlesOpen; }
 
@@ -175,7 +196,7 @@ void UI_ToggleSkills(void) {
 void UI_OpenPanel(PanelId panel) {
     switch (panel) {
         case PANEL_SKILLS:     g_skillsOpen = true; g_armedBarSlot = -1; break;
-        case PANEL_EQUIPMENT:  g_equipOpen = true; break;
+        case PANEL_EQUIPMENT:  g_invOpen = true; break; // merged into the character screen
         case PANEL_INVENTORY:  g_invOpen = true; break;
         case PANEL_ATTRIBUTES: g_skillsOpen = true; break; // merged into the build screen
         case PANEL_TITLES:     g_titlesOpen = true; break;
@@ -185,14 +206,11 @@ void UI_OpenPanel(PanelId panel) {
 // The pad's Y button opens "the bags": inventory + equipment together,
 // since on a controller you almost always want both at once.
 void UI_ToggleBags(void) {
-    bool anyOpen = g_invOpen || g_equipOpen;
-    g_invOpen = !anyOpen;
-    g_equipOpen = !anyOpen;
+    g_invOpen = !g_invOpen;
 }
 
 void UI_ClosePanels(void) {
     g_invOpen = false;
-    g_equipOpen = false;
     g_skillsOpen = false;
     g_titlesOpen = false;
     g_armedKit = -1;
@@ -241,92 +259,197 @@ static bool PanelHeader(Rectangle rect, const char *title, const char *hotkey,
     return closing;
 }
 
+// ---------------------------------------------------------------------
+// The character screen: what you wear and what you carry, together.
+//
+// GW1 dresses you in five armour pieces plus a weapon and an offhand,
+// and armour is a collection game precisely because you upgrade a set a
+// piece at a time. Splitting "equipment" and "inventory" into two
+// windows made that invisible - you could never see the hole in a set
+// next to the piece in your bag that would fill it.
 static void DrawInventory(Entity *player, int screenHeight) {
     float scale = UI_Scale(screenHeight);
-    int rowH = (int)(24 * scale);
+    int screenWidth = GetScreenWidth();
     int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
     int pad = (int)(10 * scale);
-    int w = (int)(300 * scale);
-    int h = pad * 3 + font + (g_inventoryCount + 1) * rowH;
+    int slotH = (int)(28 * scale);
+    int cell = (int)(38 * scale);
+    int cellGap = (int)(4 * scale);
 
-    // Below the party window, which now owns the upper-left.
-    g_invRect = (Rectangle){ (float)(20 * scale), (float)(310 * scale), (float)w, (float)h };
+    int cols = 5;
+    int capacity = Items_Capacity();
+    int rows = (capacity + cols - 1) / cols;
+
+    int equipW = (int)(250 * scale);
+    int gridW = cols * cell + (cols - 1) * cellGap;
+    int w = pad * 3 + equipW + gridW;
+
+    int equipH = small + (int)(4 * scale) + EQUIP_SLOT_COUNT * slotH;
+    int gridH = small + (int)(4 * scale) + rows * (cell + cellGap);
+    int bodyH = equipH > gridH ? equipH : gridH;
+    int h = pad * 2 + font + pad + bodyH + (int)(8 * scale) + font + pad;
+
+    g_invRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(100 * scale),
+                             (float)w, (float)h };
     UIHit_Claim(g_invRect);
     UI_ThemePanel(g_invRect, scale, pad + font + pad / 2);
 
-    int x = (int)g_invRect.x + pad;
-    int y = (int)g_invRect.y + pad;
-    char title[64];
-    bool armed = (g_armedKit >= 0 && g_armedKit < g_inventoryCount);
-    if (armed) {
-        snprintf(title, sizeof(title), "%s - pick a target item",
-                 g_inventory[g_armedKit].kind == ITEM_KIT_ID ? "Identify" : "Salvage");
-    } else {
-        snprintf(title, sizeof(title), "Inventory   %d gold", g_gold);
-    }
-    if (PanelHeader(g_invRect, title, "I", "Y", font, pad, scale)) {
+    char title[96];
+    snprintf(title, sizeof(title), "Character   AL %d   %d/%d carried   %d gold",
+             player->armor, g_inventoryCount, capacity, g_gold);
+    if (PanelHeader(g_invRect, title, "I", NULL, font, pad, scale)) {
         g_invOpen = false;
         g_armedKit = -1;
         return;
     }
-    y += font + pad;
-
-    if (g_armedKit >= g_inventoryCount) g_armedKit = -1; // kit vanished
 
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
 
-    for (int i = 0; i < g_inventoryCount; i++) {
-        Item *it = &g_inventory[i];
-        Rectangle row = { g_invRect.x + 4, (float)y - 2, g_invRect.width - 8, (float)rowH };
-        bool hovered = CheckCollisionPointRec(mouse, row);
-        bool equipped = (i == g_equippedWeapon || i == g_equippedArmor);
+    int x = (int)g_invRect.x + pad;
+    int y = (int)g_invRect.y + pad + font + pad;
 
-        if (hovered) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+    // --- Left: the paper doll ---
+    UIText("EQUIPPED", x, y, small, UI_GOLD_DIM);
+    int ey = y + small + (int)(4 * scale);
+
+    for (int slot = 0; slot < EQUIP_SLOT_COUNT; slot++) {
+        Rectangle row = { (float)x, (float)ey, (float)equipW, (float)(slotH - 3) };
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        int idx = g_equipped[slot];
+        bool filled = (idx >= 0 && idx < g_inventoryCount);
+
+        DrawRectangleRec(row, hovered ? UI_SURFACE_HOVER : UI_SURFACE_RAISE);
+        DrawRectangleLinesEx(row, 1.0f, filled ? UI_GOLD_DIM : (Color){ 54, 52, 48, 255 });
+
+        UIText(Items_SlotName((EquipSlot)slot), (int)row.x + (int)(6 * scale),
+               (int)row.y + (slotH - 3 - small) / 2, small, UI_TEXT_MUTED);
 
         char label[64];
-        Color rowColor;
-        if (it->kind == ITEM_WEAPON && it->unidentified) {
-            // Masked until an Identification Kit reveals it, like GW1.
-            snprintf(label, sizeof(label), "%s", Items_DisplayName(it));
-            rowColor = (Color){ 190, 150, 220, 255 };
-        } else if (it->kind == ITEM_WEAPON) {
-            snprintf(label, sizeof(label), "%s %d-%d%s", it->name, it->dmgMin, it->dmgMax,
-                     equipped ? "  [equipped]" : "");
-            rowColor = equipped ? SKYBLUE : RAYWHITE;
-        } else if (it->kind == ITEM_MATERIAL) {
-            snprintf(label, sizeof(label), "%s x%d", it->name, it->count);
-            rowColor = (Color){ 200, 180, 140, 255 };
-        } else if (it->kind == ITEM_KIT_SALVAGE || it->kind == ITEM_KIT_ID) {
-            snprintf(label, sizeof(label), "%s [%d uses]%s", it->name, it->count,
-                     (i == g_armedKit) ? "  <armed>" : "");
-            rowColor = (i == g_armedKit) ? GOLD : (Color){ 160, 200, 210, 255 };
+        if (filled) {
+            const Item *it = &g_inventory[idx];
+            if (it->kind == ITEM_ARMOR)        snprintf(label, sizeof(label), "%.24s", it->name);
+            else if (it->kind == ITEM_OFFHAND) snprintf(label, sizeof(label), "%.20s +%d AL", it->name, it->armor);
+            else if (it->kind == ITEM_BAG)     snprintf(label, sizeof(label), "%.18s +%d slots", it->name, it->count);
+            else                               snprintf(label, sizeof(label), "%.24s", Items_DisplayName(it));
         } else {
-            snprintf(label, sizeof(label), "%s%s", it->name, equipped ? "  [equipped]" : "");
-            rowColor = equipped ? SKYBLUE : RAYWHITE;
+            // A two-hander is the reason the offhand is empty, and
+            // saying so beats an empty box the player thinks is a bug.
+            int wep = g_equipped[EQUIP_WEAPON];
+            bool blocked = slot == EQUIP_OFFHAND && wep >= 0 && wep < g_inventoryCount &&
+                           g_inventory[wep].twoHanded;
+            snprintf(label, sizeof(label), "%s", blocked ? "- both hands used -" : "-");
         }
-        UIText(label, x, y, font, rowColor);
+        int lw = UITextWidth(label, small);
+        UIText(label, (int)(row.x + row.width) - lw - (int)(6 * scale),
+               (int)row.y + (slotH - 3 - small) / 2, small,
+               filled ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
 
-        if (hovered && click) {
-            if (it->kind == ITEM_KIT_SALVAGE || it->kind == ITEM_KIT_ID) {
-                // Arm/disarm the kit; the next item click applies it.
-                g_armedKit = (g_armedKit == i) ? -1 : i;
-            } else if (g_armedKit >= 0) {
-                g_armedKit = Items_UseKitOn(g_armedKit, i);
-                if (g_armedKit == -2) g_armedKit = -1; // invalid target: disarm
-                Save_Write();
-                break; // indices may have shifted - relayout next frame
-            } else if (it->kind == ITEM_WEAPON) {
-                Items_EquipWeapon(player, i); // rejects unidentified itself
-            } else if (it->kind == ITEM_ARMOR) {
-                Items_EquipArmor(player, i);
-            }
+        if (hovered && click && filled) {
+            Items_Unequip(player, (EquipSlot)slot);
+            Audio_Play(SFX_UI_CLICK);
+            Save_Write();
         }
-        y += rowH;
+        ey += slotH;
     }
 
-    if (g_inventoryCount == 0) {
-        UIText("(empty - kill something)", x, y, font, GRAY);
+    // --- Right: the bag grid ---
+    int gx = x + equipW + pad;
+    UIText("BAGS", gx, y, small, UI_GOLD_DIM);
+    int gy = y + small + (int)(4 * scale);
+
+    for (int i = 0; i < capacity; i++) {
+        int col = i % cols, row = i / cols;
+        Rectangle r = { (float)(gx + col * (cell + cellGap)),
+                        (float)(gy + row * (cell + cellGap)),
+                        (float)cell, (float)cell };
+        bool has = i < g_inventoryCount;
+        bool hovered = CheckCollisionPointRec(mouse, r);
+
+        DrawRectangleRec(r, has ? (Color){ 34, 36, 46, 255 } : (Color){ 22, 23, 29, 255 });
+        DrawRectangleLinesEx(r, 1.0f, (Color){ 52, 50, 46, 255 });
+        if (!has) { continue; }
+
+        const Item *it = &g_inventory[i];
+        bool worn = Items_IsEquipped(i);
+        bool armed = (g_armedKit == i);
+
+        // A letter tile rather than an icon: the item art doesn't exist,
+        // and a consistent glyph per kind still scans at a glance.
+        const char *glyph = it->kind == ITEM_WEAPON ? "W"
+                          : it->kind == ITEM_ARMOR ? "A"
+                          : it->kind == ITEM_OFFHAND ? "O"
+                          : it->kind == ITEM_BAG ? "B"
+                          : it->kind == ITEM_MATERIAL ? "M" : "K";
+        Color tile = it->kind == ITEM_WEAPON ? (Color){ 120, 92, 60, 255 }
+                   : it->kind == ITEM_ARMOR ? (Color){ 78, 96, 120, 255 }
+                   : it->kind == ITEM_OFFHAND ? (Color){ 96, 84, 124, 255 }
+                   : it->kind == ITEM_BAG ? (Color){ 104, 86, 56, 255 }
+                   : it->kind == ITEM_MATERIAL ? (Color){ 88, 106, 76, 255 }
+                                               : (Color){ 100, 100, 108, 255 };
+        if (it->unidentified) tile = (Color){ 82, 70, 96, 255 };
+        DrawRectangleRec((Rectangle){ r.x + 3, r.y + 3, r.width - 6, r.height - 6 }, tile);
+        UI_TextShadowCentered(glyph, (int)(r.x + r.width / 2), (int)(r.y + (cell - font) / 2 - 3),
+                              font, RAYWHITE);
+
+        if (it->count > 1) {
+            char cnt[16];
+            snprintf(cnt, sizeof(cnt), "%d", it->count);
+            int cw = UITextWidth(cnt, small);
+            UI_TextShadow(cnt, (int)(r.x + r.width) - cw - 3, (int)(r.y + r.height) - small - 2,
+                          small, (Color){ 236, 230, 214, 255 });
+        }
+        if (worn) DrawRectangleLinesEx(r, 2.0f, UI_GOLD);
+        if (armed) DrawRectangleLinesEx(r, 2.0f, SKYBLUE);
+        if (hovered) DrawRectangleLinesEx(r, 2.0f, (Color){ 210, 200, 176, 200 });
+
+        // Hover name, drawn under the grid so it can't cover a cell.
+        if (hovered) {
+            char info[80];
+            if (it->kind == ITEM_WEAPON && !it->unidentified) {
+                snprintf(info, sizeof(info), "%s  %d-%d%s", it->name, it->dmgMin, it->dmgMax,
+                         it->twoHanded ? "  (two-handed)" : "");
+            } else if (it->kind == ITEM_ARMOR) {
+                snprintf(info, sizeof(info), "%s  %s  AL %d", it->name,
+                         Items_SlotName(it->slot), it->armor);
+            } else {
+                snprintf(info, sizeof(info), "%s", Items_DisplayName(it));
+            }
+            UIText(info, x, (int)(g_invRect.y + g_invRect.height) - pad - font, font,
+                   UI_TEXT_PRIMARY);
+        }
+
+        if (hovered && click) {
+            if (g_armedKit >= 0 && g_armedKit != i) {
+                int next = Items_UseKitOn(g_armedKit, i);
+                g_armedKit = (next >= 0) ? next : -1;
+                Audio_Play(next == -2 ? SFX_UI_DENY : SFX_UI_CONFIRM);
+                Save_Write();
+            } else if (it->kind == ITEM_KIT_ID || it->kind == ITEM_KIT_SALVAGE) {
+                g_armedKit = armed ? -1 : i;
+                Audio_Play(SFX_UI_CLICK);
+            } else if (worn) {
+                for (int s2 = 0; s2 < EQUIP_SLOT_COUNT; s2++) {
+                    if (g_equipped[s2] == i) Items_Unequip(player, (EquipSlot)s2);
+                }
+                Audio_Play(SFX_UI_CLICK);
+                Save_Write();
+            } else {
+                bool ok = Items_Equip(player, i);
+                Audio_Play(ok ? SFX_UI_CONFIRM : SFX_UI_DENY);
+                if (ok) Save_Write();
+            }
+        }
+    }
+
+    // Footer hint, in the strip the hover name shares.
+    if (!CheckCollisionPointRec(mouse, g_invRect) || g_armedKit >= 0) {
+        const char *hint = g_armedKit >= 0
+            ? "Kit armed - click the item to use it on."
+            : "Click a bag slot to equip; click an equipped row to take it off.";
+        UIText(hint, x, (int)(g_invRect.y + g_invRect.height) - pad - font, font,
+               g_armedKit >= 0 ? SKYBLUE : UI_TEXT_MUTED);
     }
 }
 
@@ -1051,7 +1174,7 @@ static void DrawShop(int screenWidth, int screenHeight) {
         }
         for (int i = 0; i < g_inventoryCount; i++) {
             Item *it = &g_inventory[i];
-            bool equipped = (i == g_equippedWeapon || i == g_equippedArmor);
+            bool equipped = Items_IsEquipped(i);
             Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
             bool focused = UIFocus_Item();
             bool hovered = !equipped && CheckCollisionPointRec(mouse, row);
@@ -1087,91 +1210,11 @@ static void DrawShop(int screenWidth, int screenHeight) {
     }
 }
 
-// Clicking an equipment slot cycles to the next compatible item in the
-// inventory - quick swapping without hunting through the bag list.
-static void CycleEquip(Entity *player, ItemKind kind) {
-    int cur = (kind == ITEM_WEAPON) ? g_equippedWeapon : g_equippedArmor;
-    int n = g_inventoryCount;
-    for (int step = 1; step <= n; step++) {
-        int i = (cur < 0) ? (step - 1) : (cur + step) % n;
-        if (i < 0 || i >= n) continue;
-        if (g_inventory[i].kind != kind) continue;
-        if (kind == ITEM_WEAPON && g_inventory[i].unidentified) continue;
-        if (i == cur) break; // only one option - nothing to cycle to
-        if (kind == ITEM_WEAPON) Items_EquipWeapon(player, i);
-        else Items_EquipArmor(player, i);
-        break;
-    }
-}
 
 // The equipment screen: what's in each slot, with the numbers that
 // matter, plus a character summary - so "what do I have equipped
 // where" is never a mystery. E toggles it; the pad's Y opens it with
 // the inventory.
-static void DrawEquipment(Entity *player, int screenHeight) {
-    float scale = UI_Scale(screenHeight);
-    int rowH = (int)(44 * scale);
-    int font = (int)(12 * scale);
-    int small = (int)(10 * scale);
-    int pad = (int)(10 * scale);
-    int w = (int)(300 * scale);
-    int h = pad * 3 + font + rowH * 2 + font + (int)(8 * scale);
-
-    // Above the inventory, left side.
-    g_equipRect = (Rectangle){ (float)(20 * scale), (float)(140 * scale), (float)w, (float)h };
-    UIHit_Claim(g_equipRect);
-    UI_ThemePanel(g_equipRect, scale, pad + font + pad / 2);
-
-    int x = (int)g_equipRect.x + pad;
-    int y = (int)g_equipRect.y + pad;
-    if (PanelHeader(g_equipRect, "Equipment", "E", "Y", font, pad, scale)) {
-        g_equipOpen = false;
-        return;
-    }
-    y += font + pad;
-
-    bool click = UI_PointerClicked();
-    Vector2 mouse = UI_PointerPos();
-
-    const char *slotNames[2] = { "Weapon", "Armor" };
-    for (int slot = 0; slot < 2; slot++) {
-        ItemKind kind = (slot == 0) ? ITEM_WEAPON : ITEM_ARMOR;
-        int idx = (slot == 0) ? g_equippedWeapon : g_equippedArmor;
-
-        Rectangle row = { g_equipRect.x + 4, (float)y - 2, g_equipRect.width - 8, (float)rowH - 4 };
-        bool hovered = CheckCollisionPointRec(mouse, row);
-        if (hovered) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
-        DrawRectangleLinesEx(row, 1, (Color){ 90, 90, 110, 255 });
-
-        UIText(slotNames[slot], x, y, small, LIGHTGRAY);
-        char line[96];
-        if (idx >= 0 && idx < g_inventoryCount) {
-            const Item *it = &g_inventory[idx];
-            if (kind == ITEM_WEAPON) {
-                snprintf(line, sizeof(line), "%s   %d-%d dmg, %s, %.2fs",
-                         it->name, it->dmgMin, it->dmgMax,
-                         it->range > 60.0f ? "ranged" : "melee", it->attackInterval);
-            } else {
-                snprintf(line, sizeof(line), "%s   AL %d", it->name, it->armor);
-            }
-        } else {
-            snprintf(line, sizeof(line), "(nothing equipped)");
-        }
-        UIText(line, x, y + small + 3, font, idx >= 0 ? SKYBLUE : GRAY);
-
-        if (hovered && click) {
-            Audio_Play(SFX_UI_CLICK);
-            CycleEquip(player, kind);
-        }
-        y += rowH;
-    }
-
-    char summary[96];
-    snprintf(summary, sizeof(summary), "Level %d   HP %d/%d   Energy %d/%d   AL %d",
-             player->level, player->hp, player->maxHp,
-             player->energy, player->maxEnergy, player->armor);
-    UIText(summary, x, y + 4, small, LIGHTGRAY);
-}
 
 // The Armorer's crafting window: recipes take gold AND Charr Hides,
 // GW1's armor-is-crafted-only economy.
@@ -1505,7 +1548,7 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     // K used to open a separate attributes window. Attributes are now
     // part of the build screen, so both keys land on the same place.
     if (IsKeyPressed(KEY_K)) g_skillsOpen = !g_skillsOpen;
-    if (IsKeyPressed(KEY_E)) g_equipOpen = !g_equipOpen;
+    if (IsKeyPressed(KEY_E)) g_invOpen = !g_invOpen; // gear and bags are one screen
     if (IsKeyPressed(KEY_T)) g_titlesOpen = !g_titlesOpen;
     if (IsKeyPressed(KEY_L)) {
         g_skillsOpen = !g_skillsOpen;
@@ -1519,7 +1562,6 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (focusList) UIFocus_Begin();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
-    if (g_equipOpen) DrawEquipment(player, screenHeight);
     if (g_skillsOpen) DrawSkillsPanel(player, screenWidth, screenHeight);
     if (g_titlesOpen) DrawTitles(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);

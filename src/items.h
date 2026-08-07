@@ -6,17 +6,43 @@
 
 struct Entity;
 
-#define MAX_INVENTORY 16
+// GW1's Backpack holds 20; bags add to it. The cap here is what the
+// arrays are sized for - the CARRYABLE count is Items_Capacity(), which
+// is the backpack plus whatever bags are equipped.
+#define MAX_INVENTORY 40
+#define INVENTORY_BASE_SLOTS 20
 #define MAX_DROPS 32
 
 typedef enum {
     ITEM_NONE = 0,
     ITEM_WEAPON,
     ITEM_ARMOR,
+    ITEM_OFFHAND,      // shield or focus; blocked by a two-handed weapon
+    ITEM_BAG,          // equipping one adds `count` inventory slots
     ITEM_MATERIAL,     // crafting stock (stacks): armor is crafted, not looted
     ITEM_KIT_SALVAGE,  // breaks gear into materials; count = uses left
     ITEM_KIT_ID        // reveals unidentified weapons; count = uses left
 } ItemKind;
+
+// GW1 dresses a character in five armour pieces, not one "armor" item,
+// and that is the whole reason armour is a collection game: you upgrade
+// a set a piece at a time. The weapon and offhand share the enum so one
+// table describes everything a character wears.
+typedef enum {
+    EQUIP_HEAD = 0,
+    EQUIP_CHEST,
+    EQUIP_ARMS,
+    EQUIP_LEGS,
+    EQUIP_FEET,
+    EQUIP_WEAPON,
+    EQUIP_OFFHAND,
+    EQUIP_BAG,        // one carried bag; adds slots rather than stats
+    EQUIP_SLOT_COUNT
+} EquipSlot;
+
+#define EQUIP_ARMOR_PIECES 5   // HEAD..FEET - the ones that make up AL
+
+const char *Items_SlotName(EquipSlot slot);
 
 typedef struct {
     ItemKind kind;
@@ -28,7 +54,15 @@ typedef struct {
     float range;
     float attackInterval;
     // Armor field: GW1-style armor level (AL). 60 is the caster max.
+    // On an armour PIECE this is the rating of the whole set it belongs
+    // to - wearing all five pieces of an "AL 60" set gives AL 60, and a
+    // missing piece leaves that part of you unprotected.
     int armor;
+    // Which slot this occupies. Meaningful for ITEM_ARMOR (HEAD..FEET);
+    // weapons, offhands and bags are routed by kind.
+    EquipSlot slot;
+    // Two-handed weapons (bows, staves, hammers) rule out an offhand.
+    bool twoHanded;
     // Materials stack and kits carry uses here; everything else is
     // count 1. Zero means 1 (older saves and short struct literals).
     int count;
@@ -48,8 +82,10 @@ typedef struct {
 extern Item g_inventory[MAX_INVENTORY];
 extern int g_inventoryCount;
 extern int g_gold;
-extern int g_equippedWeapon; // index into g_inventory, -1 = none
-extern int g_equippedArmor;
+// Inventory indices of what is worn, -1 = empty. One array rather than
+// a named variable per slot, so adding a slot doesn't mean touching
+// every site that iterates equipment.
+extern int g_equipped[EQUIP_SLOT_COUNT];
 
 extern GroundDrop g_drops[MAX_DROPS];
 
@@ -87,9 +123,26 @@ bool Items_RemoveFromInventory(int inventoryIndex);
 // prices, like GW1 merchants.
 int Items_SellValue(const Item *item);
 
-// Applies an inventory weapon/armor to the player's combat stats.
-void Items_EquipWeapon(struct Entity *player, int inventoryIndex);
-void Items_EquipArmor(struct Entity *player, int inventoryIndex);
+// Equips an inventory item into whichever slot it belongs in, and
+// recomputes the player's armour and weapon stats. Refuses an offhand
+// while a two-handed weapon is held (and unequips the offhand when a
+// two-hander goes on). Returns false when nothing could be equipped.
+bool Items_Equip(struct Entity *player, int inventoryIndex);
+
+// Empties a slot and recomputes. Returns false if it was already empty.
+bool Items_Unequip(struct Entity *player, EquipSlot slot);
+
+// True when this inventory index is worn in any slot.
+bool Items_IsEquipped(int inventoryIndex);
+
+// Recomputes armour from the five worn pieces plus any offhand bonus,
+// and weapon stats from the held weapon. Called by the equip paths;
+// exposed because loading a save equips several things at once.
+void Items_RecomputeEquipped(struct Entity *player);
+
+// How many inventory slots the character actually has: the backpack
+// plus whatever the equipped bag adds.
+int Items_Capacity(void);
 
 // Rolls GW1-style loot for a killed monster: always some gold, a decent
 // chance of a weapon or a crafting material. Armor never drops - like

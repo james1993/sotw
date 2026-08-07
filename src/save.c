@@ -140,8 +140,14 @@ bool Save_Write(void) {
     for (int i = 0; i < QUEST_COUNT; i++) {
         fprintf(f, "quest%d=%d,%d\n", i, (int)g_quests[i].state, g_quests[i].kills);
     }
-    fprintf(f, "equipWeapon=%d\n", g_equippedWeapon);
-    fprintf(f, "equipArmor=%d\n", g_equippedArmor);
+    // One line for all seven worn slots plus the bag - a save written
+    // before the split simply has none, and the loader falls back to the
+    // old two keys.
+    fprintf(f, "equipped=");
+    for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
+        fprintf(f, "%d%s", g_equipped[i], i + 1 < EQUIP_SLOT_COUNT ? "," : "");
+    }
+    fprintf(f, "\n");
     fprintf(f, "itemCount=%d\n", g_inventoryCount);
     for (int i = 0; i < g_inventoryCount; i++) {
         const Item *it = &g_inventory[i];
@@ -195,14 +201,16 @@ bool Save_LoadAndApply(void) {
 
     // The save's inventory replaces the starting kit World_Init handed out.
     g_inventoryCount = 0;
-    g_equippedWeapon = -1;
-    g_equippedArmor = -1;
+    for (int i = 0; i < EQUIP_SLOT_COUNT; i++) g_equipped[i] = -1;
     g_gold = 0;
 
     int outpost = (int)ZONE_ASHFORD_ABBEY;
     bool thomHired = false;
     int titleWorn = -1;
-    int equipWeapon = -1, equipArmor = -1;
+    int equipWeapon = -1, equipArmor = -1; // legacy single-slot keys
+    int equipped[EQUIP_SLOT_COUNT];
+    bool sawEquipped = false;
+    for (int i = 0; i < EQUIP_SLOT_COUNT; i++) equipped[i] = -1;
     bool sawSkillbook = false;
 
     // Start from a clean book; the file fills it in below.
@@ -294,6 +302,13 @@ bool Save_LoadAndApply(void) {
             sscanf(val, "%d,%d", &state, &kills);
             g_quests[idx].state = (QuestState)ClampInt(state, 0, (int)QUEST_DONE);
             g_quests[idx].kills = ClampInt(kills, 0, 999);
+        } else if (strcmp(key, "equipped") == 0) {
+            const char *p2 = val;
+            for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
+                equipped[i] = (int)strtol(p2, (char **)&p2, 10);
+                if (*p2 == ',') p2++;
+            }
+            sawEquipped = true;
         } else if (strcmp(key, "equipWeapon") == 0) {
             equipWeapon = atoi(val);
         } else if (strcmp(key, "equipArmor") == 0) {
@@ -372,8 +387,18 @@ bool Save_LoadAndApply(void) {
     // the title was actually earned.
     Titles_Reset();
     Titles_SetDisplayed(titleWorn);
-    if (equipWeapon >= 0) Items_EquipWeapon(p, equipWeapon);
-    if (equipArmor >= 0) Items_EquipArmor(p, equipArmor);
+    if (sawEquipped) {
+        for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
+            g_equipped[i] = (equipped[i] >= 0 && equipped[i] < g_inventoryCount) ? equipped[i] : -1;
+        }
+    } else {
+        // A save from before armour was split into pieces: its single
+        // armour item goes on the chest, which is the piece that carries
+        // most of GW1's armour anyway.
+        if (equipWeapon >= 0 && equipWeapon < g_inventoryCount) g_equipped[EQUIP_WEAPON] = equipWeapon;
+        if (equipArmor >= 0 && equipArmor < g_inventoryCount) g_equipped[EQUIP_CHEST] = equipArmor;
+    }
+    Items_RecomputeEquipped(p);
 
     // "Log back in" at the last outpost: respawns the party (including
     // a hired Thom) and fully restores everyone, GW1-style.

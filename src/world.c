@@ -9,6 +9,7 @@
 #include "fx.h"
 #include "save.h"
 #include "progression.h"
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
 
@@ -1206,39 +1207,46 @@ void World_Init(void) {
     for (int i = 0; i < SKILL_BAR_SIZE; i++) player->skillBar[i] = -1;
 
     Item startWeapon, startArmor;
+    const char *startArmorSetName = "Ascalon";
     switch (g_character.primary) {
         case PROF_WARRIOR:
             player->skillBar[0] = SK_GASH;
-            startWeapon = (Item){ ITEM_WEAPON, "Ascalon Sword", 13, 20, 28.0f, 1.33f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Warrior Harness (AL 40)", 0, 0, 0, 0, 40, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Ascalon Sword", .dmgMin = 13, .dmgMax = 20, .range = 28.0f, .attackInterval = 1.33f, .count = 1 };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 40, .count = 1 };
+            startArmorSetName = "Warrior Harness";
             break;
         case PROF_RANGER:
             player->skillBar[0] = SK_POWER_SHOT;
             // A bow: long reach, slow swing, and the only starting
             // weapon that lets you open a fight before it reaches you.
-            startWeapon = (Item){ ITEM_WEAPON, "Ascalon Longbow", 12, 21, 240.0f, 2.0f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Ranger Leathers (AL 35)", 0, 0, 0, 0, 35, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Ascalon Longbow", .dmgMin = 12, .dmgMax = 21, .range = 240.0f, .attackInterval = 2.0f, .count = 1, .twoHanded = true };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 35, .count = 1 };
+            startArmorSetName = "Ranger Leathers";
             break;
         case PROF_MONK:
             player->skillBar[0] = SK_ORISON_OF_HEALING;
-            startWeapon = (Item){ ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Smiting Rod", .dmgMin = 11, .dmgMax = 22, .range = 160.0f, .attackInterval = 1.75f, .count = 1 };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 30, .count = 1 };
+            startArmorSetName = "Monk Raiment";
             break;
         case PROF_NECROMANCER:
             player->skillBar[0] = SK_VAMPIRIC_GAZE;
-            startWeapon = (Item){ ITEM_WEAPON, "Bone Idol", 10, 20, 220.0f, 1.75f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Necromancer Vestments (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Bone Idol", .dmgMin = 10, .dmgMax = 20, .range = 220.0f, .attackInterval = 1.75f, .count = 1 };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 30, .count = 1 };
+            startArmorSetName = "Necromancer Vestments";
             break;
         case PROF_MESMER:
             player->skillBar[0] = SK_ETHER_FEAST;
-            startWeapon = (Item){ ITEM_WEAPON, "Jeweled Wand", 10, 20, 220.0f, 1.75f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Mesmer Attire (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Jeweled Wand", .dmgMin = 10, .dmgMax = 20, .range = 220.0f, .attackInterval = 1.75f, .count = 1 };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 30, .count = 1 };
+            startArmorSetName = "Mesmer Attire";
             break;
         case PROF_ELEMENTALIST:
         default:
             player->skillBar[0] = SK_FIRE_BOLT;
-            startWeapon = (Item){ ITEM_WEAPON, "Kindling Staff", 11, 22, 220.0f, 1.75f, 0, 1, false };
-            startArmor  = (Item){ ITEM_ARMOR, "Elementalist Robes (AL 30)", 0, 0, 0, 0, 30, 1, false };
+            startWeapon = (Item){ .kind = ITEM_WEAPON, .name = "Kindling Staff", .dmgMin = 11, .dmgMax = 22, .range = 220.0f, .attackInterval = 1.75f, .count = 1, .twoHanded = true };
+            startArmor  = (Item){ .kind = ITEM_ARMOR, .armor = 30, .count = 1 };
+            startArmorSetName = "Elementalist Robes";
             break;
     }
 
@@ -1270,10 +1278,18 @@ void World_Init(void) {
     g_skillPoints = 0;
     Skillbook_Unlock(player->skillBar[0]);
 
+    // A full five-piece set plus the weapon, GW1's actual starting kit.
+    // One "armour" item was what made armour feel like a stat rather
+    // than a wardrobe.
     Items_AddToInventory(startWeapon);
-    Items_AddToInventory(startArmor);
-    Items_EquipWeapon(player, 0);
-    Items_EquipArmor(player, 1);
+    for (int piece = EQUIP_HEAD; piece <= EQUIP_FEET; piece++) {
+        Item p2 = startArmor;
+        p2.slot = (EquipSlot)piece;
+        snprintf(p2.name, sizeof(p2.name), "%s %s", startArmorSetName,
+                 Items_SlotName((EquipSlot)piece));
+        Items_AddToInventory(p2);
+    }
+    for (int i = 0; i < g_inventoryCount; i++) Items_Equip(player, i);
 
     LoadZone(ZONE_ASHFORD_ABBEY, (Vector2){ 0, 0 });
 }
