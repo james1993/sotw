@@ -8,6 +8,7 @@
 #include "projectile.h"
 #include "fx.h"
 #include "save.h"
+#include "progression.h"
 #include <math.h>
 #include <string.h>
 
@@ -17,7 +18,7 @@
 
 // What a level-5 character has banked. GW1 hands out attribute points
 // on a curve reaching 200 at level 20; this is that curve's value here.
-#define STARTING_ATTRIBUTE_POINTS 20
+#define STARTING_ATTRIBUTE_POINTS 0
 
 // ---------------------------------------------------------------------
 // Zone content data. A zone is a ZoneDef: name, mode, colors, portals,
@@ -207,7 +208,7 @@ static const SpawnDef g_citySpawns[] = {
     // Kept just above the HUD's skill bar: at the default zoom anything
     // past y ~= +130 sits behind it while you stand in the plaza, and a
     // skill trainer you can't see is the one NPC that most needs finding.
-    { .kind = SPAWN_NPC, .name = "Master Ilsa", .pos = { 0, 115 },
+    { .kind = SPAWN_NPC, .name = "Halbrik", .pos = { 0, 115 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
 };
 
@@ -752,6 +753,28 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->skillRecharge[i] = 0.0f;
 }
 
+// GW1's henchmen scale to the party leader rather than sitting at a
+// fixed level, which is what stops them from either carrying a new
+// character or becoming dead weight at 20. These two helpers are that
+// rule, in one place, so Cynn and Thom can't drift apart.
+static int HenchmanLevel(void) {
+    const Entity *player = Entity_Get(PLAYER_INDEX);
+    int level = player ? player->level : 1;
+    if (level < 1) level = 1;
+    if (level > MAX_LEVEL) level = MAX_LEVEL;
+    return level;
+}
+
+// Rank 1 at level 1 up to the rank 12 cap at 20 - the same shape a
+// player following their primary would have, without the freedom to
+// spike one line, which is the point of a henchman.
+static int HenchmanRank(int level, int offset) {
+    int rank = 1 + ((level - 1) * 11) / (MAX_LEVEL - 1) - offset;
+    if (rank < 1) rank = 1;
+    if (rank > ATTRIBUTE_RANK_CAP) rank = ATTRIBUTE_RANK_CAP;
+    return rank;
+}
+
 // Cynn is Prophecies' own Elementalist henchman. Vekk was an asura
 // from an expansion two campaigns away, which is a long way to come
 // for a walk around Lakeside.
@@ -760,14 +783,14 @@ static void SpawnCynn(Vector2 pos) {
     Entity *hero = Entity_Get(idx);
     hero->primaryProfession = PROF_ELEMENTALIST;
     hero->secondaryProfession = PROF_MONK;
-    hero->level = 5;
+    hero->level = HenchmanLevel();
     hero->attackRange = 220.0f; // caster keeps distance
     hero->armor = 30;           // Ascalon-tier robes
-    hero->attributeRank[ATTR_FIRE_MAGIC] = 4;
-    // His pool is 29, not 50: 20 base plus 3 per rank of Energy Storage.
-    // Being an Elementalist doesn't hand out energy, spending points on
-    // the primary attribute does.
-    hero->attributeRank[ATTR_ENERGY_STORAGE] = 3;
+    hero->attributeRank[ATTR_FIRE_MAGIC] = HenchmanRank(hero->level, 0);
+    // His pool is 20 base plus 3 per rank of Energy Storage, and nothing
+    // else. Being an Elementalist doesn't hand out energy; spending
+    // points on the primary attribute does.
+    hero->attributeRank[ATTR_ENERGY_STORAGE] = HenchmanRank(hero->level, 1);
     Entity_RecomputeAttributeStats(hero);
     hero->hp = hero->maxHp;
     hero->energy = hero->maxEnergy;
@@ -784,9 +807,9 @@ void World_SetupThomStats(Entity *thom) {
     thom->isHenchman = true;
     thom->primaryProfession = PROF_WARRIOR;
     thom->secondaryProfession = PROF_MONK;
-    thom->level = 5;
-    thom->attributeRank[ATTR_SWORDSMANSHIP] = 4;
-    thom->attributeRank[ATTR_STRENGTH] = 3;
+    thom->level = HenchmanLevel();
+    thom->attributeRank[ATTR_SWORDSMANSHIP] = HenchmanRank(thom->level, 0);
+    thom->attributeRank[ATTR_STRENGTH] = HenchmanRank(thom->level, 1);
     Entity_RecomputeAttributeStats(thom);
     thom->hp = thom->maxHp;
     thom->energy = thom->maxEnergy;
@@ -840,6 +863,13 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     m->armor = armor;
     m->aggroRange = def->aggro;
     m->leashRange = def->aggro * 2.5f;
+    // Attack damage scales with the monster's level, as GW1's does. It
+    // used to be a flat 6-12 for everything, which was tuned around a
+    // character who started at level 5 - against a level-1 Ascalonian in
+    // starter cloth, that made a River Skale hit as hard as a Charr and
+    // killed you on the walk out of the abbey.
+    m->attackDamageMin = 2 + def->level;
+    m->attackDamageMax = 4 + def->level * 2;
     m->attributeRank[ATTR_MONSTROUS] = def->strengthRank;
     // Aloes are rooted: they fight what comes to them and never chase.
     if (def->species == SPECIES_ALOE) m->moveSpeed = 0.0f;
@@ -1012,7 +1042,10 @@ void World_Init(void) {
     player->skinTone = g_character.skinTone;
     player->hairColor = g_character.hairColor;
     player->hairStyle = g_character.hairStyle;
-    player->level = 5;
+    // Pre-Searing starts you at level 1, with nothing spent and nothing
+    // banked. Everything below - attribute points, skill points, the
+    // ranks behind your one skill - is earned from here.
+    player->level = 1;
 
     // Per-profession starting kit. The choice has to change how the
     // character actually plays from the first fight, not just which
@@ -1036,15 +1069,11 @@ void World_Init(void) {
     Item startWeapon, startArmor;
     switch (g_character.primary) {
         case PROF_WARRIOR:
-            player->attributeRank[ATTR_SWORDSMANSHIP] = 4;
-            player->attributeRank[ATTR_STRENGTH] = 3;
             player->skillBar[0] = SK_GASH;
             startWeapon = (Item){ ITEM_WEAPON, "Ascalon Sword", 13, 20, 28.0f, 1.33f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Warrior Harness (AL 40)", 0, 0, 0, 0, 40, 1, false };
             break;
         case PROF_RANGER:
-            player->attributeRank[ATTR_MARKSMANSHIP] = 4;
-            player->attributeRank[ATTR_EXPERTISE] = 3;
             player->skillBar[0] = SK_POWER_SHOT;
             // A bow: long reach, slow swing, and the only starting
             // weapon that lets you open a fight before it reaches you.
@@ -1052,30 +1081,22 @@ void World_Init(void) {
             startArmor  = (Item){ ITEM_ARMOR, "Ranger Leathers (AL 35)", 0, 0, 0, 0, 35, 1, false };
             break;
         case PROF_MONK:
-            player->attributeRank[ATTR_HEALING_PRAYERS] = 4;
-            player->attributeRank[ATTR_DIVINE_FAVOR] = 3;
             player->skillBar[0] = SK_ORISON_OF_HEALING;
             startWeapon = (Item){ ITEM_WEAPON, "Smiting Rod", 11, 22, 160.0f, 1.75f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Monk Raiment (AL 30)", 0, 0, 0, 0, 30, 1, false };
             break;
         case PROF_NECROMANCER:
-            player->attributeRank[ATTR_BLOOD_MAGIC] = 4;
-            player->attributeRank[ATTR_SOUL_REAPING] = 3;
             player->skillBar[0] = SK_VAMPIRIC_GAZE;
             startWeapon = (Item){ ITEM_WEAPON, "Bone Idol", 10, 20, 220.0f, 1.75f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Necromancer Vestments (AL 30)", 0, 0, 0, 0, 30, 1, false };
             break;
         case PROF_MESMER:
-            player->attributeRank[ATTR_DOMINATION_MAGIC] = 4;
-            player->attributeRank[ATTR_FAST_CASTING] = 3;
             player->skillBar[0] = SK_ETHER_FEAST;
             startWeapon = (Item){ ITEM_WEAPON, "Jeweled Wand", 10, 20, 220.0f, 1.75f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Mesmer Attire (AL 30)", 0, 0, 0, 0, 30, 1, false };
             break;
         case PROF_ELEMENTALIST:
         default:
-            player->attributeRank[ATTR_FIRE_MAGIC] = 4;
-            player->attributeRank[ATTR_ENERGY_STORAGE] = 3;
             player->skillBar[0] = SK_FIRE_BOLT;
             startWeapon = (Item){ ITEM_WEAPON, "Kindling Staff", 11, 22, 220.0f, 1.75f, 0, 1, false };
             startArmor  = (Item){ ITEM_ARMOR, "Elementalist Robes (AL 30)", 0, 0, 0, 0, 30, 1, false };
@@ -1087,10 +1108,11 @@ void World_Init(void) {
     Entity_RecomputeAttributeStats(player);
     player->hp = player->maxHp;
     player->energy = player->maxEnergy;
-    // A level-5 character has 20 attribute points. Whatever the kit
-    // above already spent is deducted at the real GW1 rate rather than
-    // guessed at, so every profession is left with the same freedom to
-    // retune in the attributes panel (K).
+    // A level-1 character has no attribute points at all - GW1's
+    // schedule is 5 per level to 10, 10 to 15, 15 to 20, so level 1 is
+    // zero and every rank you ever hold is one you levelled for. The
+    // deduction below still runs at the real GW1 rate in case a
+    // starting kit ever pre-spends again.
     {
         int spent = 0;
         for (int a = 0; a < ATTR_COUNT; a++) {
@@ -1103,7 +1125,10 @@ void World_Init(void) {
     // A new character knows exactly one skill - their profession's
     // signature. The other seven slots are empty on purpose: filling
     // them is the game.
-    g_skillPoints = 1; // one to spend at the trainer straight away
+    // No banked skill point either: at level 1 the trainer has nothing
+    // for you, and your first skills come from quests. Levelling is what
+    // opens the trainer, which is the pre-Searing order.
+    g_skillPoints = 0;
     Skillbook_Unlock(player->skillBar[0]);
 
     Items_AddToInventory(startWeapon);

@@ -6,7 +6,9 @@
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
+#include "ui_tooltip.h"
 #include "raylib.h"
+#include <math.h>
 #include <stdio.h>
 
 #define PLAYER_INDEX 0
@@ -94,13 +96,32 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
                 // Elite skills get GW1's gold frame.
                 DrawRectangleLinesEx(slotRect, 2, UI_GOLD);
             }
+            // The bar shows icons, so hovering is the only way to read a
+            // skill. It gets the same full tooltip the build editor
+            // does - a bare name told you nothing you couldn't already
+            // see from the icon.
             if (CheckCollisionPointRec(GetMousePosition(), slotRect)) {
-                int tw = UITextWidth(s->name, L.font);
-                int tx = x + (L.slotSize - tw) / 2;
-                int ty = L.y - L.font - (int)(8 * L.scale);
-                DrawRectangle(tx - 4, ty - 2, tw + 8, L.font + 5, (Color){ 12, 12, 16, 230 });
-                DrawRectangleLines(tx - 4, ty - 2, tw + 8, L.font + 5, UI_GOLD_DIM);
-                UIText(s->name, tx, ty, L.font, s->isElite ? GOLD : RAYWHITE);
+                UITooltip_Request(skillIdx, slotRect);
+            }
+
+            // Activation: GW1 lights the slot it is casting from, and
+            // without that there is nothing on screen tying the pause
+            // before a spell lands to the button you pressed.
+            if (player->castingSlot == i && player->castTimeRemaining > 0.0f &&
+                player->castTimeTotal > 0.0f) {
+                float prog = 1.0f - player->castTimeRemaining / player->castTimeTotal;
+                if (prog < 0.0f) prog = 0.0f;
+                if (prog > 1.0f) prog = 1.0f;
+                // A wipe that fills the slot as the cast completes, so
+                // progress is legible at a glance without reading a number.
+                DrawRectangle(x, L.y, (int)(L.slotSize * prog), L.slotSize,
+                              (Color){ 236, 208, 130, 70 });
+                float pulse = 0.6f + 0.4f * sinf((float)GetTime() * 12.0f);
+                DrawRectangleLinesEx(slotRect, 3.0f, Fade(UI_GOLD, pulse));
+                // And a hard edge at the wavefront, which is what makes
+                // a short cast readable at all.
+                DrawRectangle(x + (int)(L.slotSize * prog) - 1, L.y, 2, L.slotSize,
+                              (Color){ 255, 240, 190, 220 });
             }
 
             if (player->skillRecharge[i] > 0.0f) {

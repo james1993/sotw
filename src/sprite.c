@@ -255,8 +255,11 @@ static void DrawHumanoid(const Entity *e, double now) {
     // distinguishable at this size.
     Vector2 headC = { p.x, top - r * 0.42f };
     DrawCircleV(headC, r * 0.42f, skin);
-    Color hair = (e == &g_entities[PLAYER_INDEX] &&
-                  e->hairColor >= 0 && e->hairColor < HAIR_COLOR_COUNT)
+    // Gated on the DATA, not on "is this g_entities[0]". The creation
+    // preview is deliberately not the player slot, so an identity check
+    // here silently ignored every swatch you clicked. Anyone who never
+    // picked hair carries -1 and keeps their identity colour.
+    Color hair = (e->hairColor >= 0 && e->hairColor < HAIR_COLOR_COUNT)
                  ? g_hairColors[e->hairColor] : Darken(e->color, 0.5f);
     switch (e->hairStyle) {
         case 1: // long: a cap plus a fall down the back

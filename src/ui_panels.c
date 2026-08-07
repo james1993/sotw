@@ -15,6 +15,7 @@
 #include "ui_hints.h"
 #include "audio.h"
 #include "ui_focus.h"
+#include "ui_tooltip.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,6 +50,13 @@ static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
 // distance GW1 puts between the two.
 #define SECONDARY_QUEST "A Second Profession"
 #define SECONDARY_CHANGE_LEVEL 10
+
+// Pre-Searing's skill trainer (Halbrik, in Ascalon City) only teaches
+// characters at level 10 or above, and only skills the quests also
+// grant. That is the whole reason pre-Searing skills come from quests:
+// the trainer is a late backstop, not the source. Gating him here is
+// what makes the quest chain the actual route to a build.
+#define TRAINER_MIN_LEVEL 10
 
 static bool SecondaryGrantAllowed(void) {
     return Quests_IsDoneByName(SECONDARY_QUEST);
@@ -389,6 +397,8 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
         UI_TextShadow(num, (int)r.x + 3, (int)(r.y + r.height) - small - 2, small,
                       (Color){ 190, 184, 168, 220 });
 
+        if (id >= 0 && CheckCollisionPointRec(mouse, r)) UITooltip_Request(id, r);
+
         if (hovered && click) {
             // Clicking the armed slot again empties it; otherwise arm it.
             if (g_armedBarSlot == i) {
@@ -468,6 +478,8 @@ static void DrawSkillsPanel(Entity *player, int screenWidth, int screenHeight) {
                y + (font - small) / 2, small,
                onBar >= 0 ? SKYBLUE : (Color){ 150, 146, 134, 255 });
 
+        if (hovered) UITooltip_Request(i, row);
+
         if (hovered && click && selectable) {
             player->skillBar[g_armedBarSlot] = i;
             player->skillRecharge[g_armedBarSlot] = 0.0f;
@@ -489,12 +501,16 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     int rowH = (int)(30 * scale);
     int w = (int)(440 * scale);
 
+    bool tooEarly = player->level < TRAINER_MIN_LEVEL;
+
     int forSale = 0;
-    for (int i = 0; i < g_skillCount; i++) {
-        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
-        if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
+    if (!tooEarly) {
+        for (int i = 0; i < g_skillCount; i++) {
+            if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
+            if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
+        }
     }
-    int rows = forSale > 0 ? forSale : 1;
+    int rows = tooEarly ? 2 : (forSale > 0 ? forSale : 1);
     int h = pad * 3 + font + small + (int)(6 * scale) + rows * rowH + pad;
 
     g_trainerRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale),
@@ -513,14 +529,27 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     int x = (int)g_trainerRect.x + pad;
     int y = (int)g_trainerRect.y + pad + font + pad;
 
-    char sub[96];
-    snprintf(sub, sizeof(sub), "Each skill costs 1 skill point and %d gold. Elites must be captured.",
-             Skillbook_TrainerGoldCost());
-    UIText(sub, x, y, small, (Color){ 150, 146, 134, 255 });
+    char sub[128];
+    if (tooEarly) {
+        snprintf(sub, sizeof(sub), "Requires: level %d (you are %d)",
+                 TRAINER_MIN_LEVEL, player->level);
+    } else {
+        snprintf(sub, sizeof(sub), "Each skill costs 1 skill point and %d gold. Elites must be captured.",
+                 Skillbook_TrainerGoldCost());
+    }
+    UIText(sub, x, y, small,
+           tooEarly ? (Color){ 200, 150, 120, 255 } : (Color){ 150, 146, 134, 255 });
     y += small + (int)(6 * scale);
 
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
+
+    if (tooEarly) {
+        UIText("Learn your trade in the field first - the quest givers", x, y, font, GRAY);
+        y += font + (int)(4 * scale);
+        UIText("of Ascalon have skills for you. Come back at 10.", x, y, font, GRAY);
+        return;
+    }
 
     if (forSale == 0) {
         UIText("You've learned everything I can teach.", x, y, font, GRAY);
@@ -554,6 +583,11 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
         UIText(why, (int)(g_trainerRect.x + g_trainerRect.width) - pad - rw,
                y + (font - small) / 2, small,
                affordable ? (Color){ 140, 220, 150, 255 } : (Color){ 170, 120, 110, 255 });
+
+        // The trainer's whole job is helping you decide, so the same
+        // tooltip the skills panel uses shows up here - on hover, and on
+        // pad focus, since a controller has no pointer to hover with.
+        if (hovered || focused) UITooltip_Request(i, row);
 
         if (((hovered && click) || (focused && UIFocus_Confirm())) && affordable) {
             if (Skillbook_Buy(i, player->primaryProfession, player->secondaryProfession)) {

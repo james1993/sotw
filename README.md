@@ -267,7 +267,7 @@ out (research and the liberties taken are written up in
 | --- | --- | --- |
 | **Ashford Abbey** | outpost | Where you start. Brother Mhenlo (Monk trainer), Abbot Ciglo, Merchant Niles, Armorer Dunda, Little Thom |
 | **Lakeside County** | explorable | The gentle first field: River Skale and Moa Birds |
-| **Ascalon City** | outpost | The capital and the hub. Sir Tydus, Prince Rurik, Master Ilsa (skills), Merchant Vassar, Armorer Gali |
+| **Ascalon City** | outpost | The capital and the hub. Sir Tydus, Prince Rurik, Halbrik (skills), Merchant Vassar, Armorer Gali |
 | **Green Hills County** | explorable | Warrior country and the theatre. Grawl warbands, Warmaster Grast (Warrior), Lady Althea (Mesmer) |
 | **Regent Valley** | explorable | Ranger country. Bandits and giant spiders, Master Ranger Nente (Ranger), Duke Barradin |
 | **Wizard's Folly** | explorable | Elementalist country. Aloes and skale, Elementalist Aziure |
@@ -513,7 +513,7 @@ got:
   against *your* professions rather than hard-named, preferring your
   primary's lines — with six professions in play, a fixed reward would
   be dead loot to four of them.
-- **Skill trainers** (Master Ilsa in Ascalon City, Adept Kerra in Piken
+- **Skill trainers** (Halbrik in Ascalon City, Adept Kerra in Piken
   Square) sell skills for **1 skill point plus gold**, with the gold
   price climbing on every purchase. You earn a skill point per level.
   Their stock is filtered to what your two professions can actually

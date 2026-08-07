@@ -27,6 +27,7 @@
 #include "audio.h"
 #include "ui_world.h"
 #include "ui_hints.h"
+#include "ui_tooltip.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -230,6 +231,11 @@ int main(void) {
             // buttons can't be clicked through the menu.
             UI_PanelsUpdateAndDraw(screenWidth, screenHeight);
             UI_MapUpdateAndDraw(screenWidth, screenHeight); // region map (M/Select)
+            // Skill tooltips are requested by whichever widget the
+            // pointer is over - the HUD bar, the build editor, the
+            // trainer's list - and painted here so they land above all
+            // of them rather than under the next window drawn.
+            UITooltip_Flush(Entity_Get(PLAYER_INDEX), screenWidth, screenHeight);
             UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
         } else {
             PauseAction pa = UI_DrawPauseMenu(screenWidth, screenHeight);

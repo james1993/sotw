@@ -46,6 +46,10 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     e->adrenaline = 0;
     e->armor = 60; // neutral AL - no bonus, no penalty
     e->level = 1;
+    // -1 means "never chose hair at creation", which is everyone except
+    // the player and the creation preview. sprite.c reads this rather
+    // than testing entity identity, so both of them get it right.
+    e->hairColor = -1;
 
     e->castingSlot = -1;
     e->targetRef = Entity_NoRef();
