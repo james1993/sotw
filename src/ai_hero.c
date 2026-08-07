@@ -38,7 +38,10 @@ static void UseSkillBarOn(int index, int targetIndex) {
 // pulling with a hero in the party work: hang back and the hero does
 // too, instead of charging in and aggroing everything nearby.
 static int FindHeroEngageTarget(const Entity *self, const Entity *player) {
-    if (player && player->alive) {
+    // The player merely SELECTING a foe is not an order to attack it -
+    // that is what used to send the whole party charging the moment you
+    // cycled targets. Only an engaged player pulls the party in.
+    if (player && player->alive && player->engaged) {
         int playerTarget = Entity_RefIndex(player->targetRef);
         Entity *t = Entity_Get(playerTarget);
         if (t && t->alive && t->team != self->team) return playerTarget;
@@ -69,6 +72,7 @@ static void UpdateHero(int index) {
     Entity *player = Entity_Get(PLAYER_INDEX);
     int foe = FindHeroEngageTarget(self, player);
     self->targetRef = Entity_RefOf(foe);
+    self->engaged = (foe >= 0);
     if (foe >= 0) {
         UseSkillBarOn(index, foe);
         return;
@@ -158,6 +162,7 @@ static void UpdateMonster(int index) {
     bool giveUp = !target || !target->alive || Dist(self->pos, self->spawnPos) > self->leashRange;
     if (giveUp) {
         self->aggroed = false;
+        self->engaged = false;
         self->targetRef = Entity_NoRef();
         if (self->hasPatrol) {
             // Patrollers reset on the spot and resume the route from the

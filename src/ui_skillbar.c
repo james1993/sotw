@@ -134,6 +134,21 @@ void UI_DrawSkillBar(int screenWidth, int screenHeight) {
                 UIText(buf, x + 4, L.y + L.slotSize - (int)(16 * L.scale), L.font, GOLD);
             }
 
+            // Ally-targeted skills can never land on a foe - GW1 falls
+            // them back to the caster. Say so on the slot BEFORE it is
+            // pressed, because a heal that silently redirected looked
+            // from the outside like a heal aimed at the enemy.
+            if (s->targeting == TARGET_SINGLE_ALLY) {
+                Entity *t = Entity_Resolve(player->targetRef);
+                bool validAlly = t && t->alive && t->team == player->team;
+                if (!validAlly) {
+                    const char *tag = "self";
+                    int tw = UITextWidth(tag, L.font);
+                    UIText(tag, x + (L.slotSize - tw) / 2, L.y + 2, L.font,
+                           (Color){ 150, 210, 160, 230 });
+                }
+            }
+
             char costBuf[16] = { 0 };
             if (s->energyCost > 0) snprintf(costBuf, sizeof(costBuf), "%dE", s->energyCost);
             else if (s->adrenalineCost > 0) snprintf(costBuf, sizeof(costBuf), "%dAd", s->adrenalineCost);

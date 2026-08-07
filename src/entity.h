@@ -171,6 +171,12 @@ typedef struct Entity {
                              // heal doesn't stomp your selected target
 
     EntityRef targetRef;    // current target, Entity_Resolve to read
+    // Selecting a foe and FIGHTING it are two different things, exactly
+    // as they are in GW1. targetRef alone only puts a foe on the HUD;
+    // nothing closes the distance or swings until `engaged` is set,
+    // which takes an attack order or a skill cast. Any movement order
+    // clears it - that is how you call off a charge.
+    bool engaged;
     float attackTimer;
     float attackInterval;
     int attackDamageMin, attackDamageMax;

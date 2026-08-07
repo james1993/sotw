@@ -762,21 +762,31 @@ static void DrawShop(int screenWidth, int screenHeight) {
     Vector2 mouse = UI_PointerPos();
 
     // --- Tabs: Buy | Sell ---
+    // Left/right switches tabs, up/down walks the rows. The tabs used to
+    // be the first two entries of the same focus list, which meant
+    // reaching the top item took a step DOWN past both of them - not how
+    // a tabbed window reads on a pad.
     {
+        int hstep = UIFocus_Horizontal();
+        if (hstep != 0) {
+            int next = (g_shopTab + hstep) & 1;
+            if (next != g_shopTab) {
+                g_shopTab = next;
+                UIFocus_Clear(); // the list underneath just changed entirely
+                Audio_Play(SFX_UI_CLICK);
+            }
+        }
+
         float tabW = (g_shopRect.width - 2 * pad) / 2.0f;
         const char *names[2] = { "Buy", "Sell" };
         for (int t = 0; t < 2; t++) {
             Rectangle tab = { g_shopRect.x + pad + t * tabW, (float)y, tabW, (float)tabH };
             bool active = (g_shopTab == t);
-            // Registered unconditionally and BEFORE any short-circuiting
-            // test: the focus index is positional, so an item that skips
-            // registration on some frames shifts every item after it.
-            bool focused = UIFocus_Item();
             bool hovered = CheckCollisionPointRec(mouse, tab);
             DrawRectangleRec(tab, active ? (Color){ 60, 66, 90, 255 }
-                            : (hovered || focused) ? (Color){ 45, 50, 70, 255 }
-                                                   : (Color){ 32, 35, 48, 255 });
-            DrawRectangleLinesEx(tab, focused ? 2.0f : 1.0f, focused ? UI_GOLD : UI_GOLD_DIM);
+                            : hovered ? (Color){ 45, 50, 70, 255 }
+                                      : (Color){ 32, 35, 48, 255 });
+            DrawRectangleLinesEx(tab, 1.0f, UI_GOLD_DIM);
             if (active) {
                 // Gold underline marks the live tab.
                 DrawRectangle((int)tab.x, (int)(tab.y + tab.height - 3), (int)tab.width, 3, UI_GOLD);
@@ -784,10 +794,18 @@ static void DrawShop(int screenWidth, int screenHeight) {
             int tw = UITextWidth(names[t], font);
             UIText(names[t], (int)(tab.x + (tab.width - tw) / 2),
                    (int)(tab.y + (tab.height - font) / 2), font, active ? RAYWHITE : LIGHTGRAY);
-            if ((hovered && click) || (focused && UIFocus_Confirm())) {
-                if (g_shopTab != t) Audio_Play(SFX_UI_CLICK);
+            if (hovered && click) {
+                if (g_shopTab != t) { Audio_Play(SFX_UI_CLICK); UIFocus_Clear(); }
                 g_shopTab = t;
             }
+        }
+        // A pad has no pointer, so name the binding rather than leaving
+        // the player to discover it.
+        if (IsGamepadAvailable(0)) {
+            const char *hint = "D-pad left/right switches tab";
+            int hw = UITextWidth(hint, (int)(10 * scale));
+            UIText(hint, (int)(g_shopRect.x + g_shopRect.width) - pad - hw,
+                   y + tabH + (int)(2 * scale), (int)(10 * scale), UI_TEXT_MUTED);
         }
         y += tabH + pad;
     }

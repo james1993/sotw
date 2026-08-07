@@ -130,8 +130,19 @@ static void CycleFoeTarget(Entity *player, int direction, const Camera2D *camera
     g_manualGamepadTarget = true;
 }
 
+// True while a menu, panel or conversation owns the pad. The D-pad
+// means "move the highlight" there, and must not simultaneously cycle
+// world targets behind the window - which is what made choosing a
+// dialogue reply also select a different NPC.
+static bool MenuOwnsPad(void) {
+    return UI_IsNpcDialogOpen() || UI_IsInventoryOpen() || UI_IsAttributesOpen() ||
+           UI_IsEquipmentOpen() || UI_IsSkillsOpen() || UI_IsMapOpen();
+}
+
 static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     if (!IsGamepadAvailable(GAMEPAD_ID)) return;
+
+    bool menuOpen = MenuOwnsPad();
 
     // --- Left stick: direct movement (not click-to-move). While a
     // menu cursor is up (NPC dialog open), the stick steers the cursor
@@ -155,6 +166,9 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             if (player->pos.x > b.x + b.width) player->pos.x = b.x + b.width;
             if (player->pos.y > b.y + b.height) player->pos.y = b.y + b.height;
             player->hasMoveTarget = false; // stick overrides any pending click-move
+            // Steering is a cancel: GW1 lets you break off a charge by
+            // simply walking, and the target stays selected on the HUD.
+            player->engaged = false;
         }
         g_gamepadMode = true;
     }
@@ -168,9 +182,15 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     else if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) face = 2;  // X
     else if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_UP)) face = 3;    // Y
 
+    // Skills and the attack order are world actions: while a window is
+    // up, A is the menu cursor's click button and must not also swing a
+    // sword behind it. B (back out) and X (talk) stay live because they
+    // are how you leave the window in the first place.
+    if (face == 0 && menuOpen) face = -1;
+
     if (face >= 0) {
-        bool l2 = TriggerDown(GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_BUTTON_LEFT_TRIGGER_2);
-        bool r2 = TriggerDown(GAMEPAD_AXIS_RIGHT_TRIGGER, GAMEPAD_BUTTON_RIGHT_TRIGGER_2);
+        bool l2 = !menuOpen && TriggerDown(GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_BUTTON_LEFT_TRIGGER_2);
+        bool r2 = !menuOpen && TriggerDown(GAMEPAD_AXIS_RIGHT_TRIGGER, GAMEPAD_BUTTON_RIGHT_TRIGGER_2);
         if (l2) {
             Combat_ActivateSkill(PLAYER_INDEX, face, Entity_RefIndex(player->targetRef));
             g_gamepadMode = true;
@@ -199,6 +219,17 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                 g_manualGamepadTarget = false;
             }
             g_gamepadMode = true;
+        } else if (face == 0) {
+            // Bare A (Xbox) / Cross (PS): ATTACK the selected foe. This
+            // is the pad's Space bar. Cycling with the D-pad or the
+            // shoulders only puts a foe on the HUD; this is what
+            // actually sends you (and the party) at it.
+            Entity *t = Entity_Resolve(player->targetRef);
+            if (t && t->alive && t->team != player->team) {
+                player->engaged = true;
+                player->hasMoveTarget = false;
+            }
+            g_gamepadMode = true;
         } else if (face == 2) {
             // Bare X (Xbox) / Square (PS): talk to the NPC you're
             // standing next to - the one the world overlay is already
@@ -212,27 +243,20 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                 UI_OpenNpcDialog(g_interactNpc);
             }
             g_gamepadMode = true;
-        } else if (face == 3) {
-            // Bare Y (Xbox) / Triangle (PS): open the bags - inventory
-            // AND the equipment screen - with the menu cursor on the
-            // stick, A to equip/cycle, B to close. The pad's route to
-            // changing gear.
-            UI_ToggleBags();
-            g_gamepadMode = true;
         }
     }
 
-    // R3 (right stick click): the build editor. The face buttons are all
-    // spoken for by skills and the bags, and the D-pad by targeting, so
-    // the stick clicks are the only free buttons left - the on-screen
-    // control legend names it so nobody has to guess.
-    if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_THUMB)) {
-        UI_ToggleSkills();
-        g_gamepadMode = true;
-    }
+    // No per-panel pad bindings. Start opens the menu and every screen
+    // hangs off it - one button to remember instead of a stick-click for
+    // the build editor and a face button for the bags.
 
-    // --- Shoulder buttons: cycle visible enemies, L1 backward and R1
-    // forward through the nearest-first order. ---
+    // --- Targeting. All of it is suppressed while a window is up: the
+    // D-pad belongs to that window's highlight, and the shoulders would
+    // otherwise be quietly re-aiming the world behind it. ---
+    if (menuOpen) return;
+
+    // Shoulder buttons: cycle visible enemies, L1 backward and R1
+    // forward through the nearest-first order.
     if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_TRIGGER_1)) {
         CycleFoeTarget(player, -1, camera);
         g_gamepadMode = true;
@@ -271,13 +295,10 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     }
 
     // --- Auto-targeting: nearest foe within attack range ---
-    // Runs every frame in gamepad mode so auto-attack engages the moment
-    // you walk into range and drops the moment you leave it. Deliberately
-    // NOT sticky beyond attack range: the chase-your-target logic in
-    // combat.c would otherwise wrestle the stick for control of the
-    // player's position, and stick-driven kiting only works if walking
-    // away actually disengages. Suspended while a D-pad selection is
-    // live so cycling to a specific target isn't instantly overwritten.
+    // Convenience only. It picks what the HUD shows when you haven't
+    // chosen anything yourself; it never sets `engaged`, so walking near
+    // a monster no longer starts a fight on its own. Suspended while a
+    // D-pad selection is live so cycling isn't instantly overwritten.
     if (g_gamepadMode && !g_manualGamepadTarget) {
         int best = -1;
         float bestDist = 1e9f;
@@ -354,6 +375,7 @@ void Input_Update(Camera2D *camera, float dt) {
     if (IsKeyPressed(KEY_ESCAPE)) {
         player->targetRef = Entity_NoRef();
         player->hasMoveTarget = false;
+        player->engaged = false;
     }
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !UIHit_Contains(GetMousePosition())) {
@@ -373,7 +395,11 @@ void Input_Update(Camera2D *camera, float dt) {
         }
 
         if (clickedEntity >= 0 && g_entities[clickedEntity].team != player->team) {
+            // Clicking a foe directly IS the attack order - the pointer
+            // equivalent of pressing Space. Cycling with Tab or the pad
+            // deliberately is not.
             player->targetRef = Entity_RefOf(clickedEntity);
+            player->engaged = true;
         } else if (clickedEntity >= 0 && g_entities[clickedEntity].kind == ENT_HERO) {
             // Clicking a party member selects them, so ally-targeted
             // spells (Orison) land on them instead of self-falling back.
@@ -407,6 +433,18 @@ void Input_Update(Camera2D *camera, float dt) {
             player->targetRef = Entity_NoRef();
             player->moveTarget = world;
             player->hasMoveTarget = true;
+            player->engaged = false; // walking somewhere calls off the charge
+        }
+    }
+
+    // Space: GW1's action key. Selecting a foe (Tab, C, the pad's D-pad)
+    // only shows it on the HUD - this is the order that actually sends
+    // you at it, and it is what a skill cast does implicitly.
+    if (IsKeyPressed(KEY_SPACE)) {
+        Entity *t = Entity_Resolve(player->targetRef);
+        if (t && t->alive && t->team != player->team) {
+            player->engaged = true;
+            player->hasMoveTarget = false;
         }
     }
 

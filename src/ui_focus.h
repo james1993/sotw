@@ -38,6 +38,13 @@ bool UIFocus_Cancel(void);
 // Puts focus back on the first item. Call when the list a player is
 // looking at changes out from under them - a new dialog, a window
 // opening - or the highlight is left pointing at something else.
+// Sideways navigation, for screens with a row of tabs. Returns -1, 0 or
+// +1 once per push (the stick re-arms at centre). Deliberately separate
+// from the focus index: a tab is not another item in the list, and
+// making it one meant stepping DOWN past the last tab to reach the
+// first row - which is not how a tabbed window reads.
+int UIFocus_Horizontal(void);
+
 void UIFocus_Clear(void);
 
 #endif

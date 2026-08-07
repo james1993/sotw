@@ -175,13 +175,44 @@ static GroundDrop *FindFreeDrop(void) {
     return NULL;
 }
 
+// GW1 assigns each drop to one member of the party, so what YOU see on
+// the ground is divided by how many of you there are: a solo run drops
+// everything to you, a full party drops you roughly an Nth. This is why
+// henchmen are a real cost rather than free help, and it is what stops
+// "bring everyone, always" from being the only sane answer.
+//
+// Gold is not divided - GW1 splits gold drops across the party instead
+// of assigning them, so the player's share shrinks rather than
+// vanishing. That is applied to the amount, below.
+static int PartySize(void) {
+    int n = 0;
+    for (int i = 0; i < g_entityCount; i++) {
+        const Entity *e = &g_entities[i];
+        if (!e->alive) continue;
+        if (e->team != 0) continue;
+        if (e->kind == ENT_PLAYER || e->kind == ENT_HERO) n++;
+    }
+    return n < 1 ? 1 : n;
+}
+
+// True when this drop falls to the player rather than to a party member.
+static bool DropIsMine(int partySize) {
+    return GetRandomValue(1, partySize) == 1;
+}
+
 void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
+    int party = PartySize();
+
     GroundDrop *d = FindFreeDrop();
     if (d) {
         memset(d, 0, sizeof(GroundDrop));
         d->active = true;
         d->pos = (Vector2){ pos.x - 10, pos.y + 6 };
         d->gold = 8 + monsterLevel * 4 + GetRandomValue(0, monsterLevel * 3);
+        // Gold is SPLIT rather than assigned, so a party always leaves
+        // you something - just less of it.
+        d->gold /= party;
+        if (d->gold < 1) d->gold = 1;
         // Reforged Mode's 5% gold bonus, applied where gold is minted
         // rather than where it's picked up - so what you see on the
         // ground is what you get.
@@ -190,7 +221,7 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
 
     // A weapon sometimes, a crafting hide often - never armor, which is
     // craft-only like GW1.
-    if (GetRandomValue(1, 100) <= 30) {
+    if (GetRandomValue(1, 100) <= 30 && DropIsMine(party)) {
         d = FindFreeDrop();
         if (d) {
             memset(d, 0, sizeof(GroundDrop));
@@ -208,7 +239,7 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
         if (species == SPECIES_CHARR) material = &g_charrHide;
         else if (species == SPECIES_SKALE) material = &g_skaleFin;
 
-        if (material && GetRandomValue(1, 100) <= 55) {
+        if (material && GetRandomValue(1, 100) <= 55 && DropIsMine(party)) {
             d = FindFreeDrop();
             if (d) {
                 memset(d, 0, sizeof(GroundDrop));

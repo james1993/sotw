@@ -113,6 +113,7 @@ void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe) {
     if (!monster->aggroed) {
         monster->aggroed = true;
         monster->targetRef = foe;
+        monster->engaged = true; // a woken monster is always committed
     }
     if (monster->groupId <= 0) return;
 
@@ -122,6 +123,7 @@ void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe) {
         if (e->groupId != monster->groupId || e->aggroed) continue;
         e->aggroed = true;
         e->targetRef = foe;
+        e->engaged = true;
     }
 }
 

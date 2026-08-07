@@ -45,13 +45,13 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     }
 
     int panelH = pad * 2 + members * rowH;
-    // GW1 uses both positions: the in-mission party health list sits
-    // top-LEFT, while the outpost party-formation window (the one you
-    // hire and dismiss from) opens on the RIGHT - stacked below the
-    // compass, which owns the top-right corner.
+    // Always on the right, stacked under the compass. It used to jump to
+    // the left in explorable areas, which meant the one window you watch
+    // constantly moved every time you left town - and the quest tracker
+    // now owns the top-left corner, where GW1 puts it.
     bool outpost = (World_GetMode() == MODE_OUTPOST);
-    int x = outpost ? screenWidth - panelW - (int)(14 * scale) : (int)(14 * scale);
-    int y = outpost ? (int)UI_CompassBottom(screenHeight) + (int)(24 * scale) : (int)(80 * scale);
+    int x = screenWidth - panelW - (int)(14 * scale);
+    int y = (int)UI_CompassBottom(screenHeight) + (int)(24 * scale);
     g_panelRect = (Rectangle){ (float)x, (float)y, (float)panelW, (float)panelH };
     UIHit_Claim(g_panelRect);
 
@@ -95,6 +95,18 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
             snprintf(dp, sizeof(dp), "-%d%%", e->deathPenalty);
             int nameW = UITextWidth(e->name, font);
             UIText(dp, x + pad + nameW + 8, rowY, font, (Color){ 220, 120, 120, 255 });
+        }
+
+        // Level, right-aligned on the name row. Henchmen scale to the
+        // party leader, so this is the one place you can see that they
+        // have - and it keeps clear of the dismiss button, which claims
+        // the same corner in outposts.
+        {
+            char lvl[16];
+            snprintf(lvl, sizeof(lvl), "Lv %d", e->level);
+            int reserve = (e->isHenchman && outpost) ? (int)(14 * scale) + 4 : 0;
+            int lw = UITextWidth(lvl, font);
+            UIText(lvl, x + panelW - pad - reserve - lw, rowY, font, UI_TEXT_SECOND);
         }
 
         // Dismiss button for hired henchmen - outposts only, GW1's rule

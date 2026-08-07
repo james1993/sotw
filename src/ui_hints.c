@@ -16,15 +16,19 @@ typedef struct {
     const char *what;
 } HintEntry;
 
+// A NULL pad label means "no controller binding" - the entry is simply
+// dropped from the pad legend. On a controller every screen is reached
+// through Start, so the panel hotkeys only appear for the keyboard.
 static const HintEntry g_hints[] = {
-    { "L",   "R3",     "Skills" },
-    { "I",   "Y",      "Bags" },
-    { "E",   "Y",      "Gear" },
-    { "K",   NULL,     "Attributes" },
-    { "M",   "Select", "Map" },
-    { "F",   "X",      "Talk" },
-    { "Tab", "R1",     "Next foe" },
-    { "P",   "Start",  "Menu" },
+    { "Space", "A",      "Attack" },
+    { "Tab",   "R1",     "Next foe" },
+    { "F",     "X",      "Talk" },
+    { "L",     NULL,     "Skills" },
+    { "I",     NULL,     "Bags" },
+    { "E",     NULL,     "Gear" },
+    { "K",     NULL,     "Attributes" },
+    { "M",     "Select", "Map" },
+    { "P",     "Start",  "Menu" },
 };
 #define HINT_COUNT (int)(sizeof(g_hints) / sizeof(g_hints[0]))
 

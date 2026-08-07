@@ -10,6 +10,7 @@ static int g_registeredThisFrame = 0;
 static int g_countLastFrame = 0;
 static int g_pendingStep = 0;
 static bool g_stickLatched = false;
+static bool g_stickLatchedX = false;
 
 // Deliberately NOT gated on a gamepad being present. The same focus runs
 // off the arrow keys, which means keyboard players get list navigation
@@ -93,4 +94,28 @@ void UIFocus_Clear(void) {
     g_index = 0;
     g_pendingStep = 0;
     g_stickLatched = false;
+    g_stickLatchedX = false;
+}
+
+int UIFocus_Horizontal(void) {
+    int nav = 0;
+    if (IsKeyPressed(KEY_RIGHT)) nav++;
+    if (IsKeyPressed(KEY_LEFT)) nav--;
+
+    if (IsGamepadAvailable(GAMEPAD_ID)) {
+        if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) nav++;
+        if (IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) nav--;
+        // Same latch-and-rearm as the vertical axis, so a held stick
+        // doesn't flip a tab every frame.
+        float lx = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X);
+        if (fabsf(lx) < STICK_THRESHOLD) {
+            g_stickLatchedX = false;
+        } else if (!g_stickLatchedX) {
+            nav += (lx > 0.0f) ? 1 : -1;
+            g_stickLatchedX = true;
+        }
+    }
+    if (nav > 0) return 1;
+    if (nav < 0) return -1;
+    return 0;
 }

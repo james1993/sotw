@@ -68,6 +68,15 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     }
     EntityRef targetRef = Entity_RefOf(targetIndex);
 
+    // Casting AT a foe is an attack order: it commits the caster (and,
+    // through them, the party) to closing with that foe. Ally- and
+    // self-targeted skills deliberately do not, so healing mid-retreat
+    // doesn't turn the retreat into a charge.
+    if (target && target->team != caster->team && skill->targeting != TARGET_SELF) {
+        caster->targetRef = targetRef;
+        caster->engaged = true;
+    }
+
     caster->energy -= energyCost;
     caster->adrenaline -= skill->adrenalineCost;
     if (caster->adrenaline < 0) caster->adrenaline = 0;
@@ -236,7 +245,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
     }
 
     Entity *target = Entity_Resolve(e->targetRef);
-    if (target && target->alive && target->team != e->team) {
+    if (target && target->alive && target->team != e->team && e->engaged) {
         float d = Dist(e->pos, target->pos);
         if (d <= e->attackRange) {
             e->hasMoveTarget = false;
