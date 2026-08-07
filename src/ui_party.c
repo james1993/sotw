@@ -4,6 +4,7 @@
 #include "ui_compass.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
+#include "ui_healthbar.h"
 #include "raylib.h"
 #include "ui_font.h"
 #include <stdio.h>
@@ -12,16 +13,6 @@ static Rectangle g_panelRect;
 
 float UI_PartyPanelBottom(void) {
     return g_panelRect.y + g_panelRect.height;
-}
-
-// Small downward-pointing triangle, the GW1 party-window shorthand for
-// "something is on this player": brown = condition, purple = hex.
-static void DrawStatusArrow(int x, int y, int size, Color color) {
-    DrawTriangle(
-        (Vector2){ (float)x, (float)y },
-        (Vector2){ (float)(x + size), (float)y },
-        (Vector2){ (float)(x + size / 2), (float)(y + size) },
-        color);
 }
 
 void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
@@ -129,9 +120,8 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
 
         int barY = rowY + font + 2;
         int barW = panelW - 2 * pad - arrow - 6; // leave room for status arrows
-        float pct = (e->maxHp > 0) ? (float)e->hp / (float)e->maxHp : 0.0f;
-        UI_ThemeBar((Rectangle){ (float)(x + pad), (float)barY, (float)barW, (float)barH },
-                    e->alive ? pct : 0.0f, (Color){ 190, 40, 40, 255 }, NULL, font);
+        UIHealthBar_Draw((Rectangle){ (float)(x + pad), (float)barY, (float)barW, (float)barH },
+                         e, font, false);
 
         // Thin energy strip under each member's health, like GW1's party
         // window gives heroes.
@@ -142,19 +132,7 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         UI_ThemeBar((Rectangle){ (float)(x + pad), (float)enY, (float)barW, (float)energyH },
                     e->alive ? enPct : 0.0f, (Color){ 60, 130, 220, 255 }, NULL, font);
 
-        bool hasCondition = false, hasHex = false;
-        for (int j = 0; j < MAX_ACTIVE_EFFECTS; j++) {
-            if (!e->effects[j].active) continue;
-            if (e->effects[j].category == EFFECT_HEX) hasHex = true;
-            else hasCondition = true;
-        }
-        int arrowX = x + pad + barW + 4;
-        if (hasCondition) {
-            DrawStatusArrow(arrowX, barY, arrow, (Color){ 165, 110, 50, 255 });
-        }
-        if (hasHex) {
-            DrawStatusArrow(arrowX, barY + (hasCondition ? arrow + 2 : 0), arrow, (Color){ 150, 70, 200, 255 });
-        }
+        UIHealthBar_DrawStatusArrows(x + pad + barW + 4, barY, arrow, e);
 
         rowY += rowH;
     }

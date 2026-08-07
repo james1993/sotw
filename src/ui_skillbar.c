@@ -6,6 +6,7 @@
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
+#include "ui_healthbar.h"
 #include "ui_tooltip.h"
 #include "raylib.h"
 #include <math.h>
@@ -237,8 +238,11 @@ void UI_DrawResourceBars(int screenWidth, int screenHeight) {
     int hpX = centerX - centerGap / 2 - barW;
     UIHit_Claim((Rectangle){ (float)(centerX - centerGap / 2 - barW), (float)barY,
                              (float)(barW * 2 + centerGap), (float)barH });
-    DrawResourceBar(hpX, barY, barW, barH, L.font,
-                    (float)player->hp / (float)player->maxHp, (Color){ 190, 40, 40, 255 }, player->hp);
+    // Your own bar gets the same condition/hex treatment the party
+    // window gets - it showed nothing at all before, which meant the one
+    // bar you look at most was the one that told you least.
+    UIHealthBar_Draw((Rectangle){ (float)hpX, (float)barY, (float)barW, (float)barH },
+                     player, L.font, true);
 
     // The fill uses the regen accumulator as a fractional pip so the
     // bar rises smoothly instead of jumping a notch every few seconds;

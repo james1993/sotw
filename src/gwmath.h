@@ -52,6 +52,12 @@
 // is untouched) and drops every non-zero attribute by 1.
 #define GW_WEAKNESS_DAMAGE_SCALE 0.34f
 
+// Deep Wound: 20% off maximum health and 20% off healing received. It
+// is the reason a spike lands - the target's ceiling drops at the same
+// moment their healer's numbers get smaller.
+#define GW_DEEP_WOUND_HEALTH_LOSS 0.20f
+#define GW_DEEP_WOUND_HEAL_LOSS   0.20f
+
 // --- Adrenaline ------------------------------------------------------
 // GW1 counts adrenaline in STRIKES, worth 25 points each, and every
 // adrenal skill carries its OWN pool. Landing a hit gives one strike to

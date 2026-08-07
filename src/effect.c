@@ -39,6 +39,7 @@ static float AfflictionDegenPips(EffectCategory category, int kind) {
     switch ((ConditionKind)kind) {
         case COND_BLEEDING: return GW_PIPS_BLEEDING;
         case COND_BURNING:  return GW_PIPS_BURNING;
+        case COND_POISON:   return GW_PIPS_POISON;
         default:            return 0.0f; // Crippled/Weakness impair, not degenerate
     }
 }
@@ -62,6 +63,12 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind, f
     free->kind = kind;
     free->remaining = duration;
     free->degenPips = AfflictionDegenPips(category, kind);
+    // Deep Wound changes the health CEILING, so the derived stats have
+    // to move with it rather than at the next thing that happens to
+    // recompute them.
+    if (category == EFFECT_CONDITION && (ConditionKind)kind == COND_DEEP_WOUND) {
+        Entity_RecomputePenalizedStats(target);
+    }
 }
 
 static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectStep *step, Entity *target) {
@@ -84,6 +91,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
         }
         case FX_HEAL: {
             int amount = (int)RankScaledValue(step, caster, skill->attribute);
+            amount = Entity_ScaleIncomingHeal(target, amount); // Deep Wound
             // Divine Favor: GW1's Monk primary adds 3.2 healing per rank
             // to every Monk spell that heals - the whole reason a primary
             // Monk out-heals a secondary one with identical Healing

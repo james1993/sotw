@@ -38,6 +38,7 @@ typedef enum {
     SK_POWER_SHOT,
     SK_PIN_DOWN,
     SK_TROLL_UNGUENT,
+    SK_APPLY_POISON,
     // Necromancer
     SK_VAMPIRIC_GAZE,
     SK_FAINTHEARTEDNESS,

@@ -54,8 +54,14 @@ typedef enum {
     COND_NONE = 0,
     COND_BLEEDING,
     COND_BURNING,
+    COND_POISON,     // -4 pips, and it overrides Bleeding's bar tint
     COND_CRIPPLED,
     COND_WEAKNESS,
+    // Deep Wound is the odd one out: it does no degeneration at all.
+    // It takes 20% off maximum health and 20% off healing received,
+    // which is why a Warrior applies it before a spike rather than as
+    // damage in its own right.
+    COND_DEEP_WOUND,
     COND_COUNT
 } ConditionKind;
 
@@ -336,6 +342,9 @@ int Entity_ScaleOutgoingDamage(const Entity *e, int damage);
 // ranks actually change, and driving them from a condition would make a
 // character's maximum energy flicker as Weakness came and went. Every
 // USE-time read goes through here.
+// Healing received, after Deep Wound.
+int Entity_ScaleIncomingHeal(const Entity *e, int amount);
+
 int Entity_EffectiveRank(const Entity *e, AttributeKind attr);
 
 // One landed strike: every adrenal skill on the bar gains 25 points.

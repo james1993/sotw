@@ -139,8 +139,28 @@ void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe) {
 void Entity_RecomputePenalizedStats(Entity *e) {
     e->maxHp = e->baseMaxHp * (100 - e->deathPenalty) / 100;
     e->maxEnergy = e->baseMaxEnergy * (100 - e->deathPenalty) / 100;
+
+    // Deep Wound takes another 20% off the ceiling, on top of death
+    // penalty. Applied here rather than at the call sites so nothing can
+    // read a maximum that hasn't accounted for it.
+    if (Entity_HasCondition(e, COND_DEEP_WOUND)) {
+        e->maxHp = (int)((float)e->maxHp * (1.0f - GW_DEEP_WOUND_HEALTH_LOSS));
+        if (e->maxHp < 1) e->maxHp = 1;
+    }
+
     if (e->hp > e->maxHp) e->hp = e->maxHp;
     if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+}
+
+int Entity_ScaleIncomingHeal(const Entity *e, int amount) {
+    if (!e) return amount;
+    // The other half of Deep Wound, and the half that makes it a spike
+    // tool: the target's ceiling drops AND their healer's numbers get
+    // smaller at the same moment.
+    if (Entity_HasCondition(e, COND_DEEP_WOUND)) {
+        amount = (int)((float)amount * (1.0f - GW_DEEP_WOUND_HEAL_LOSS));
+    }
+    return amount;
 }
 
 void Entity_RecomputeAttributeStats(Entity *e) {

@@ -72,10 +72,14 @@ void SkillDB_Init(void) {
     Skill s;
 
     // --- Warrior-like ("Brute") skills: adrenaline, melee, no cast time ---
+    // GW1's Gash is the Deep Wound skill: it is what a Warrior lands
+    // before a spike, because it drops the target's health ceiling and
+    // their healer's numbers at the same moment. Applying Bleeding
+    // instead made it just another damage-over-time press.
     s = MakeSkill("Gash", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
                   0, 25, 0.0f, 4.0f, 28.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_DAMAGE, 8, 1.5f, 0, 0);
-    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLEEDING, 8.0f);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DEEP_WOUND, 10.0f);
     RegisterAs(SK_GASH, s);
 
     s = MakeSkill("Rush Strike", SKILLTYPE_ATTACK_SKILL, ATTR_SWORDSMANSHIP,
@@ -242,6 +246,16 @@ void SkillDB_Init(void) {
                   5, 0, 3.0f, 10.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_HEAL, 30, 6.0f, 0, 0);
     RegisterAs(SK_TROLL_UNGUENT, s);
+
+    // Poison is one of GW1's four core conditions and nothing in the
+    // demake applied it, which left a whole quarter of the condition
+    // vocabulary - and the health bar's green tint - unreachable. It
+    // belongs on a Ranger: Apply Poison is the skill the profession is
+    // built around.
+    s = MakeSkill("Apply Poison", SKILLTYPE_SPELL, ATTR_WILDERNESS_SURVIVAL,
+                  15, 0, 1.0f, 12.0f, 240.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_POISON, 12.0f);
+    RegisterAs(SK_APPLY_POISON, s);
 
     // --- Necromancer -------------------------------------------------
     // Life stealing rather than raw damage: the two-step "take from
