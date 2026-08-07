@@ -39,6 +39,7 @@ add_executable(sotw_demake
     src/assets.c
     src/ground.c
     src/ui_focus.c
+    src/ui_nav.c
     src/audio.c
     src/ui_create.c
     src/entity.c

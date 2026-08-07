@@ -6,6 +6,7 @@
 #include "gwmath.h"
 #include "ui_font.h"
 #include "ui_theme.h"
+#include "ui_nav.h"
 #include "ui_cursor.h"
 #include "audio.h"
 #include "raylib.h"
@@ -27,6 +28,7 @@ static float g_previewTime = 0.0f;
 static Entity g_previewEntity;
 
 void UI_CreateReset(void) {
+    UINav_Clear(); // nothing highlighted until the player reaches for the D-pad
     g_draft = Character_Default();
     g_nameFocused = false;
     g_previewTime = 0.0f;
@@ -106,11 +108,44 @@ static void SyncPreview(void) {
     g_previewEntity.color = Character_ProfessionColor(g_draft.primary);
 }
 
+// Every interactive control on this screen goes through one of these
+// three wrappers, so each one is registered with the spatial nav ring in
+// draw order and draws its own focus ring. Registering unconditionally
+// matters: nav identity is the registration index, so a control that
+// skipped a frame would renumber every control after it.
+static void NavRing(Rectangle r) {
+    DrawRectangleLinesEx((Rectangle){ r.x - 3, r.y - 3, r.width + 6, r.height + 6 },
+                         2.0f, UI_GOLD);
+}
+
+static bool NavButton(Rectangle r, const char *label, int font, bool enabled, bool selected) {
+    bool focused = UINav_Item(r);
+    bool fired = UI_Button(r, label, font, enabled, selected || focused);
+    if (focused) NavRing(r);
+    if (focused && enabled && UINav_Confirm()) {
+        Audio_Play(SFX_UI_CLICK);
+        return true;
+    }
+    return fired;
+}
+
 // A row of small swatches; returns the index clicked, or -1.
 static int SwatchRow(int x, int y, int size, int gap, const Color *colors, int count,
                      int selected) {
     int clicked = -1;
     Vector2 mouse = UI_PointerPos();
+
+    // The row is ONE nav stop, not one per swatch: left/right walks the
+    // colours, up/down leaves the row. Six separate stops would mean
+    // pressing Down five times to get past a palette.
+    Rectangle rowRect = { (float)x, (float)y, (float)(count * size + (count - 1) * gap),
+                          (float)size };
+    if (UINav_Item(rowRect)) {
+        NavRing(rowRect);
+        int step = UINav_ClaimHorizontal();
+        if (step != 0) clicked = (selected + step + count) % count;
+    }
+
     for (int i = 0; i < count; i++) {
         Rectangle r = { (float)(x + i * (size + gap)), (float)y, (float)size, (float)size };
         DrawRectangleRec(r, colors[i]);
@@ -134,6 +169,16 @@ static int Stepper(int x, int y, int w, int h, const char *label, const char *va
     Rectangle left = { (float)(x + w - btn * 2 - 90), (float)y, (float)btn, (float)h };
     Rectangle right = { (float)(x + w - btn), (float)y, (float)btn, (float)h };
     int result = current;
+
+    // One stop for the whole stepper - left/right IS the control, so
+    // focusing the two arrows separately would be busywork.
+    Rectangle rowRect = { (float)x, (float)y, (float)w, (float)h };
+    if (UINav_Item(rowRect)) {
+        NavRing(rowRect);
+        int step = UINav_ClaimHorizontal();
+        if (step != 0) result = (current + step + count) % count;
+    }
+
     if (UI_Button(left, "<", font, true, false)) result = (current - 1 + count) % count;
     if (UI_Button(right, ">", font, true, false)) result = (current + 1) % count;
     int vw = UITextWidth(value, font);
@@ -146,6 +191,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
     float scale = UI_Scale(screenHeight);
     g_previewTime += dt;
     SyncPreview();
+    UINav_Begin();
 
     ClearBackground((Color){ 14, 14, 19, 255 });
 
@@ -191,7 +237,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
             Rectangle r = { (float)(x + (i % 2) * (btnW + colGap)),
                             (float)(y + (i / 2) * (btnH + UI_SP(scale, 2))),
                             (float)btnW, (float)btnH };
-            if (UI_Button(r, Character_ProfessionName(p), small, true, g_draft.primary == p)) {
+            if (NavButton(r, Character_ProfessionName(p), small, true, g_draft.primary == p)) {
                 g_draft.primary = p;
             }
         }
@@ -308,7 +354,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         UI_TextShadow("Reforged Mode", x, y, small, UI_GOLD);
         y += small + UI_SP(scale, 2);
         Rectangle toggle = { (float)x, (float)y, (float)innerW, (float)(30 * scale) };
-        if (UI_Button(toggle, g_draft.reforged ? "Reforged:  ON" : "Reforged:  off",
+        if (NavButton(toggle, g_draft.reforged ? "Reforged:  ON" : "Reforged:  off",
                       small, true, g_draft.reforged)) {
             g_draft.reforged = !g_draft.reforged;
         }
@@ -338,6 +384,15 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         Rectangle field = { (float)fx, (float)y, (float)fieldW, (float)fieldH };
         bool hovered = CheckCollisionPointRec(UI_PointerPos(), field);
         if (UI_PointerClicked()) g_nameFocused = hovered;
+
+        bool navField = UINav_Item(field);
+        if (navField) {
+            NavRing(field);
+            // Confirm arms the field; confirm again (or Escape) releases
+            // it. Without the release, Enter would type forever and the
+            // pad could never leave the name box.
+            if (UINav_Confirm()) g_nameFocused = !g_nameFocused;
+        }
 
         DrawRectangleRec(field, (Color){ 20, 21, 28, 255 });
         DrawRectangleLinesEx(field, g_nameFocused ? 2.0f : 1.0f,
@@ -376,13 +431,13 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         int gap = UI_SP(scale, 4);
         int bx = (screenWidth - (btnW * 2 + gap)) / 2;
 
-        if (UI_Button((Rectangle){ (float)bx, (float)y, (float)btnW, (float)btnH },
+        if (NavButton((Rectangle){ (float)bx, (float)y, (float)btnW, (float)btnH },
                       "Back", font, true, false)) {
             action = CREATE_CANCEL;
         }
         // A nameless character is the one thing that isn't allowed.
         bool canCreate = (strlen(g_draft.name) > 0);
-        if (UI_Button((Rectangle){ (float)(bx + btnW + gap), (float)y, (float)btnW, (float)btnH },
+        if (NavButton((Rectangle){ (float)(bx + btnW + gap), (float)y, (float)btnW, (float)btnH },
                       "Enter Ascalon", font, canCreate, canCreate)) {
             action = CREATE_CONFIRM;
         }
@@ -391,6 +446,8 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
                                   y + btnH + UI_SP(scale, 2), tiny, UI_NEGATIVE);
         }
     }
+
+    UINav_End();
 
     if (IsKeyPressed(KEY_ESCAPE) ||
         (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))) {

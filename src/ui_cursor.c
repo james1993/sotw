@@ -30,14 +30,10 @@ void UICursor_Update(float dt, bool menuOpen) {
     if (fabsf(lx) < CURSOR_STICK_DEADZONE) lx = 0.0f;
     if (fabsf(ly) < CURSOR_STICK_DEADZONE) ly = 0.0f;
 
-    // The D-pad drives the cursor too, at full deflection. Plenty of
-    // players reach for the D-pad on a menu screen before the stick, and
-    // having it do nothing reads as the screen being broken. Held, not
-    // pressed, so it steers continuously like the stick does.
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT))  lx = -1.0f;
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) lx = +1.0f;
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_UP))    ly = -1.0f;
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_DOWN))  ly = +1.0f;
+    // The D-pad deliberately does NOT steer the cursor. Steering a
+    // pointer with a D-pad is the worst of both worlds; it steps between
+    // controls instead (ui_nav.c), and the stick keeps the pointer for
+    // the screens that genuinely want one.
 
     if (lx != 0.0f || ly != 0.0f) {
         float speed = CURSOR_SPEED * UI_Scale(GetScreenHeight());
