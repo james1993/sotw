@@ -25,10 +25,18 @@ typedef enum {
 } EntityKind;
 
 // What the sprite renderer draws for this entity (sprite.c).
+// Pre-Searing's bestiary. Each one gets its own body in sprite.c: a
+// Skale that looks like a Charr tells the player the wrong thing about
+// what it is and how hard it hits.
 typedef enum {
-    SPECIES_HUMAN = 0,
+    SPECIES_HUMAN = 0,   // also bandits
     SPECIES_CHARR,
-    SPECIES_DEVOURER
+    SPECIES_DEVOURER,    // also the giant spiders of Regent Valley
+    SPECIES_SKALE,       // amphibian; the first thing you ever kill
+    SPECIES_GRAWL,       // hunched ape-men off the hills
+    SPECIES_MOA,         // flightless bird; harmless unless provoked
+    SPECIES_UNDEAD,      // the Catacombs
+    SPECIES_ALOE         // rooted plant; never moves
 } Species;
 
 typedef enum {
@@ -147,6 +155,9 @@ typedef struct Entity {
 
     Profession primaryProfession;
     Profession secondaryProfession;
+    // Profession trainers (ENT_NPC, NPC_PROFESSION_CHANGER): the one
+    // profession this NPC teaches.
+    Profession teachesProfession;
     int attributeRank[ATTR_COUNT];
 
     int skillBar[SKILL_BAR_SIZE];      // index into g_skillDB, -1 = empty

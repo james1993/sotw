@@ -43,9 +43,11 @@ static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
 // re-choose it until much later. A build you can rewrite on a whim
 // isn't a build, it's a menu.
 //
-// Granted after Ashford's first quest; re-chooseable only out at Piken
-// Watch, and only once you're level 10.
-#define SECONDARY_QUEST "Charr at the Gate"
+// Sir Tydus's "A Second Profession" is the canon gate: he sends you off
+// to find a trainer, and only then will one teach you. Re-choosing is
+// held back to level 10, standing in for the campaign's worth of
+// distance GW1 puts between the two.
+#define SECONDARY_QUEST "A Second Profession"
 #define SECONDARY_CHANGE_LEVEL 10
 
 static bool SecondaryGrantAllowed(void) {
@@ -981,13 +983,15 @@ static void DrawCraft(Entity *player, int screenWidth, int screenHeight) {
 // offered; taking one opens its non-primary attribute lines and its
 // half of the trainer's stock.
 static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeight) {
+    const Entity *trainer = Entity_Get(g_dialogNpc);
+    if (trainer && trainer->npcRole != NPC_PROFESSION_CHANGER) trainer = NULL;
     float scale = UI_Scale(screenHeight);
     int font = (int)(12 * scale);
     int small = (int)(10 * scale);
     int pad = (int)(10 * scale);
     int rowH = (int)(34 * scale);
     int w = (int)(440 * scale);
-    int rows = PROF_COUNT - 1;
+    int rows = trainer ? 1 : (PROF_COUNT - 1);
     int h = pad * 3 + font + small + (int)(6 * scale) + rows * rowH + pad;
 
     g_professionRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale),
@@ -1003,7 +1007,8 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
     int x = (int)g_professionRect.x + pad;
     int y = (int)g_professionRect.y + pad + font + pad;
 
-    UIText("Your primary never changes. This is the other half of your build.",
+    UIText(trainer ? "Your primary never changes. This is the other half of your build."
+                   : "Your primary never changes.",
            x, y, small, (Color){ 150, 146, 134, 255 });
     y += small + (int)(6 * scale);
 
@@ -1012,6 +1017,10 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
 
     for (int p = 0; p < PROF_COUNT; p++) {
         if (p == (int)player->primaryProfession) continue;
+        // Pre-Searing scatters the six trainers across six areas, and
+        // each one teaches only their own calling. Which secondary you
+        // can take is therefore a question of where you can get to.
+        if (trainer && p != (int)trainer->teachesProfession) continue;
         bool current = (g_character.secondary == p);
 
         Rectangle row = { g_professionRect.x + 4, (float)y - 2,

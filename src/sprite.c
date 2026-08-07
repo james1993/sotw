@@ -446,11 +446,246 @@ static void DrawDevourer(const Entity *e, double now) {
                 (Color){ 255, 120, 70, 255 });
 }
 
+
+// ----- Skale: a hunched amphibian. Long snout, fin crest, webbed feet.
+// The first thing most Prophecies characters ever killed. -----
+static void DrawSkale(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    Color hide = e->color;
+    Color dark = Darken(hide, 0.6f);
+    Color belly = Lighten(hide, 0.35f);
+
+    float bob = sinf(e->animTime * 7.0f) * e->moveBlend * r * 0.1f;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+    float lunge = snap * r * 0.5f;
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.72f), r * 0.95f, r * 0.26f, (Color){ 0, 0, 0, 70 });
+
+    float bx = p.x + sx * lunge;
+    float by = p.y + bob;
+
+    // Splayed legs, low and wide - it squats rather than stands.
+    for (int i = -1; i <= 1; i += 2) {
+        float k = sinf(e->animTime * 7.0f + (i > 0 ? 0.0f : 3.14f)) * e->moveBlend;
+        DrawLineEx((Vector2){ bx + i * r * 0.34f, by + r * 0.18f },
+                   (Vector2){ bx + i * r * 0.62f, by + r * 0.66f + k * r * 0.08f },
+                   r * 0.15f, dark);
+    }
+
+    // Body: a low egg leaning forward.
+    DrawEllipse((int)bx, (int)(by + r * 0.1f), r * 0.62f, r * 0.5f, hide);
+    DrawEllipse((int)bx, (int)(by + r * 0.26f), r * 0.44f, r * 0.28f, belly);
+
+    // Dorsal fin crest - the silhouette cue that says "not a mammal".
+    for (int i = 0; i < 3; i++) {
+        float fx = bx - sx * (r * 0.1f + i * r * 0.22f);
+        float h = r * (0.34f - i * 0.07f);
+        DrawTriangle((Vector2){ fx - r * 0.1f, by - r * 0.1f },
+                     (Vector2){ fx + r * 0.1f, by - r * 0.1f },
+                     (Vector2){ fx, by - r * 0.1f - h }, dark);
+    }
+
+    // Head on a short neck, snout thrust forward.
+    float hx = bx + sx * r * 0.5f, hy = by - r * 0.22f;
+    DrawCircleV((Vector2){ hx, hy }, r * 0.3f, hide);
+    DrawEllipse((int)(hx + sx * r * 0.26f), (int)(hy + r * 0.06f), r * 0.26f, r * 0.14f, hide);
+    // Jaw gapes on the strike.
+    float gape = (snap > 0.0f) ? snap * r * 0.13f : 0.0f;
+    DrawEllipse((int)(hx + sx * r * 0.28f), (int)(hy + r * 0.16f + gape), r * 0.2f, r * 0.07f, dark);
+    DrawCircleV((Vector2){ hx + sx * r * 0.1f, hy - r * 0.12f }, r * 0.07f,
+                (Color){ 240, 240, 200, 255 });
+    DrawCircleV((Vector2){ hx + sx * r * 0.11f, hy - r * 0.12f }, r * 0.035f, BLACK);
+}
+
+// ----- Grawl: hunched ape-men. Heavy shoulders, long arms, a club. -----
+static void DrawGrawl(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    Color fur = e->color;
+    Color dark = Darken(fur, 0.6f);
+    Color skin = Lighten(fur, 0.45f);
+
+    float step = sinf(e->animTime * 8.0f) * e->moveBlend;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.78f), r * 0.9f, r * 0.26f, (Color){ 0, 0, 0, 70 });
+
+    float bx = p.x + sx * snap * r * 0.3f;
+    float by = p.y;
+
+    // Short bowed legs.
+    for (int i = -1; i <= 1; i += 2) {
+        float k = (i > 0 ? step : -step) * r * 0.14f;
+        DrawLineEx((Vector2){ bx + i * r * 0.2f, by + r * 0.2f },
+                   (Vector2){ bx + i * r * 0.3f, by + r * 0.72f + k },
+                   r * 0.19f, dark);
+    }
+
+    // Barrel torso, hunched forward.
+    DrawEllipse((int)bx, (int)(by - r * 0.05f), r * 0.5f, r * 0.46f, fur);
+    // Heavy shoulders: the read is "top-heavy".
+    DrawCircleV((Vector2){ bx - sx * r * 0.3f, by - r * 0.34f }, r * 0.26f, fur);
+    DrawCircleV((Vector2){ bx + sx * r * 0.3f, by - r * 0.34f }, r * 0.26f, fur);
+
+    // Long forward arm carrying the club; it winds back and comes down.
+    float armA = -0.5f + snap * 1.5f;
+    Vector2 hand = { bx + sx * (r * 0.42f + cosf(armA) * r * 0.5f),
+                     by - r * 0.2f + sinf(armA) * r * 0.5f };
+    DrawLineEx((Vector2){ bx + sx * r * 0.32f, by - r * 0.3f }, hand, r * 0.16f, fur);
+    DrawLineEx(hand, (Vector2){ hand.x + sx * r * 0.42f, hand.y + r * 0.24f },
+               r * 0.17f, (Color){ 122, 92, 60, 255 });
+
+    // Head: low brow, jutting jaw.
+    float hx = bx + sx * r * 0.16f, hy = by - r * 0.62f;
+    DrawCircleV((Vector2){ hx, hy }, r * 0.27f, fur);
+    DrawEllipse((int)(hx + sx * r * 0.16f), (int)(hy + r * 0.1f), r * 0.19f, r * 0.13f, skin);
+    DrawCircleV((Vector2){ hx + sx * r * 0.08f, hy - r * 0.06f }, r * 0.055f, BLACK);
+}
+
+// ----- Moa: a tall flightless bird. Harmless unless you start it. -----
+static void DrawMoa(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    Color plume = e->color;
+    Color dark = Darken(plume, 0.6f);
+
+    float step = sinf(e->animTime * 9.0f) * e->moveBlend;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.8f), r * 0.7f, r * 0.22f, (Color){ 0, 0, 0, 70 });
+
+    float bx = p.x, by = p.y + sinf(e->animTime * 9.0f) * e->moveBlend * r * 0.06f;
+
+    // Two long legs - most of the bird's height is leg.
+    for (int i = -1; i <= 1; i += 2) {
+        float k = (i > 0 ? step : -step) * r * 0.3f;
+        DrawLineEx((Vector2){ bx + i * r * 0.12f, by + r * 0.15f },
+                   (Vector2){ bx + i * r * 0.16f + k, by + r * 0.78f },
+                   r * 0.09f, (Color){ 180, 150, 90, 255 });
+    }
+
+    // Round body, tail plume behind.
+    DrawEllipse((int)bx, (int)(by - r * 0.05f), r * 0.46f, r * 0.4f, plume);
+    DrawEllipse((int)(bx - sx * r * 0.42f), (int)(by - r * 0.12f), r * 0.22f, r * 0.3f, dark);
+
+    // Long neck sweeping up, head at the top. It stoops when it pecks.
+    float stoop = snap * r * 0.45f;
+    Vector2 headPos = { bx + sx * (r * 0.2f + stoop * 0.6f), by - r * 0.72f + stoop };
+    DrawLineEx((Vector2){ bx + sx * r * 0.1f, by - r * 0.2f }, headPos, r * 0.13f, plume);
+    DrawCircleV(headPos, r * 0.17f, plume);
+    // Beak.
+    DrawTriangle((Vector2){ headPos.x + sx * r * 0.1f, headPos.y - r * 0.05f },
+                 (Vector2){ headPos.x + sx * r * 0.1f, headPos.y + r * 0.07f },
+                 (Vector2){ headPos.x + sx * r * 0.38f, headPos.y + r * 0.02f },
+                 (Color){ 210, 170, 80, 255 });
+    DrawCircleV((Vector2){ headPos.x + sx * r * 0.05f, headPos.y - r * 0.05f }, r * 0.04f, BLACK);
+}
+
+// ----- Undead: the Catacombs. A humanoid frame stripped to bone. -----
+static void DrawUndead(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    Color bone = (Color){ 214, 208, 186, 255 };
+    Color shadow = (Color){ 96, 92, 80, 255 };
+
+    float sway = sinf(e->animTime * 5.0f) * e->moveBlend;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.76f), r * 0.8f, r * 0.24f, (Color){ 0, 0, 0, 80 });
+
+    float bx = p.x + sx * snap * r * 0.28f;
+    float by = p.y + sway * r * 0.05f;
+
+    // Legs: bare bone, no mass.
+    for (int i = -1; i <= 1; i += 2) {
+        float k = (i > 0 ? sway : -sway) * r * 0.2f;
+        DrawLineEx((Vector2){ bx + i * r * 0.16f, by + r * 0.18f },
+                   (Vector2){ bx + i * r * 0.22f + k, by + r * 0.72f },
+                   r * 0.1f, bone);
+    }
+
+    // Ribcage: a spine with ribs, deliberately gappy so it reads hollow.
+    DrawLineEx((Vector2){ bx, by - r * 0.42f }, (Vector2){ bx, by + r * 0.2f }, r * 0.11f, bone);
+    for (int i = 0; i < 3; i++) {
+        float ry = by - r * 0.3f + i * r * 0.19f;
+        DrawEllipseLines((int)bx, (int)ry, r * (0.34f - i * 0.04f), r * 0.1f, bone);
+    }
+
+    // Arm with a rusted blade, winding back and chopping down.
+    float armA = -0.7f + snap * 1.7f;
+    Vector2 hand = { bx + sx * (r * 0.3f + cosf(armA) * r * 0.46f),
+                     by - r * 0.28f + sinf(armA) * r * 0.46f };
+    DrawLineEx((Vector2){ bx + sx * r * 0.22f, by - r * 0.36f }, hand, r * 0.09f, bone);
+    DrawLineEx(hand, (Vector2){ hand.x + sx * r * 0.5f, hand.y + r * 0.16f },
+               r * 0.09f, (Color){ 150, 140, 130, 255 });
+
+    // Skull, with the sockets lit - the only colour on the whole figure.
+    float hx = bx, hy = by - r * 0.62f;
+    DrawCircleV((Vector2){ hx, hy }, r * 0.26f, bone);
+    DrawEllipse((int)hx, (int)(hy + r * 0.18f), r * 0.16f, r * 0.1f, bone);
+    DrawCircleV((Vector2){ hx + sx * r * 0.1f, hy - r * 0.03f }, r * 0.075f, shadow);
+    DrawCircleV((Vector2){ hx - sx * r * 0.06f, hy - r * 0.03f }, r * 0.07f, shadow);
+    DrawCircleV((Vector2){ hx + sx * r * 0.1f, hy - r * 0.03f }, r * 0.035f,
+                (Color){ 150, 230, 160, 255 });
+    DrawCircleV((Vector2){ hx - sx * r * 0.06f, hy - r * 0.03f }, r * 0.032f,
+                (Color){ 150, 230, 160, 255 });
+}
+
+// ----- Aloe: a rooted plant. It never moves, so it never walks. -----
+static void DrawAloe(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    Color leaf = e->color;
+    Color dark = Darken(leaf, 0.6f);
+
+    // Sways with the wind rather than with movement: it has none.
+    float breeze = sinf((float)e->animTime * 1.6f + p.x * 0.01f) * 0.12f;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.7f), r * 0.85f, r * 0.25f, (Color){ 0, 0, 0, 70 });
+
+    // A rosette of blades, splayed from the root.
+    for (int i = 0; i < 7; i++) {
+        float a = -3.14159f / 2.0f + (i - 3) * 0.42f + breeze + snap * 0.25f;
+        float len = r * (1.0f - fabsf((float)(i - 3)) * 0.09f);
+        Vector2 tip = { p.x + cosf(a) * len, p.y + r * 0.3f + sinf(a) * len };
+        Vector2 mid = { p.x + cosf(a) * len * 0.5f - sinf(a) * r * 0.12f,
+                        p.y + r * 0.3f + sinf(a) * len * 0.5f + cosf(a) * r * 0.12f };
+        DrawTriangle((Vector2){ p.x - r * 0.16f, p.y + r * 0.34f },
+                     (Vector2){ p.x + r * 0.16f, p.y + r * 0.34f }, tip,
+                     (i % 2 == 0) ? leaf : dark);
+        DrawLineEx((Vector2){ p.x, p.y + r * 0.3f }, mid, r * 0.05f, dark);
+    }
+    // The bulb at the centre, which is the part that actually bites.
+    DrawCircleV((Vector2){ p.x, p.y + r * 0.26f }, r * 0.26f, Lighten(leaf, 0.3f));
+    DrawCircleV((Vector2){ p.x, p.y + r * 0.26f }, r * 0.12f, dark);
+}
+
 void Sprite_DrawEntity(const Entity *e, double now) {
     switch (e->species) {
-        case SPECIES_CHARR: DrawCharr(e, now); break;
+        case SPECIES_CHARR:    DrawCharr(e, now); break;
         case SPECIES_DEVOURER: DrawDevourer(e, now); break;
-        default: DrawHumanoid(e, now); break;
+        case SPECIES_SKALE:    DrawSkale(e, now); break;
+        case SPECIES_GRAWL:    DrawGrawl(e, now); break;
+        case SPECIES_MOA:      DrawMoa(e, now); break;
+        case SPECIES_UNDEAD:   DrawUndead(e, now); break;
+        case SPECIES_ALOE:     DrawAloe(e, now); break;
+        default:               DrawHumanoid(e, now); break;
     }
 }
 

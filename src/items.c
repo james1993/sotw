@@ -1,4 +1,5 @@
 #include "items.h"
+#include "character.h"
 #include "audio.h"
 #include "entity.h"
 #include "raylib.h"
@@ -28,6 +29,7 @@ static const Item g_weaponTable[] = {
 // The crafting material Charr leave behind - the Armorer turns these
 // (plus gold) into armor, GW1's craft-only armor economy in miniature.
 static const Item g_charrHide = { ITEM_MATERIAL, "Charr Hide", 0, 0, 0, 0, 0, 1, false };
+static const Item g_skaleFin  = { ITEM_MATERIAL, "Skale Fin",  0, 0, 0, 0, 0, 1, false };
 
 void Items_Reset(void) {
     g_inventoryCount = 0;
@@ -173,13 +175,17 @@ static GroundDrop *FindFreeDrop(void) {
     return NULL;
 }
 
-void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, bool dropsHide) {
+void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
     GroundDrop *d = FindFreeDrop();
     if (d) {
         memset(d, 0, sizeof(GroundDrop));
         d->active = true;
         d->pos = (Vector2){ pos.x - 10, pos.y + 6 };
         d->gold = 8 + monsterLevel * 4 + GetRandomValue(0, monsterLevel * 3);
+        // Reforged Mode's 5% gold bonus, applied where gold is minted
+        // rather than where it's picked up - so what you see on the
+        // ground is what you get.
+        if (Character_IsReforged()) d->gold = d->gold * 105 / 100;
     }
 
     // A weapon sometimes, a crafting hide often - never armor, which is
@@ -194,13 +200,22 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, bool dropsHide) {
             d->item.count = 1;
             d->item.unidentified = true; // looted weapons need an ID kit
         }
-    } else if (dropsHide && GetRandomValue(1, 100) <= 55) {
-        d = FindFreeDrop();
-        if (d) {
-            memset(d, 0, sizeof(GroundDrop));
-            d->active = true;
-            d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
-            d->item = g_charrHide;
+    } else {
+        // Crafting materials come off the body they'd come off in the
+        // fiction: hides from Charr, fins from skale. Quests that ask
+        // for a material are therefore also telling you where to hunt.
+        const Item *material = NULL;
+        if (species == SPECIES_CHARR) material = &g_charrHide;
+        else if (species == SPECIES_SKALE) material = &g_skaleFin;
+
+        if (material && GetRandomValue(1, 100) <= 55) {
+            d = FindFreeDrop();
+            if (d) {
+                memset(d, 0, sizeof(GroundDrop));
+                d->active = true;
+                d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
+                d->item = *material;
+            }
         }
     }
 }

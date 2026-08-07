@@ -20,11 +20,19 @@ typedef enum {
 // code changes elsewhere.
 // New zones append at the end: the save file stores these values as
 // ints, so reordering would send old saves to the wrong outpost.
+// Pre-Searing Ascalon (docs/research/pre-searing.md). Two outposts, six
+// explorable areas each themed on a profession, and Piken Square - the
+// outpost Reforged Mode adds, which you have to fight north to reach.
 typedef enum {
-    ZONE_ASHFORD_CAMP = 0,
-    ZONE_ASHFORD_PLAINS,
-    ZONE_CHARR_FOOTHILLS,
-    ZONE_PIKEN_WATCH,
+    ZONE_ASHFORD_ABBEY = 0,   // outpost: where you start
+    ZONE_LAKESIDE_COUNTY,     // Mesmer/Monk country; the gentle first field
+    ZONE_ASCALON_CITY,        // outpost: the capital, and the hub
+    ZONE_GREEN_HILLS,         // Warrior country, and the theatre
+    ZONE_REGENT_VALLEY,       // Ranger country: bandits and spiders
+    ZONE_WIZARDS_FOLLY,       // Elementalist country
+    ZONE_CATACOMBS,           // Necromancer country: the undead below Ashford
+    ZONE_NORTHLANDS,          // the Charr frontier
+    ZONE_PIKEN_SQUARE,        // outpost, Reforged Mode only
     ZONE_COUNT
 } ZoneId;
 
@@ -83,6 +91,11 @@ ZoneId World_GetLastOutpostId(void);
 // Loads straight into an outpost (save-game login). Falls back to the
 // starting camp if the id isn't an outpost.
 void World_RestoreToOutpost(ZoneId zone);
+
+// True when this zone is reachable by the current character. Piken
+// Square exists only for Reforged characters, so its portal is hidden
+// and its label explains itself rather than silently failing.
+bool World_ZoneUnlocked(ZoneId zone);
 
 // Whether Little Thom has been hired into the party (persists across
 // zone loads; GW1 henchmen stay in the party until dismissed).

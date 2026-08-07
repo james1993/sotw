@@ -60,7 +60,7 @@ typedef struct {
     int prereq; // index of a quest that must be DONE first, -1 = none
 } Quest;
 
-#define QUEST_COUNT 5
+#define QUEST_COUNT 8
 extern Quest g_quests[QUEST_COUNT];
 
 // The first offerable (available + prerequisite met) / turn-in-ready

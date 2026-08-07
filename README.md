@@ -213,7 +213,7 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   so there's never a question about who you're about to speak to — and
   the prompt marks the exact NPC the key acts on. **Left-clicking** an
   NPC works too (and walks you over if you're out of range).
-- **1–8** activate whatever you've slotted on your skill bar. Vekk, the
+- **1–8** activate whatever you've slotted on your skill bar. Cynn, the
   hero companion, fights automatically the same way a GW1 hero does.
 - **L** opens the **skills panel** — your eight-slot bar on top, every
   skill you've learned underneath. Click a slot to arm it, then click a
@@ -256,38 +256,84 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   pad glyphs the moment a controller is detected. Each panel also carries
   its own hotkey badge in its title bar and a close box.
 
-### Zones
+### Setting: Pre-Searing Ascalon
 
-The world is a four-zone chain. The game starts in **Ashford Camp**, a
-GW1-style outpost: no combat, service NPCs (quest giver, merchant,
-armorer, skill trainer, hireable henchman), and a portal to **Ashford Plains** — a
-combat instance that reloads fresh on every entry, exactly like GW1's
-per-party explorable areas. Past the plains' eastern ridge lie the
-**Charr Foothills**, a harder explorable where warbands field **Charr
-Shamans** (ranged Fire Magic casters worth killing first) and the
-gullies crawl with **Devourers** — a second species with its own look
-and no hides to salvage. The road ends at **Piken Watch**, a forward
-outpost where **Warmaster Grast** offers his own quest book (kill,
-collect, and item-reward quests) and a trader keeps you stocked.
-Returning to any outpost fully restores the party, and party members
-wait near the gate while you wander the outpost instead of trailing
-you around town - they only fall in behind you out in the field.
+The prototype is set in **pre-Searing Ascalon** — GW1 Prophecies' opening
+region, before the Charr burn it. Nine zones, laid out as GW1 lays them
+out (research and the liberties taken are written up in
+`docs/research/pre-searing.md`):
+
+| Zone | Kind | What's there |
+| --- | --- | --- |
+| **Ashford Abbey** | outpost | Where you start. Brother Mhenlo (Monk trainer), Abbot Ciglo, Merchant Niles, Armorer Dunda, Little Thom |
+| **Lakeside County** | explorable | The gentle first field: River Skale and Moa Birds |
+| **Ascalon City** | outpost | The capital and the hub. Sir Tydus, Prince Rurik, Master Ilsa (skills), Merchant Vassar, Armorer Gali |
+| **Green Hills County** | explorable | Warrior country and the theatre. Grawl warbands, Warmaster Grast (Warrior), Lady Althea (Mesmer) |
+| **Regent Valley** | explorable | Ranger country. Bandits and giant spiders, Master Ranger Nente (Ranger), Duke Barradin |
+| **Wizard's Folly** | explorable | Elementalist country. Aloes and skale, Elementalist Aziure |
+| **The Catacombs** | explorable | The undead below the abbey. Necromancer Munne |
+| **The Northlands** | explorable | The Charr frontier — the only place the war is real yet |
+| **Piken Square** | outpost | Reforged Mode only. Warmaster Riga, Trader Hurm, Adept Kerra, Armorer Sten |
+
+The **six Prophecies professions each have one trainer**, scattered so
+that finding a second profession means actually leaving the city:
+Monk at the abbey, Warrior and Mesmer in Green Hills, Ranger in Regent
+Valley, Elementalist in Wizard's Folly, Necromancer in the Catacombs.
+Sir Tydus' quest **A Second Profession** is what sends you looking.
+
+Eight quests run off canon givers — Abbot Ciglo's tithe, Sir Tydus'
+second profession, Prince Rurik's two Charr chains, Duke Barradin's
+bandits and aloes, and Warmaster Riga's pair in Piken Square.
+
+Enemies are drawn from the pre-Searing bestiary and each species has its
+own silhouette: **Skale** (hunched amphibians, dorsal crest), **Moa
+Birds** (long legs, sweeping neck, harmless unless provoked),
+**Grawl** (bowed legs, heavy shoulders, club), **Devourers** and the
+giant spiders that share their build, **Undead** (gappy ribcage, rusted
+blade), **Aloes** (rooted — they never move, they only sway), and the
+**Charr** themselves.
+
+### Reforged Mode
+
+**Reforged Mode** is a per-character toggle offered at creation, in the
+appearance column. It is not a difficulty slider you can flip later —
+you choose it when you make the character, and the save remembers it.
+Turning it on changes four things:
+
+- **Piken Square opens.** The Northlands grows a second portal to a
+  forward outpost with its own trader, armorer, skill trainer and quest
+  giver. Without Reforged the portal is not merely locked, it is never
+  drawn — a character who can't go there is never shown a door.
+- **More Charr in the north.** Four extra spawns, including the boss
+  **Bonfaaz Burntfur**, so reaching Piken Square is a fight rather than
+  a walk.
+- **Foes hit softer.** Every monster loses 15% of its health and 5
+  armor, verified in play: a Charr Grunt drops from 200 HP / AL 50 to
+  170 HP / AL 45.
+- **+5% XP and gold** on quest turn-ins and minted drops.
+
+### Zones
 
 Every zone has a hard **boundary** - drawn as a wall line in the
 world, dashed on the compass, and framing the region map - so the
-instance's edges are never a mystery.
+instance's edges are never a mystery. Outposts have no combat and full
+service NPCs; explorables reload fresh on every entry, exactly like
+GW1's per-party instances. Returning to any outpost fully restores the
+party, and party members wait near the gate while you wander the outpost
+instead of trailing you around town - they only fall in behind you out
+in the field.
 
 **Armor is crafted, never looted** - GW1's rule. Charr drop **Charr
-Hides** (they stack), and Armorer Dunda in the camp turns hides plus
-gold into raiment. The merchant deals in weapons and **kits**: dropped
-weapons come up **unidentified** (masked name, hidden stats, can't be
-equipped, nearly worthless to sell) until an **Identification Kit**
-reveals them, and a **Salvage Kit** breaks unwanted gear into hides for
-crafting - GW1's full kit economy. Click a kit in the inventory to arm
-it, then click the target item; kits carry 25 uses and vanish when
-spent.
+Hides** and skale drop **Skale Fins** (both stack), and the armorers
+turn hides plus gold into raiment. The merchant deals in weapons and
+**kits**: dropped weapons come up **unidentified** (masked name, hidden
+stats, can't be equipped, nearly worthless to sell) until an
+**Identification Kit** reveals them, and a **Salvage Kit** breaks
+unwanted gear into materials for crafting - GW1's full kit economy.
+Click a kit in the inventory to arm it, then click the target item;
+kits carry 25 uses and vanish when spent.
 
-Charr camp out in small **groups** (never more than four) that share
+Monsters camp out in small **groups** (never more than four) that share
 aggro like GW1 mobs: pull any member — by proximity, a landed hit, or a
 spell — and the whole camp answers. Patrols hunt alone; their threat is
 walking into your fight at the wrong moment.
@@ -347,12 +393,14 @@ Prophecies does two separate things with your secondary, a campaign
 apart, and the distance between them is the design. The demake keeps
 both halves:
 
-- **Sebedoh the Mesmer** stands in Ashford Camp and will grant you a
-  second profession — but only once *Charr at the Gate* is done. Before
-  that he tells you so, by name: "Requires: Charr at the Gate."
-- **Nicholas the Restless** is out at Piken Watch and is the only one who
-  will *change* it, and only at **level 10 or above**. Under that, the
-  button reads "Requires: level 10 (you are 6)."
+- **Six profession trainers**, one per profession, scattered across the
+  county will grant you a second profession — but only once Sir Tydus'
+  *A Second Profession* is done. Before that they tell you so, by name:
+  "Requires: A Second Profession." Each trainer teaches only their own
+  calling, so which one you walk to *is* the choice.
+- **Nicholas the Restless** is out in the Northlands and is the only one
+  who will *change* it, and only at **level 10 or above**. Under that,
+  the button reads "Requires: level 10 (you are 6)."
 
 A build you can rewrite on a whim isn't a build, it's a menu. Changing
 your secondary refunds every attribute point sunk into the old one's
@@ -465,30 +513,31 @@ got:
   against *your* professions rather than hard-named, preferring your
   primary's lines — with six professions in play, a fixed reward would
   be dead loot to four of them.
-- **Skill trainers** (Master Ilsa in Ashford Camp, Adept Kerra at Piken
-  Watch) sell skills for **1 skill point plus gold**, with the gold
+- **Skill trainers** (Master Ilsa in Ascalon City, Adept Kerra in Piken
+  Square) sell skills for **1 skill point plus gold**, with the gold
   price climbing on every purchase. You earn a skill point per level.
   Their stock is filtered to what your two professions can actually
   use — a Mo/E is offered Monk and Fire Magic skills, but never Energy
   Storage, which is the Elementalist *primary* attribute. Until you've
   earned a secondary, that's your primary's skills and nothing else.
 - **Elites are never sold.** The only way one reaches your bar is
-  killing the boss that uses it: **Kruul the Emberfang** in Ashford
-  Plains teaches Meteor, **Vharn the Bonesmith** in the foothills
-  teaches Healing Light. Bosses are bigger, hit harder, and are worth
+  killing the boss that uses it: **Ulrick Grawl Chief** in Green Hills
+  teaches Death Blow, and **Bonfaaz Burntfur** in the Northlands
+  teaches Meteor. Bosses are bigger, hit harder, and are worth
   hunting specifically — GW1's Signet of Capture, condensed.
 
 Everything you own is saved with the character, and a skill can't sit on
 your bar unless the book backs it.
 
-Quests are per-giver, GW1-style: Captain Osric's chain in Ashford
-(finish *Charr at the Gate* and he offers *Scout the Eastern Ridge*,
-whose marker points at the foothills gate), and Warmaster Grast's book
-at Piken Watch — *Silence the Shamans* (Warmaster's Hammer plus a
-skill), *Clear the Gullies* (an Identification Kit plus a skill), and the
-collect quest *Hides for the Watch*, which consumes 4 Charr Hides on
-turn-in and tracks your bag live. Item rewards need a free bag slot,
-and each giver's green "!" only lights for their own work.
+Quests are per-giver, GW1-style: Prince Rurik's chain in Ascalon City
+(finish *A Second Profession* and he offers *Charr at the Gate*, whose
+marker points at the Northlands), Duke Barradin's pair in Regent Valley
+(*Bandit Raid*, then *Unnatural Growths*), and Warmaster Riga's book in
+Piken Square — *Hold the Square*, and the collect quest *Hides for the
+Watch*, which consumes 4 Charr Hides on turn-in and tracks your bag
+live. Abbot Ciglo's *Tithe for Ashford Abbey* does the same with 3
+Skale Fins. Item rewards need a free bag slot, and each giver's green
+"!" only lights for their own work.
 
 ### Death
 

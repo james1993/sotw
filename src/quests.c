@@ -1,5 +1,6 @@
 #include "quests.h"
 #include "audio.h"
+#include "character.h"
 #include "entity.h"
 #include "progression.h"
 #include "items.h"
@@ -23,62 +24,59 @@ static const Item g_rewardWarhammer = { ITEM_WEAPON, "Warmaster's Hammer", 22, 3
 static const Item g_rewardIdKit = { ITEM_KIT_ID, "Identification Kit", 0, 0, 0, 0, 0, 25, false };
 
 Quest g_quests[QUEST_COUNT] = {
-    // --- Captain Osric's line (Ashford Camp) ---
+    // --- Ashford Abbey ---
+    // Abbot Ciglo's tithe. "Tithe for Ashford Abbey" is a real
+    // pre-Searing quest; the abbot standing in for its giver is the
+    // demake's choice (docs/research/pre-searing.md #6).
     {
-        .name = "Charr at the Gate",
-        .objective = "Slay the Charr in Ashford Plains",
-        .offerText = "The Charr prowl our plains. Will you thin them out?",
-        .giverName = "Captain Osric",
-        .type = QTYPE_KILL,
+        .name = "Tithe for Ashford Abbey",
+        .objective = "Bring 3 Skale Fins to Ashford Abbey",
+        .offerText = "The abbey lives on charity, and charity is thin this season. "
+                     "Bring me three skale fins from the lake and we'll call it a tithe.",
+        .giverName = "Abbot Ciglo",
+        .type = QTYPE_COLLECT,
         .killsRequired = 3,
-        .targetName = "Charr", // only Charr kills advance this quest
-        .rewardXP = 250,
-        .rewardGold = 100,
+        .collectMaterial = "Skale Fin",
+        .rewardXP = 150,
+        .rewardGold = 80,
         .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
-    },
-    {
-        .name = "Scout the Eastern Ridge",
-        .objective = "Reach the ridge marker east of the plains",
-        .offerText = "With the Charr culled, we need eyes on the eastern ridge.",
-        .giverName = "Captain Osric",
-        .type = QTYPE_REACH,
-        .targetPos = { 1340, 40 }, // past the prowler's beat - you'll meet it on the road
-        .reachRadius = 70.0f,
-        .targetZone = ZONE_ASHFORD_PLAINS,
-        .rewardXP = 300,
-        .rewardGold = 150,
-        .rewardSkill = QUEST_REWARD_ANY_SKILL,
-        .state = QUEST_AVAILABLE,
-        .prereq = 0, // opens up after Charr at the Gate, GW1 chain-style
     },
 
-    // --- Warmaster Grast's book (Piken Watch, past the foothills) ---
+    // --- Ascalon City: Sir Tydus ---
+    // The canon quest that sends you to find a second profession. It is
+    // the gate on the profession trainers, so it comes early and asks
+    // almost nothing of you.
     {
-        .name = "Silence the Shamans",
-        .objective = "Slay Charr Shamans in the foothills",
-        .offerText = "Their shamans burn my scouts from across the field. Silence them.",
-        .giverName = "Warmaster Grast",
+        .name = "A Second Profession",
+        .objective = "Find a profession trainer and take a second profession",
+        .offerText = "You've a fine right arm, but one calling won't hold the wall. "
+                     "Find a trainer - they're scattered across the county - and "
+                     "learn a second.",
+        .giverName = "Sir Tydus",
         .type = QTYPE_KILL,
         .killsRequired = 2,
-        .targetName = "Charr Shaman",
-        .rewardXP = 400,
-        .rewardGold = 150,
-        .rewardItem = &g_rewardWarhammer,
+        .targetName = "Skale",
+        .rewardXP = 200,
+        .rewardGold = 60,
         .rewardSkill = QUEST_REWARD_ANY_SKILL,
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
+
+    // --- Ascalon City: Prince Rurik ---
     {
-        .name = "Clear the Gullies",
-        .objective = "Slay Devourers in the foothills",
-        .offerText = "Devourers nest in the gullies south of the road. Burn them out.",
-        .giverName = "Warmaster Grast",
+        .name = "Charr in the Catacombs",
+        .objective = "Clear the undead from the Catacombs",
+        .offerText = "Scouts say something stirs beneath the abbey - and worse, that "
+                     "the Charr have been seen going down there. Find out what walks "
+                     "in the Catacombs.",
+        .giverName = "Prince Rurik",
         .type = QTYPE_KILL,
         .killsRequired = 3,
-        .targetName = "Devourer",
-        .rewardXP = 350,
+        .targetName = "Skeleton",
+        .rewardXP = 300,
         .rewardGold = 120,
         .rewardItem = &g_rewardIdKit,
         .rewardSkill = QUEST_REWARD_ANY_SKILL,
@@ -86,18 +84,86 @@ Quest g_quests[QUEST_COUNT] = {
         .prereq = -1,
     },
     {
-        .name = "Hides for the Watch",
-        .objective = "Bring 4 Charr Hides to Piken Watch",
-        .offerText = "Winter comes early up here. Bring me 4 Charr Hides for the wall-watchers.",
-        .giverName = "Warmaster Grast",
-        .type = QTYPE_COLLECT,
-        .killsRequired = 4, // items needed
-        .collectMaterial = "Charr Hide",
-        .rewardXP = 300,
+        .name = "Charr at the Gate",
+        .objective = "Drive the Charr back in the Northlands",
+        .offerText = "The Charr have crossed into the Northlands. Come with me and "
+                     "we'll send them back over the wall.",
+        .giverName = "Prince Rurik",
+        .type = QTYPE_KILL,
+        .killsRequired = 3,
+        .targetName = "Charr",
+        .rewardXP = 450,
         .rewardGold = 200,
+        .rewardItem = &g_rewardWarhammer,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE,
+        .prereq = 1, // after Sir Tydus has sent you for a second profession
+    },
+
+    // --- Regent Valley: Duke Barradin ---
+    {
+        .name = "Bandit Raid",
+        .objective = "Break up the bandits holding the Regent Valley road",
+        .offerText = "Highwaymen have taken my road, and my tenants can't reach the "
+                     "market. Break them.",
+        .giverName = "Duke Barradin",
+        .type = QTYPE_KILL,
+        .killsRequired = 3,
+        .targetName = "Bandit",
+        .rewardXP = 350,
+        .rewardGold = 160,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE,
+        .prereq = -1,
+    },
+    {
+        .name = "Unnatural Growths",
+        .objective = "Destroy the aloes in Wizard's Folly",
+        .offerText = "The wizard's old ground is sprouting things that shouldn't "
+                     "sprout. Cut them down before they seed any further.",
+        .giverName = "Duke Barradin",
+        .type = QTYPE_KILL,
+        .killsRequired = 3,
+        .targetName = "Aloe",
+        .rewardXP = 300,
+        .rewardGold = 140,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE,
+        .prereq = 4, // the duke trusts you once his road is clear
+    },
+
+    // --- Piken Square: Reforged Mode only ---
+    // Warmaster Riga has nothing to say to a character who can't reach
+    // her, which is the point: this line only exists for Reforged.
+    {
+        .name = "Hold the Square",
+        .objective = "Slay Charr Axe Fiends in the Northlands",
+        .offerText = "You fought your way in, so you know what's out there. The axe "
+                     "fiends are the ones that break a shield wall. Thin them.",
+        .giverName = "Warmaster Riga",
+        .type = QTYPE_KILL,
+        .killsRequired = 2,
+        .targetName = "Axe Fiend",
+        .rewardXP = 500,
+        .rewardGold = 250,
+        .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE,
+        .prereq = -1,
+    },
+    {
+        .name = "Hides for the Watch",
+        .objective = "Bring 4 Charr Hides to Piken Square",
+        .offerText = "Winter comes early this far north. Four Charr hides for the "
+                     "wall-watchers and I'll see you paid.",
+        .giverName = "Warmaster Riga",
+        .type = QTYPE_COLLECT,
+        .killsRequired = 4,
+        .collectMaterial = "Charr Hide",
+        .rewardXP = 400,
+        .rewardGold = 300,
         .rewardSkill = -1,
         .state = QUEST_AVAILABLE,
-        .prereq = 2, // the warmaster trusts you after the shaman work
+        .prereq = 6,
     },
 };
 
@@ -191,8 +257,8 @@ bool Quests_TurnIn(Entity *player, int index) {
     }
 
     Audio_Play(SFX_QUEST_DONE);
-    Progression_AwardXP(player, q->rewardXP);
-    g_gold += q->rewardGold;
+    Progression_AwardXP(player, q->rewardXP); // Reforged's XP bonus is applied there
+    g_gold += Character_IsReforged() ? (q->rewardGold * 105 / 100) : q->rewardGold;
     Save_Write();
     return true;
 }

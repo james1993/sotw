@@ -95,6 +95,7 @@ bool Save_Write(void) {
     fprintf(f, "secondary=%d\n", g_character.secondary);
     fprintf(f, "look=%d,%d,%d,%d\n", g_character.sex, g_character.skinTone,
             g_character.hairColor, g_character.hairStyle);
+    fprintf(f, "reforged=%d\n", g_character.reforged ? 1 : 0);
     fprintf(f, "charName=%s\n", g_character.name);
     fprintf(f, "outpost=%d\n", (int)World_GetLastOutpostId());
     fprintf(f, "level=%d\n", p->level);
@@ -183,7 +184,7 @@ bool Save_LoadAndApply(void) {
     g_equippedArmor = -1;
     g_gold = 0;
 
-    int outpost = (int)ZONE_ASHFORD_CAMP;
+    int outpost = (int)ZONE_ASHFORD_ABBEY;
     bool thomHired = false;
     int equipWeapon = -1, equipArmor = -1;
     bool sawSkillbook = false;
@@ -214,6 +215,8 @@ bool Save_LoadAndApply(void) {
             g_character.skinTone = ClampInt(skin, 0, SKIN_TONE_COUNT - 1);
             g_character.hairColor = ClampInt(hair, 0, HAIR_COLOR_COUNT - 1);
             g_character.hairStyle = ClampInt(style, 0, HAIR_STYLE_COUNT - 1);
+        } else if (strcmp(key, "reforged") == 0) {
+            g_character.reforged = (atoi(val) != 0);
         } else if (strcmp(key, "charName") == 0) {
             snprintf(g_character.name, sizeof(g_character.name), "%s", val);
         } else if (strcmp(key, "outpost") == 0) {

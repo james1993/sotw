@@ -96,6 +96,10 @@ void Character_FormatTitle(const CharacterDef *def, char *out, int outSize) {
     }
 }
 
+bool Character_IsReforged(void) {
+    return g_character.reforged;
+}
+
 CharacterDef Character_Default(void) {
     CharacterDef d;
     memset(&d, 0, sizeof(d));
@@ -106,5 +110,8 @@ CharacterDef Character_Default(void) {
     d.skinTone = 1;
     d.hairColor = 1;
     d.hairStyle = 0;
+    // Off by default, like the real thing: Reforged is a deliberate
+    // choice you make about the run, not the way the game arrives.
+    d.reforged = false;
     return d;
 }

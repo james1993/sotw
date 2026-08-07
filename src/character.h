@@ -31,6 +31,13 @@ typedef struct {
     int skinTone;       // index into the palettes below
     int hairColor;
     int hairStyle;
+
+    // Reforged Mode. GW1's Reforged updates make this a per-character
+    // toggle taken at creation and never changed after, so it lives with
+    // the character rather than in settings. It unlocks Piken Square,
+    // adds spawns to the Northlands, softens pre-Searing enemies and
+    // pays 5% more XP and gold - see docs/research/pre-searing.md #5.
+    bool reforged;
 } CharacterDef;
 
 #define SKIN_TONE_COUNT 5
@@ -52,6 +59,11 @@ void Character_FormatTitle(const CharacterDef *def, char *out, int outSize);
 
 // A sane default so nothing is uninitialised if creation is skipped.
 CharacterDef Character_Default(void);
+
+// True when the current character is playing Reforged Mode. Read by the
+// world, quest and progression code, so the check reads as a rule
+// rather than as a poke at a global.
+bool Character_IsReforged(void);
 
 // The character the current run is playing. World_Init reads this.
 extern CharacterDef g_character;

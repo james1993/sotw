@@ -1,5 +1,6 @@
 #include "progression.h"
 #include "audio.h"
+#include "character.h"
 #include "entity.h"
 #include "skillbook.h"
 #include "ui_hints.h"
@@ -17,6 +18,9 @@ static int AttrPointsForLevel(int newLevel) {
 
 void Progression_AwardXP(Entity *player, int amount) {
     if (!player || !player->alive || player->level >= MAX_LEVEL) return;
+
+    // Reforged Mode pays 5% more experience and gold across Prophecies.
+    if (Character_IsReforged()) amount = amount * 105 / 100;
 
     player->xp += amount;
     while (player->level < MAX_LEVEL && player->xp >= Progression_XPToNext(player->level)) {

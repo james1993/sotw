@@ -52,6 +52,15 @@ typedef struct {
                       // kept to at most 4 members so pulls stay winnable.
     NpcRole npcRole;  // NPCs only
     Color npcColor;   // NPCs only
+    // Profession trainers (npcRole == NPC_PROFESSION_CHANGER): the ONE
+    // profession this trainer teaches. Pre-Searing scatters the six
+    // trainers across six areas, so which secondary you can take is a
+    // question of where you can get to - see docs/research/pre-searing.md.
+    Profession teaches;
+    // Reforged Mode adds spawns to the Northlands. Marked rather than
+    // held in a second table, so the area reads as one place with more
+    // in it rather than as two different zones.
+    bool reforgedOnly;
 } SpawnDef;
 
 typedef struct {
@@ -70,293 +79,569 @@ typedef struct {
     int spawnCount;
 } ZoneDef;
 
-// --- Ashford Camp: a small circle of tents around a fire ---
+// ---------------------------------------------------------------------
+// Pre-Searing Ascalon. Two outposts, six explorable areas each themed on
+// a profession, and Piken Square for Reforged characters who can fight
+// their way north. See docs/research/pre-searing.md for what's canon and
+// what's a liberty.
+// ---------------------------------------------------------------------
 
-static const EnvProp g_campProps[] = {
-    { { 0, -140 }, PROP_FIRE, 1.0f },
-    { { -150, -140 }, PROP_TENT, 1.0f },
-    { { -190, -40 }, PROP_TENT, 0.9f },
-    { { 150, -150 }, PROP_TENT, 1.1f },
-    { { 190, -50 }, PROP_TENT, 0.9f },
-    { { -120, 150 }, PROP_TENT, 1.0f },
-    { { 140, 160 }, PROP_TENT, 0.95f },
-    { { -260, -180 }, PROP_TREE, 1.0f },
-    { { 280, -200 }, PROP_TREE, 1.1f },
-    { { -280, 120 }, PROP_ROCK, 1.0f },
-    { { 240, 140 }, PROP_ROCK, 0.9f },
+// --- Ashford Abbey: the cloister you start at ---
+
+static const EnvProp g_abbeyProps[] = {
+    { {    0, -150 }, PROP_FIRE,  1.0f },
+    { { -170, -130 }, PROP_TENT,  1.0f },
+    { {  170, -140 }, PROP_TENT,  1.0f },
+    { { -210,   40 }, PROP_TENT,  0.9f },
+    { {  200,   60 }, PROP_TENT,  0.9f },
+    { { -300, -190 }, PROP_TREE,  1.1f },
+    { {  300, -200 }, PROP_TREE,  1.0f },
+    { { -320,  150 }, PROP_TREE,  0.9f },
+    { {  330,  170 }, PROP_TREE,  1.0f },
+    { { -110,  190 }, PROP_ROCK,  0.9f },
+    { {  120,  200 }, PROP_ROCK,  1.0f },
+    { {  -60,   80 }, PROP_GRASS, 1.0f },
+    { {   70,  -30 }, PROP_GRASS, 0.9f },
 };
 
-static const SpawnDef g_campSpawns[] = {
-    // Little Thom's standing NPC only appears while he isn't hired -
-    // the loader skips henchman NPCs who are currently in the party.
-    { .kind = SPAWN_NPC, .name = "Little Thom", .pos = { 40, 110 },
-      .npcRole = NPC_HENCHMAN, .npcColor = { 170, 80, 60, 255 } },
-    { .kind = SPAWN_NPC, .name = "Captain Osric", .pos = { -120, -60 },
+static const SpawnDef g_abbeySpawns[] = {
+    // Brother Mhenlo is the Monk trainer in the real Ashford Abbey, and
+    // the closest trainer to where you start - which is a large part of
+    // why so many Prophecies characters ended up Monk-secondary.
+    { .kind = SPAWN_NPC, .name = "Brother Mhenlo", .pos = { -120, -60 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_MONK,
+      .npcColor = { 205, 190, 150, 255 } },
+    { .kind = SPAWN_NPC, .name = "Abbot Ciglo", .pos = { 120, -80 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Merchant", .pos = { 90, -90 },
+    { .kind = SPAWN_NPC, .name = "Merchant Niles", .pos = { 230, 40 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Armorer Dunda", .pos = { -200, 60 },
+    { .kind = SPAWN_NPC, .name = "Armorer Dunda", .pos = { -240, 60 },
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Master Ilsa", .pos = { 230, 120 },
+    { .kind = SPAWN_NPC, .name = "Little Thom", .pos = { 40, 130 },
+      .npcRole = NPC_HENCHMAN, .npcColor = { 170, 80, 60, 255 } },
+};
+
+// --- Lakeside County: the first field. Deliberately gentle - skale in
+// the shallows and moa on the grass, nothing that hunts you. ---
+
+static const EnvProp g_lakesideProps[] = {
+    { { -340, -170 }, PROP_TREE,  1.1f },
+    { { -190, -250 }, PROP_TREE,  0.9f },
+    { {   80, -270 }, PROP_TREE,  1.0f },
+    { {  350, -190 }, PROP_TREE,  1.2f },
+    { {  430,   50 }, PROP_TREE,  0.9f },
+    { {  300,  260 }, PROP_TREE,  1.0f },
+    { {  -90,  280 }, PROP_TREE,  1.1f },
+    { { -330,  210 }, PROP_TREE,  0.9f },
+    { { -230,  -50 }, PROP_ROCK,  1.0f },
+    { {  160,  -90 }, PROP_ROCK,  0.9f },
+    { {   40,  170 }, PROP_ROCK,  0.8f },
+    { {  760, -180 }, PROP_TREE,  1.0f },
+    { {  900,  120 }, PROP_TREE,  1.1f },
+    { {  620,  240 }, PROP_ROCK,  0.9f },
+    { {  210,   30 }, PROP_GRASS, 1.0f },
+    { { -140,  110 }, PROP_GRASS, 0.9f },
+    { {  120, -170 }, PROP_GRASS, 1.1f },
+    { {  520,  -40 }, PROP_GRASS, 1.0f },
+    { {  840,  -20 }, PROP_GRASS, 0.9f },
+    { { -250,  260 }, PROP_GRASS, 1.0f },
+};
+
+static const SpawnDef g_lakesideSpawns[] = {
+    // River Skale in the water margin - the first thing most Prophecies
+    // characters ever killed.
+    { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 300, 60 },
+      .level = 1, .hp = 80, .armor = 20, .aggro = 110.0f, .strengthRank = 3,
+      .species = SPECIES_SKALE, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 380, 140 },
+      .level = 1, .hp = 80, .armor = 20, .aggro = 110.0f, .strengthRank = 3,
+      .species = SPECIES_SKALE, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "River Skale Fin", .pos = { 250, 160 },
+      .level = 2, .hp = 110, .armor = 25, .aggro = 115.0f, .strengthRank = 4,
+      .species = SPECIES_SKALE, .group = 1 },
+
+    // Moa wander and won't start anything - the tutorial's way of
+    // teaching that not everything on the field is a fight.
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Moa Bird", .pos = { -200, -150 },
+      .posB = { 200, -200 }, .level = 1, .hp = 70, .armor = 20, .aggro = 70.0f,
+      .strengthRank = 2, .species = SPECIES_MOA },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Moa Bird", .pos = { 600, 200 },
+      .posB = { 900, 60 }, .level = 2, .hp = 90, .armor = 20, .aggro = 70.0f,
+      .strengthRank = 3, .species = SPECIES_MOA },
+
+    { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 820, -60 },
+      .level = 2, .hp = 100, .armor = 25, .aggro = 115.0f, .strengthRank = 4,
+      .species = SPECIES_SKALE, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "River Skale Fin", .pos = { 900, -140 },
+      .level = 3, .hp = 130, .armor = 30, .aggro = 120.0f, .strengthRank = 5,
+      .species = SPECIES_SKALE, .group = 2 },
+};
+
+// --- Ascalon City: the capital, and the hub every road runs back to ---
+
+static const EnvProp g_cityProps[] = {
+    { {    0, -170 }, PROP_FIRE,  1.1f },
+    { { -230, -160 }, PROP_TENT,  1.1f },
+    { {  230, -160 }, PROP_TENT,  1.1f },
+    { { -280,   30 }, PROP_TENT,  1.0f },
+    { {  280,   30 }, PROP_TENT,  1.0f },
+    { { -150,  190 }, PROP_TENT,  0.9f },
+    { {  160,  200 }, PROP_TENT,  0.9f },
+    { { -380, -220 }, PROP_TREE,  1.0f },
+    { {  390, -230 }, PROP_TREE,  1.0f },
+    { { -400,  180 }, PROP_ROCK,  1.0f },
+    { {  400,  190 }, PROP_ROCK,  0.9f },
+};
+
+static const SpawnDef g_citySpawns[] = {
+    // Sir Tydus sends you off to find a second profession; Prince Rurik
+    // is the one who takes you to the Charr. Both are canon givers.
+    { .kind = SPAWN_NPC, .name = "Sir Tydus", .pos = { -140, -70 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Prince Rurik", .pos = { 150, -70 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 120, 190, 120, 255 } },
+    { .kind = SPAWN_NPC, .name = "Merchant Vassar", .pos = { -260, 90 },
+      .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Armorer Gali", .pos = { 260, 100 },
+      .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
+    // Kept just above the HUD's skill bar: at the default zoom anything
+    // past y ~= +130 sits behind it while you stand in the plaza, and a
+    // skill trainer you can't see is the one NPC that most needs finding.
+    { .kind = SPAWN_NPC, .name = "Master Ilsa", .pos = { 0, 115 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
-    // Prophecies pacing: the second profession is granted here, in the
-    // starting camp, but only after the first quest is behind you.
-    { .kind = SPAWN_NPC, .name = "Sebedoh the Mesmer", .pos = { -350, -80 },
-      .npcRole = NPC_PROFESSION_CHANGER, .npcColor = { 90, 170, 90, 255 } },
 };
 
-// --- Ashford Plains: three static camps spaced beyond each other's
-// aggro bubbles, two patrols sweeping the ground between them. The
-// strategy is pure GW1 - watch the compass, pull a camp when the patrol
-// is at the far end of its route, and finish the fight before it swings
-// back through. ---
+// --- Green Hills County: Warrior country, and the theatre where Lady
+// Althea teaches Mesmers. Grawl come down off the hills in packs. ---
 
-static const EnvProp g_plainsProps[] = {
-    { { -320, -160 }, PROP_TREE, 1.1f },
-    { { -260, -230 }, PROP_TREE, 0.85f },
-    { { -140, -260 }, PROP_TREE, 1.0f },
-    { { 120, -260 }, PROP_TREE, 0.9f },
-    { { 340, -180 }, PROP_TREE, 1.2f },
-    { { 420, -60 }, PROP_TREE, 0.8f },
-    { { 400, 160 }, PROP_TREE, 1.0f },
-    { { 300, 260 }, PROP_TREE, 0.9f },
-    { { -80, 260 }, PROP_TREE, 1.1f },
-    { { -300, 200 }, PROP_TREE, 0.85f },
-    { { -420, 40 }, PROP_TREE, 1.0f },
-    { { -220, -60 }, PROP_ROCK, 1.0f },
-    { { -160, 120 }, PROP_ROCK, 0.8f },
-    { { 140, -80 }, PROP_ROCK, 1.1f },
-    { { 380, 40 }, PROP_ROCK, 0.9f },
-    { { 60, 180 }, PROP_ROCK, 0.7f },
-    { { -60, -160 }, PROP_ROCK, 0.9f },
-    { { 200, 140 }, PROP_GRASS, 1.0f },
-    { { -180, 20 }, PROP_GRASS, 0.9f },
-    { { 100, -40 }, PROP_GRASS, 1.1f },
-    { { -100, 140 }, PROP_GRASS, 0.8f },
-    { { 320, -20 }, PROP_GRASS, 1.0f },
-    { { -20, 220 }, PROP_GRASS, 0.9f },
-    { { 220, -160 }, PROP_GRASS, 1.0f },
-    // Eastern reaches of the expanded plains.
-    { { 620, -420 }, PROP_TREE, 1.1f },
-    { { 980, -400 }, PROP_TREE, 0.9f },
-    { { 1180, -160 }, PROP_TREE, 1.2f },
-    { { 1240, 240 }, PROP_TREE, 1.0f },
-    { { 760, 430 }, PROP_TREE, 1.1f },
-    { { 1050, 60 }, PROP_ROCK, 1.1f },
-    { { 640, 200 }, PROP_ROCK, 0.9f },
-    { { 880, -60 }, PROP_ROCK, 0.8f },
-    { { 1300, -60 }, PROP_ROCK, 1.0f },
-    { { 720, -120 }, PROP_GRASS, 1.0f },
-    { { 1000, 180 }, PROP_GRASS, 1.1f },
-    { { 1150, -280 }, PROP_GRASS, 0.9f },
-    { { 560, 60 }, PROP_GRASS, 1.0f },
-    { { 1330, 150 }, PROP_GRASS, 1.0f },
+static const EnvProp g_greenHillsProps[] = {
+    { { -300, -200 }, PROP_TREE,  1.2f },
+    { { -120, -260 }, PROP_TREE,  1.0f },
+    { {  180, -240 }, PROP_TREE,  1.1f },
+    { {  400, -140 }, PROP_TREE,  0.9f },
+    { {  330,  200 }, PROP_TREE,  1.0f },
+    { {  -40,  270 }, PROP_TREE,  1.1f },
+    { { -350,  180 }, PROP_TREE,  0.9f },
+    { {  -80,  -80 }, PROP_ROCK,  1.1f },
+    { {  240,   40 }, PROP_ROCK,  1.0f },
+    { { -260,   60 }, PROP_ROCK,  0.9f },
+    { {  100,  140 }, PROP_GRASS, 1.0f },
+    { { -180,  -20 }, PROP_GRASS, 0.9f },
+    { {  340,  -40 }, PROP_GRASS, 1.0f },
+    // The theatre: a stage with a ring of seating stones around it.
+    { { -430,  -60 }, PROP_TENT,  1.2f },
+    { { -500,   20 }, PROP_ROCK,  0.8f },
+    { { -430,   90 }, PROP_ROCK,  0.8f },
+    { { -360,   20 }, PROP_ROCK,  0.8f },
 };
 
-static const SpawnDef g_plainsSpawns[] = {
-    // Camp 1, near the entrance - the first pull.
-    { .kind = SPAWN_MONSTER, .name = "Charr Brute", .pos = { 300, 40 },
-      .level = 5, .hp = 220, .armor = 60, .aggro = 130.0f, .strengthRank = 8, .withHowl = true, .species = SPECIES_CHARR, .group = 1 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 380, -50 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 1 },
+static const SpawnDef g_greenHillsSpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Warmaster Grast", .pos = { 300, -180 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_WARRIOR,
+      .npcColor = { 170, 96, 72, 255 } },
+    // Lady Althea holds the theatre, north-west of the city.
+    { .kind = SPAWN_NPC, .name = "Lady Althea", .pos = { -440, 10 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_MESMER,
+      .npcColor = { 168, 92, 148, 255 } },
 
-    // Camp 2, northeast.
-    { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 820, -300 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .species = SPECIES_CHARR, .group = 2 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 760, -220 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 2 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 900, -230 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 120, -60 },
+      .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_GRAWL, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 200, 20 },
+      .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_GRAWL, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Grawl Longeye", .pos = { 60, 40 },
+      .level = 4, .hp = 160, .armor = 35, .aggro = 130.0f, .strengthRank = 6,
+      .caster = true, .species = SPECIES_GRAWL, .group = 1 },
 
-    // Camp 3, southeast.
-    { .kind = SPAWN_MONSTER, .name = "Charr Stalker", .pos = { 900, 320 },
-      .level = 4, .hp = 180, .armor = 50, .aggro = 130.0f, .strengthRank = 7, .withHowl = true, .species = SPECIES_CHARR, .group = 3 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 830, 250 },
-      .level = 2, .hp = 140, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 3 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 980, 260 },
-      .level = 3, .hp = 160, .armor = 40, .aggro = 120.0f, .strengthRank = 6, .species = SPECIES_CHARR, .group = 3 },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Moa Bird", .pos = { -200, 200 },
+      .posB = { 200, 240 }, .level = 2, .hp = 90, .armor = 20, .aggro = 70.0f,
+      .strengthRank = 3, .species = SPECIES_MOA },
 
-    // Patrols hunt alone (no .group): their interception threat comes
-    // from timing, not numbers. The north-south sweep crosses the
-    // corridor between camp 1 and the eastern camps; the east-west
-    // prowler covers the road to the ridge. Aggro capped at
-    // AGGRO_RING_RADIUS so the drawn bubble never under-promises what a
-    // patrol can notice.
-    { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Patrol",
-      .pos = { 560, -320 }, .posB = { 560, 320 },
-      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
-    // Kruul the Emberfang: the plains boss, alone in the far northeast so
-    // finding him is its own small expedition. He casts the Meteor elite
-    // and teaches it when he falls - the first elite most players will
-    // own, and the reason to come back here once you can handle him.
-    { .kind = SPAWN_MONSTER, .name = "Kruul the Emberfang", .pos = { 1320, -380 },
-      .level = 8, .hp = 420, .armor = 70, .aggro = 140.0f, .strengthRank = 10,
-      .caster = true, .boss = true, .capSkill = SK_METEOR, .species = SPECIES_CHARR, .group = 4 },
-
-    { .kind = SPAWN_MONSTER_PATROL, .name = "Charr Prowler",
-      .pos = { 700, 40 }, .posB = { 1240, 40 },
-      .level = 4, .hp = 170, .armor = 45, .aggro = AGGRO_RING_RADIUS, .strengthRank = 7, .species = SPECIES_CHARR },
+    // A grawl chief holds the high ground: the elite in Warrior country.
+    { .kind = SPAWN_MONSTER, .name = "Ulrick Grawl Chief", .pos = { 420, 160 },
+      .level = 6, .hp = 320, .armor = 45, .aggro = 140.0f, .strengthRank = 8,
+      .withHowl = true, .boss = true, .capSkill = SK_DEATHBLOW,
+      .species = SPECIES_GRAWL, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 350, 230 },
+      .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_GRAWL, .group = 2 },
 };
 
-// --- Charr Foothills: the ashen ground past the eastern ridge, on the
-// road to Piken Watch. Harder than the plains: warbands bring a Shaman
-// (a ranged Fire Magic caster - kill or interrupt it first), and the
-// gullies crawl with Devourers, whose corpses yield no hides. ---
+// --- Regent Valley: Ranger country. Bandits hold the road, spiders the
+// treeline, and Duke Barradin's estate sits at the far end. ---
 
-static const EnvProp g_foothillsProps[] = {
-    { { -380, -200 }, PROP_ROCK, 1.3f },
-    { { -300, 180 },  PROP_ROCK, 1.1f },
-    { { -120, -80 },  PROP_ROCK, 0.9f },
-    { { 60, -260 },   PROP_ROCK, 1.2f },
-    { { 240, 120 },   PROP_ROCK, 1.0f },
-    { { 420, -140 },  PROP_ROCK, 1.4f },
-    { { 620, 220 },   PROP_ROCK, 1.1f },
-    { { 840, -40 },   PROP_ROCK, 0.8f },
-    { { 1020, -260 }, PROP_ROCK, 1.2f },
-    { { 1160, 160 },  PROP_ROCK, 1.0f },
-    { { -200, -320 }, PROP_TREE, 0.8f }, // scorched stragglers
-    { { 500, 320 },   PROP_TREE, 0.7f },
-    { { 900, 340 },   PROP_TREE, 0.75f },
-    { { 1240, -80 },  PROP_TREE, 0.8f },
-    { { 160, 40 },    PROP_GRASS, 0.8f },
-    { { 700, -180 },  PROP_GRASS, 0.9f },
-    { { 1080, 60 },   PROP_GRASS, 0.8f },
-    { { -40, 240 },   PROP_GRASS, 0.9f },
+static const EnvProp g_regentProps[] = {
+    { { -320, -180 }, PROP_TREE,  1.2f },
+    { { -180, -240 }, PROP_TREE,  1.1f },
+    { {   60, -260 }, PROP_TREE,  1.0f },
+    { {  280, -200 }, PROP_TREE,  1.2f },
+    { {  460,  -80 }, PROP_TREE,  1.0f },
+    { {  400,  180 }, PROP_TREE,  1.1f },
+    { {  120,  260 }, PROP_TREE,  1.0f },
+    { { -200,  240 }, PROP_TREE,  1.1f },
+    { { -400,   60 }, PROP_TREE,  0.9f },
+    { { -100,  -60 }, PROP_ROCK,  1.0f },
+    { {  200,   60 }, PROP_ROCK,  0.9f },
+    { {  -40,  140 }, PROP_GRASS, 1.0f },
+    { {  300,  -40 }, PROP_GRASS, 0.9f },
+    // Barradin's estate, east.
+    { {  700, -100 }, PROP_TENT,  1.3f },
+    { {  820,  -20 }, PROP_TENT,  1.1f },
+    { {  760,   90 }, PROP_FIRE,  1.0f },
 };
 
-static const SpawnDef g_foothillsSpawns[] = {
-    // Warband 1 guards the road in: the Shaman hangs back and burns you
-    // while the legionnaires close - focus or interrupt it, GW1 rule #1.
-    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 260, -60 },
-      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9, .species = SPECIES_CHARR, .group = 1 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 340, 20 },
-      .level = 6, .hp = 180, .armor = 45, .aggro = 130.0f, .strengthRank = 8, .caster = true, .species = SPECIES_CHARR, .group = 1 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 300, -140 },
-      .level = 4, .hp = 170, .armor = 45, .aggro = 120.0f, .strengthRank = 7, .species = SPECIES_CHARR, .group = 1 },
+static const SpawnDef g_regentSpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Master Ranger Nente", .pos = { -300, 120 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_RANGER,
+      .npcColor = { 96, 134, 78, 255 } },
+    { .kind = SPAWN_NPC, .name = "Duke Barradin", .pos = { 760, -30 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
 
-    // Devourer gully, south: a pinned nest, all melee, hits hard.
-    { .kind = SPAWN_MONSTER, .name = "Plague Devourer", .pos = { 600, 260 },
-      .level = 5, .hp = 200, .armor = 55, .aggro = 125.0f, .strengthRank = 8, .species = SPECIES_DEVOURER, .group = 2 },
-    { .kind = SPAWN_MONSTER, .name = "Whiptail Devourer", .pos = { 680, 320 },
-      .level = 5, .hp = 180, .armor = 50, .aggro = 125.0f, .strengthRank = 8, .species = SPECIES_DEVOURER, .group = 2 },
-    { .kind = SPAWN_MONSTER, .name = "Whiptail Devourer", .pos = { 540, 340 },
-      .level = 4, .hp = 170, .armor = 50, .aggro = 120.0f, .strengthRank = 7, .species = SPECIES_DEVOURER, .group = 2 },
+    // Bandits on the road: human, and the only pre-Searing enemy that
+    // fights with a real skill bar rather than teeth.
+    { .kind = SPAWN_MONSTER, .name = "Bandit Highwayman", .pos = { 120, -80 },
+      .level = 4, .hp = 170, .armor = 40, .aggro = 130.0f, .strengthRank = 6,
+      .species = SPECIES_HUMAN, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Bandit Raider", .pos = { 210, -20 },
+      .level = 3, .hp = 140, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_HUMAN, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Bandit Mesmer", .pos = { 60, 30 },
+      .level = 4, .hp = 130, .armor = 30, .aggro = 130.0f, .strengthRank = 6,
+      .caster = true, .species = SPECIES_HUMAN, .group = 1 },
 
-    // Warband 2 holds the pass to Piken Watch: the hardest pull, with a
-    // howling brute AND a shaman behind it.
-    { .kind = SPAWN_MONSTER, .name = "Charr Warcaller", .pos = { 1000, -120 },
-      .level = 7, .hp = 300, .armor = 70, .aggro = 135.0f, .strengthRank = 10, .withHowl = true, .species = SPECIES_CHARR, .group = 3 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 1080, -40 },
-      .level = 6, .hp = 180, .armor = 45, .aggro = 130.0f, .strengthRank = 8, .caster = true, .species = SPECIES_CHARR, .group = 3 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 940, -40 },
-      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9, .species = SPECIES_CHARR, .group = 3 },
+    { .kind = SPAWN_MONSTER, .name = "Giant Needle Spider", .pos = { -160, -160 },
+      .level = 4, .hp = 150, .armor = 35, .aggro = 120.0f, .strengthRank = 6,
+      .species = SPECIES_DEVOURER, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Giant Needle Spider", .pos = { -80, -210 },
+      .level = 3, .hp = 130, .armor = 35, .aggro = 120.0f, .strengthRank = 5,
+      .species = SPECIES_DEVOURER, .group = 2 },
 
-    // Vharn the Bonesmith: the foothills boss, keeping his warband alive
-    // with the Healing Light elite. Kill him and the elite is yours -
-    // the Monk capture, and a genuinely hard fight because he heals
-    // himself unless you interrupt or burst him down.
-    { .kind = SPAWN_MONSTER, .name = "Vharn the Bonesmith", .pos = { 1180, 300 },
-      .level = 9, .hp = 460, .armor = 70, .aggro = 140.0f, .strengthRank = 10,
-      .caster = true, .boss = true, .capSkill = SK_HEALING_LIGHT,
-      .species = SPECIES_CHARR, .group = 4 },
-    { .kind = SPAWN_MONSTER, .name = "Charr Legionnaire", .pos = { 1080, 350 },
-      .level = 6, .hp = 240, .armor = 65, .aggro = 130.0f, .strengthRank = 9,
-      .species = SPECIES_CHARR, .group = 4 },
-
-    // A lone Devourer prowls the middle ground - no group, pure ambush.
-    { .kind = SPAWN_MONSTER_PATROL, .name = "Lurking Devourer",
-      .pos = { 400, -280 }, .posB = { 820, 160 },
-      .level = 5, .hp = 190, .armor = 50, .aggro = AGGRO_RING_RADIUS, .strengthRank = 8, .species = SPECIES_DEVOURER },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Grawl", .pos = { 300, 200 },
+      .posB = { 600, 120 }, .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f,
+      .strengthRank = 5, .species = SPECIES_GRAWL },
+    { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { -260, -60 },
+      .level = 2, .hp = 100, .armor = 25, .aggro = 110.0f, .strengthRank = 4,
+      .species = SPECIES_SKALE },
 };
 
-// --- Piken Watch: a forward outpost dug into the foothills. Warmaster
-// Grast hands out the frontier work; a trader keeps the party stocked
-// without the walk home. ---
+// --- Wizard's Folly: Elementalist country. Sodden ground, skale, and
+// the aloes that made "Unnatural Growths" a quest. ---
+
+static const EnvProp g_follyProps[] = {
+    { { -280, -160 }, PROP_TREE,  0.9f },
+    { {  -60, -220 }, PROP_TREE,  1.0f },
+    { {  240, -180 }, PROP_TREE,  0.9f },
+    { {  360,   80 }, PROP_TREE,  1.0f },
+    { {  -20,  240 }, PROP_TREE,  0.9f },
+    { { -320,  120 }, PROP_TREE,  1.0f },
+    { { -160,  -40 }, PROP_ROCK,  1.1f },
+    { {  140,   20 }, PROP_ROCK,  1.0f },
+    { {  260,  200 }, PROP_ROCK,  0.9f },
+    { { -240,  220 }, PROP_ROCK,  0.8f },
+    { {   40,  120 }, PROP_GRASS, 1.1f },
+    { { -120,  160 }, PROP_GRASS, 1.0f },
+    { {  200,  -80 }, PROP_GRASS, 0.9f },
+    { {  -60,  -90 }, PROP_FIRE,  0.9f },
+};
+
+static const SpawnDef g_follySpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Elementalist Aziure", .pos = { -60, -140 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_ELEMENTALIST,
+      .npcColor = { 80, 120, 200, 255 } },
+
+    { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 160, 120 },
+      .level = 3, .hp = 120, .armor = 30, .aggro = 115.0f, .strengthRank = 5,
+      .species = SPECIES_SKALE, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "River Skale Fin", .pos = { 250, 60 },
+      .level = 4, .hp = 150, .armor = 35, .aggro = 120.0f, .strengthRank = 6,
+      .species = SPECIES_SKALE, .group = 1 },
+
+    // Aloes don't move. A stationary hazard is exactly what made them a
+    // teaching tool for pulling one thing without waking three.
+    { .kind = SPAWN_MONSTER, .name = "Aloe Husk", .pos = { -220, 40 },
+      .level = 3, .hp = 140, .armor = 25, .aggro = 95.0f, .strengthRank = 5,
+      .caster = true, .species = SPECIES_ALOE, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Aloe Seed", .pos = { -160, 110 },
+      .level = 2, .hp = 90, .armor = 20, .aggro = 90.0f, .strengthRank = 3,
+      .species = SPECIES_ALOE, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Aloe Seed", .pos = { -280, 130 },
+      .level = 2, .hp = 90, .armor = 20, .aggro = 90.0f, .strengthRank = 3,
+      .species = SPECIES_ALOE, .group = 2 },
+
+    { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 300, -140 },
+      .level = 4, .hp = 160, .armor = 35, .aggro = 125.0f, .strengthRank = 6,
+      .species = SPECIES_GRAWL, .group = 3 },
+    { .kind = SPAWN_MONSTER, .name = "Grawl Longeye", .pos = { 380, -60 },
+      .level = 4, .hp = 150, .armor = 35, .aggro = 130.0f, .strengthRank = 6,
+      .caster = true, .species = SPECIES_GRAWL, .group = 3 },
+};
+
+// --- The Catacombs: Necromancer country, under the abbey. The only
+// pre-Searing area that is genuinely unpleasant. ---
+
+static const EnvProp g_catacombProps[] = {
+    { { -260, -140 }, PROP_ROCK, 1.2f },
+    { { -120, -200 }, PROP_ROCK, 1.0f },
+    { {  100, -190 }, PROP_ROCK, 1.1f },
+    { {  280, -120 }, PROP_ROCK, 1.2f },
+    { {  320,   60 }, PROP_ROCK, 1.0f },
+    { {  180,  200 }, PROP_ROCK, 1.1f },
+    { {  -80,  230 }, PROP_ROCK, 1.0f },
+    { { -300,  140 }, PROP_ROCK, 1.2f },
+    { { -180,   20 }, PROP_ROCK, 0.8f },
+    { {  120,   40 }, PROP_ROCK, 0.9f },
+    { {  -20, -100 }, PROP_FIRE, 0.8f },
+    { {  240,  -20 }, PROP_FIRE, 0.7f },
+};
+
+static const SpawnDef g_catacombSpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Necromancer Munne", .pos = { -240, -60 },
+      .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_NECROMANCER,
+      .npcColor = { 86, 74, 104, 255 } },
+
+    { .kind = SPAWN_MONSTER, .name = "Bone Minion", .pos = { 80, -60 },
+      .level = 3, .hp = 110, .armor = 30, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_UNDEAD, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Skeleton Warrior", .pos = { 160, -120 },
+      .level = 4, .hp = 170, .armor = 45, .aggro = 130.0f, .strengthRank = 6,
+      .species = SPECIES_UNDEAD, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Skeleton Mesmer", .pos = { 40, -150 },
+      .level = 4, .hp = 130, .armor = 30, .aggro = 130.0f, .strengthRank = 6,
+      .caster = true, .species = SPECIES_UNDEAD, .group = 1 },
+
+    // Diseased Devourers are canon Catacombs residents.
+    { .kind = SPAWN_MONSTER, .name = "Diseased Devourer", .pos = { -100, 140 },
+      .level = 4, .hp = 150, .armor = 40, .aggro = 120.0f, .strengthRank = 6,
+      .species = SPECIES_DEVOURER, .group = 2 },
+    { .kind = SPAWN_MONSTER, .name = "Diseased Devourer", .pos = { -30, 200 },
+      .level = 3, .hp = 130, .armor = 40, .aggro = 120.0f, .strengthRank = 5,
+      .species = SPECIES_DEVOURER, .group = 2 },
+
+    { .kind = SPAWN_MONSTER, .name = "Vengeful Grenth's Champion", .pos = { 300, 180 },
+      .level = 7, .hp = 360, .armor = 50, .aggro = 145.0f, .strengthRank = 9,
+      .withHowl = true, .boss = true, .capSkill = SK_HEALING_LIGHT,
+      .species = SPECIES_UNDEAD, .group = 3 },
+    { .kind = SPAWN_MONSTER, .name = "Bone Minion", .pos = { 230, 240 },
+      .level = 3, .hp = 110, .armor = 30, .aggro = 125.0f, .strengthRank = 5,
+      .species = SPECIES_UNDEAD, .group = 3 },
+};
+
+// --- The Northlands: the frontier. Charr here, and the road to Piken
+// Square for anyone playing Reforged. ---
+
+static const EnvProp g_northProps[] = {
+    { { -340, -200 }, PROP_ROCK,  1.2f },
+    { { -160, -260 }, PROP_ROCK,  1.0f },
+    { {  120, -250 }, PROP_ROCK,  1.1f },
+    { {  380, -180 }, PROP_ROCK,  1.2f },
+    { {  480,   40 }, PROP_ROCK,  1.0f },
+    { {  300,  240 }, PROP_ROCK,  1.1f },
+    { {  -60,  280 }, PROP_ROCK,  1.0f },
+    { { -360,  180 }, PROP_ROCK,  1.2f },
+    { { -220,  -40 }, PROP_TREE,  0.8f },
+    { {  200,   60 }, PROP_TREE,  0.8f },
+    { {  760, -120 }, PROP_ROCK,  1.1f },
+    { {  920,   80 }, PROP_ROCK,  1.0f },
+    { {  640,  200 }, PROP_TREE,  0.8f },
+    { {  -40,  -60 }, PROP_FIRE,  1.0f },
+};
+
+static const SpawnDef g_northSpawns[] = {
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 180, -80 },
+      .level = 5, .hp = 200, .armor = 50, .aggro = 130.0f, .strengthRank = 7,
+      .species = SPECIES_CHARR, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Axe Fiend", .pos = { 280, -20 },
+      .level = 6, .hp = 240, .armor = 55, .aggro = 135.0f, .strengthRank = 8,
+      .withHowl = true, .species = SPECIES_CHARR, .group = 1 },
+    { .kind = SPAWN_MONSTER, .name = "Charr Shaman", .pos = { 120, 20 },
+      .level = 6, .hp = 190, .armor = 45, .aggro = 135.0f, .strengthRank = 8,
+      .caster = true, .species = SPECIES_CHARR, .group = 1 },
+
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Grawl", .pos = { -280, 120 },
+      .posB = { 100, 220 }, .level = 4, .hp = 160, .armor = 35, .aggro = 125.0f,
+      .strengthRank = 6, .species = SPECIES_GRAWL },
+
+    // Reforged Mode adds spawns to the Northlands. These are them: the
+    // extra pressure that makes reaching Piken Square a fight rather
+    // than a walk, which is exactly how Reforged frames it.
+    { .kind = SPAWN_MONSTER, .name = "Charr Grunt", .pos = { 620, -60 },
+      .level = 5, .hp = 200, .armor = 50, .aggro = 130.0f, .strengthRank = 7,
+      .species = SPECIES_CHARR, .group = 2, .reforgedOnly = true },
+    { .kind = SPAWN_MONSTER, .name = "Charr Ash Walker", .pos = { 700, 20 },
+      .level = 6, .hp = 220, .armor = 50, .aggro = 135.0f, .strengthRank = 8,
+      .caster = true, .species = SPECIES_CHARR, .group = 2, .reforgedOnly = true },
+    { .kind = SPAWN_MONSTER, .name = "Charr Axe Fiend", .pos = { 800, -120 },
+      .level = 6, .hp = 240, .armor = 55, .aggro = 135.0f, .strengthRank = 8,
+      .withHowl = true, .species = SPECIES_CHARR, .group = 3, .reforgedOnly = true },
+    { .kind = SPAWN_MONSTER, .name = "Bonfaaz Burntfur", .pos = { 950, 60 },
+      .level = 8, .hp = 420, .armor = 60, .aggro = 150.0f, .strengthRank = 10,
+      .withHowl = true, .boss = true, .capSkill = SK_METEOR,
+      .species = SPECIES_CHARR, .group = 3, .reforgedOnly = true },
+};
+
+// --- Piken Square: Reforged Mode's pre-Searing outpost, past the Charr ---
 
 static const EnvProp g_pikenProps[] = {
-    { { 0, -150 },    PROP_FIRE, 1.1f },
-    { { -160, -120 }, PROP_TENT, 1.0f },
-    { { 150, -130 },  PROP_TENT, 1.05f },
-    { { -190, 60 },   PROP_TENT, 0.9f },
-    { { 180, 80 },    PROP_TENT, 0.95f },
-    { { -300, -60 },  PROP_ROCK, 1.3f },
-    { { 290, -40 },   PROP_ROCK, 1.2f },
-    { { -240, 160 },  PROP_ROCK, 1.0f },
-    { { 250, 170 },   PROP_ROCK, 1.1f },
-    { { 0, 220 },     PROP_ROCK, 0.9f },
+    { {    0, -140 }, PROP_FIRE, 1.1f },
+    { { -180, -120 }, PROP_TENT, 1.1f },
+    { {  180, -130 }, PROP_TENT, 1.1f },
+    { { -220,   60 }, PROP_TENT, 0.9f },
+    { {  220,   70 }, PROP_TENT, 0.9f },
+    { { -300, -190 }, PROP_ROCK, 1.1f },
+    { {  310, -180 }, PROP_ROCK, 1.0f },
+    { { -280,  180 }, PROP_ROCK, 1.0f },
+    { {  290,  190 }, PROP_ROCK, 0.9f },
 };
 
 static const SpawnDef g_pikenSpawns[] = {
-    { .kind = SPAWN_NPC, .name = "Warmaster Grast", .pos = { -110, -50 },
+    { .kind = SPAWN_NPC, .name = "Warmaster Riga", .pos = { -120, -50 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Trader Hurm", .pos = { 100, -80 },
+    { .kind = SPAWN_NPC, .name = "Trader Hurm", .pos = { 110, -70 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Adept Kerra", .pos = { 210, 90 },
+    { .kind = SPAWN_NPC, .name = "Adept Kerra", .pos = { 200, 90 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
-    // ...and CHANGING it happens out here on the frontier, much later.
-    // GW1 puts a whole campaign between the two, which is the point:
-    // you live with the build you chose long enough for it to matter.
-    { .kind = SPAWN_NPC, .name = "Nicholas the Restless", .pos = { -230, 120 },
-      .npcRole = NPC_PROFESSION_CHANGER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Armorer Sten", .pos = { -210, 80 },
+      .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
 };
 
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
 static const ZoneDef g_zones[ZONE_COUNT] = {
-    [ZONE_ASHFORD_CAMP] = {
-        .name = "Ashford Camp",
+    [ZONE_ASHFORD_ABBEY] = {
+        .name = "Ashford Abbey",
         .mode = MODE_OUTPOST,
-        .clearColor = { 24, 20, 14, 255 },  // warm dirt tones
-        .gridColor = { 80, 68, 52, 255 },
+        .clearColor = { 22, 24, 18, 255 },  // cool cloister stone and grass
+        .gridColor = { 74, 80, 60, 255 },
         .portals = {
-            { { 260, 0 }, "To Ashford Plains", ZONE_ASHFORD_PLAINS, { -320, 0 } },
+            { {  380, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { -420, 0 } },
+            { { -380, 0 }, "To The Catacombs",   ZONE_CATACOMBS,       {  320, 0 } },
         },
-        .portalCount = 1,
+        .portalCount = 2,
         .bounds = { -450, -300, 900, 600 },
         .hasShrine = false,
-        .props = g_campProps, .propCount = COUNT(g_campProps),
-        .spawns = g_campSpawns, .spawnCount = COUNT(g_campSpawns),
+        .props = g_abbeyProps, .propCount = COUNT(g_abbeyProps),
+        .spawns = g_abbeySpawns, .spawnCount = COUNT(g_abbeySpawns),
     },
-    [ZONE_ASHFORD_PLAINS] = {
-        .name = "Ashford Plains",
+    [ZONE_LAKESIDE_COUNTY] = {
+        .name = "Lakeside County",
         .mode = MODE_EXPLORABLE,
-        .clearColor = { 14, 22, 13, 255 },  // cool grass tones
-        .gridColor = { 52, 76, 48, 255 },
+        .clearColor = { 16, 26, 18, 255 },  // green, wet, and safe
+        .gridColor = { 58, 92, 58, 255 },
         .portals = {
-            { { -420, 0 }, "To Ashford Camp", ZONE_ASHFORD_CAMP, { 160, 0 } },
-            // Past the ridge marker the scouting quest sends you to.
-            { { 1400, 40 }, "To Charr Foothills", ZONE_CHARR_FOOTHILLS, { -400, 0 } },
+            { { -460, 0 },   "To Ashford Abbey",     ZONE_ASHFORD_ABBEY,  {  320, 0 } },
+            { { 1020, 0 },   "To Ascalon City",      ZONE_ASCALON_CITY,   { -360, 0 } },
+            { { 280, -420 }, "To Green Hills County", ZONE_GREEN_HILLS,   {    0, 300 } },
+            { { 280,  420 }, "To Regent Valley",     ZONE_REGENT_VALLEY,  {    0, -280 } },
+        },
+        .portalCount = 4,
+        .bounds = { -520, -480, 1600, 960 },
+        .hasShrine = true,
+        .shrinePos = { -360, 160 },
+        .props = g_lakesideProps, .propCount = COUNT(g_lakesideProps),
+        .spawns = g_lakesideSpawns, .spawnCount = COUNT(g_lakesideSpawns),
+    },
+    [ZONE_ASCALON_CITY] = {
+        .name = "Ascalon City",
+        .mode = MODE_OUTPOST,
+        .clearColor = { 26, 23, 17, 255 },  // warm stone, banners, torchlight
+        .gridColor = { 92, 80, 58, 255 },
+        .portals = {
+            { { -420, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, {  960, 0 } },
+            { {  420, 0 }, "To The Northlands",  ZONE_NORTHLANDS,      { -420, 0 } },
         },
         .portalCount = 2,
-        .bounds = { -520, -480, 1980, 960 },
-        .hasShrine = true,
-        .shrinePos = { -320, 140 },
-        .props = g_plainsProps, .propCount = COUNT(g_plainsProps),
-        .spawns = g_plainsSpawns, .spawnCount = COUNT(g_plainsSpawns),
+        .bounds = { -480, -300, 960, 600 },
+        .hasShrine = false,
+        .props = g_cityProps, .propCount = COUNT(g_cityProps),
+        .spawns = g_citySpawns, .spawnCount = COUNT(g_citySpawns),
     },
-    [ZONE_CHARR_FOOTHILLS] = {
-        .name = "Charr Foothills",
+    [ZONE_GREEN_HILLS] = {
+        .name = "Green Hills County",
         .mode = MODE_EXPLORABLE,
-        .clearColor = { 24, 17, 14, 255 },  // ashen scorched ground
-        .gridColor = { 84, 62, 50, 255 },
+        .clearColor = { 17, 25, 15, 255 },
+        .gridColor = { 62, 94, 54, 255 },
         .portals = {
-            { { -480, 0 }, "To Ashford Plains", ZONE_ASHFORD_PLAINS, { 1320, 40 } },
-            { { 1300, -180 }, "To Piken Watch", ZONE_PIKEN_WATCH, { -220, 0 } },
+            { { 0, 340 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { 280, -360 } },
+        },
+        .portalCount = 1,
+        .bounds = { -560, -340, 1120, 720 },
+        .hasShrine = true,
+        .shrinePos = { -160, 250 },
+        .props = g_greenHillsProps, .propCount = COUNT(g_greenHillsProps),
+        .spawns = g_greenHillsSpawns, .spawnCount = COUNT(g_greenHillsSpawns),
+    },
+    [ZONE_REGENT_VALLEY] = {
+        .name = "Regent Valley",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 18, 23, 15, 255 },  // deeper woodland
+        .gridColor = { 66, 86, 50, 255 },
+        .portals = {
+            { {    0, -320 }, "To Lakeside County",  ZONE_LAKESIDE_COUNTY, { 280,  360 } },
+            { { -480,    0 }, "To Wizard's Folly",   ZONE_WIZARDS_FOLLY,   { 380,    0 } },
         },
         .portalCount = 2,
-        .bounds = { -560, -400, 1960, 800 },
+        .bounds = { -540, -340, 1500, 700 },
         .hasShrine = true,
-        .shrinePos = { -380, 120 },
-        .props = g_foothillsProps, .propCount = COUNT(g_foothillsProps),
-        .spawns = g_foothillsSpawns, .spawnCount = COUNT(g_foothillsSpawns),
+        .shrinePos = { -260, -180 },
+        .props = g_regentProps, .propCount = COUNT(g_regentProps),
+        .spawns = g_regentSpawns, .spawnCount = COUNT(g_regentSpawns),
     },
-    [ZONE_PIKEN_WATCH] = {
-        .name = "Piken Watch",
+    [ZONE_WIZARDS_FOLLY] = {
+        .name = "Wizard's Folly",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 15, 21, 24, 255 },  // sodden, blue-grey
+        .gridColor = { 54, 74, 88, 255 },
+        .portals = {
+            { { 420, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -440, 0 } },
+        },
+        .portalCount = 1,
+        .bounds = { -460, -300, 920, 600 },
+        .hasShrine = true,
+        .shrinePos = { 300, 200 },
+        .props = g_follyProps, .propCount = COUNT(g_follyProps),
+        .spawns = g_follySpawns, .spawnCount = COUNT(g_follySpawns),
+    },
+    [ZONE_CATACOMBS] = {
+        .name = "The Catacombs",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 14, 13, 16, 255 },  // near-black; the one grim place
+        .gridColor = { 62, 58, 70, 255 },
+        .portals = {
+            { { 380, 0 }, "To Ashford Abbey", ZONE_ASHFORD_ABBEY, { -320, 0 } },
+        },
+        .portalCount = 1,
+        .bounds = { -420, -300, 840, 600 },
+        .hasShrine = true,
+        .shrinePos = { -300, -200 },
+        .props = g_catacombProps, .propCount = COUNT(g_catacombProps),
+        .spawns = g_catacombSpawns, .spawnCount = COUNT(g_catacombSpawns),
+    },
+    [ZONE_NORTHLANDS] = {
+        .name = "The Northlands",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 20, 21, 24, 255 },  // cold, grey, no green left
+        .gridColor = { 78, 82, 90, 255 },
+        .portals = {
+            { { -460,  0 }, "To Ascalon City", ZONE_ASCALON_CITY, {  380, 0 } },
+            // Reforged only. World_ZoneUnlocked hides it otherwise, so a
+            // character who can't go there is never shown a door.
+            { { 1120, 60 }, "To Piken Square", ZONE_PIKEN_SQUARE, { -300, 0 } },
+        },
+        .portalCount = 2,
+        .bounds = { -520, -340, 1740, 700 },
+        .hasShrine = true,
+        .shrinePos = { -380, -200 },
+        .props = g_northProps, .propCount = COUNT(g_northProps),
+        .spawns = g_northSpawns, .spawnCount = COUNT(g_northSpawns),
+    },
+    [ZONE_PIKEN_SQUARE] = {
+        .name = "Piken Square",
         .mode = MODE_OUTPOST,
         .clearColor = { 26, 22, 20, 255 },  // stone and torchlight
         .gridColor = { 88, 76, 66, 255 },
         .portals = {
-            { { -300, 0 }, "To Charr Foothills", ZONE_CHARR_FOOTHILLS, { 1200, -180 } },
+            { { -340, 0 }, "To The Northlands", ZONE_NORTHLANDS, { 1040, 60 } },
         },
         .portalCount = 1,
         .bounds = { -400, -280, 800, 560 },
@@ -370,9 +655,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
 // Zone state + accessors
 // ---------------------------------------------------------------------
 
-static const ZoneDef *g_zone = &g_zones[ZONE_ASHFORD_CAMP];
-static ZoneId g_zoneId = ZONE_ASHFORD_CAMP;
-static ZoneId g_lastOutpostId = ZONE_ASHFORD_CAMP;
+static const ZoneDef *g_zone = &g_zones[ZONE_ASHFORD_ABBEY];
+static ZoneId g_zoneId = ZONE_ASHFORD_ABBEY;
+static ZoneId g_lastOutpostId = ZONE_ASHFORD_ABBEY;
 static bool g_thomHired = false;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
@@ -392,11 +677,25 @@ void World_SetThomHired(bool hired) {
 
 ZoneId World_GetLastOutpostId(void) { return g_lastOutpostId; }
 
-int World_GetPortalCount(void) { return g_zone->portalCount; }
+// Portals to locked zones are filtered out of BOTH accessors, so the
+// renderer, the compass and the transition check all agree on which
+// doors exist. Filtering in one place and not the others is how you get
+// a gate you can see but not use.
+int World_GetPortalCount(void) {
+    int n = 0;
+    for (int i = 0; i < g_zone->portalCount; i++) {
+        if (World_ZoneUnlocked(g_zone->portals[i].destZone)) n++;
+    }
+    return n;
+}
 
 const ZonePortal *World_GetPortal(int index) {
-    if (index < 0 || index >= g_zone->portalCount) return NULL;
-    return &g_zone->portals[index];
+    if (index < 0) return NULL;
+    for (int i = 0; i < g_zone->portalCount; i++) {
+        if (!World_ZoneUnlocked(g_zone->portals[i].destZone)) continue;
+        if (index-- == 0) return &g_zone->portals[i];
+    }
+    return NULL;
 }
 
 const EnvProp *World_GetProps(int *count) {
@@ -453,8 +752,11 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->skillRecharge[i] = 0.0f;
 }
 
-static void SpawnVekk(Vector2 pos) {
-    int idx = Entity_Spawn(ENT_HERO, "Vekk", 0, pos, (Color){ 60, 120, 220, 255 });
+// Cynn is Prophecies' own Elementalist henchman. Vekk was an asura
+// from an expansion two campaigns away, which is a long way to come
+// for a walk around Lakeside.
+static void SpawnCynn(Vector2 pos) {
+    int idx = Entity_Spawn(ENT_HERO, "Cynn", 0, pos, (Color){ 60, 120, 220, 255 });
     Entity *hero = Entity_Get(idx);
     hero->primaryProfession = PROF_ELEMENTALIST;
     hero->secondaryProfession = PROF_MONK;
@@ -503,17 +805,44 @@ static void SpawnThomCompanion(Vector2 pos) {
     World_SetupThomStats(Entity_Get(idx));
 }
 
+// Body colour per species. The sprite shapes carry most of the read,
+// but colour is what tells you at a glance whether the thing across the
+// field is a moa you can walk past or a Charr that will kill you.
+static Color SpeciesColor(Species s) {
+    switch (s) {
+        case SPECIES_SKALE:    return (Color){  92, 134, 116, 255 }; // wet green
+        case SPECIES_GRAWL:    return (Color){ 132, 112,  86, 255 }; // matted fur
+        case SPECIES_MOA:      return (Color){ 198, 158,  96, 255 }; // straw plumage
+        case SPECIES_UNDEAD:   return (Color){ 150, 146, 128, 255 }; // grave-grey
+        case SPECIES_ALOE:     return (Color){  96, 148,  72, 255 }; // rank green
+        case SPECIES_DEVOURER: return (Color){ 118,  92,  74, 255 }; // chitin
+        case SPECIES_CHARR:    return (Color){ 112,  82,  62, 255 };
+        default:               return (Color){ 120, 104,  92, 255 }; // bandits
+    }
+}
+
 static Entity *SpawnMonster(const SpawnDef *def) {
-    int idx = Entity_Spawn(ENT_MONSTER, def->name, 1, def->pos, (Color){ 100, 90, 80, 255 });
+    int idx = Entity_Spawn(ENT_MONSTER, def->name, 1, def->pos, SpeciesColor(def->species));
     Entity *m = Entity_Get(idx);
     if (!m) return NULL;
     m->level = def->level;
-    m->maxHp = m->hp = def->hp;
+    // Reforged Mode gives pre-Searing enemies reduced health and armor.
+    // Applied here, once, so every spawn table stays written in the
+    // game's normal numbers rather than carrying two sets.
+    int hp = def->hp, armor = def->armor;
+    if (Character_IsReforged()) {
+        hp = hp * 85 / 100;
+        armor -= 5;
+        if (armor < 0) armor = 0;
+    }
+    m->maxHp = m->hp = hp;
     m->maxEnergy = m->energy = 20;
-    m->armor = def->armor;
+    m->armor = armor;
     m->aggroRange = def->aggro;
     m->leashRange = def->aggro * 2.5f;
     m->attributeRank[ATTR_MONSTROUS] = def->strengthRank;
+    // Aloes are rooted: they fight what comes to them and never chase.
+    if (def->species == SPECIES_ALOE) m->moveSpeed = 0.0f;
     m->groupId = def->group;
     m->species = def->species;
     m->isBoss = def->boss;
@@ -576,7 +905,10 @@ static void SpawnMonsterPatrol(const SpawnDef *def) {
 static void SpawnNpc(const SpawnDef *def) {
     int idx = Entity_Spawn(ENT_NPC, def->name, 0, def->pos, def->npcColor);
     Entity *npc = Entity_Get(idx);
-    if (npc) npc->npcRole = def->npcRole;
+    if (npc) {
+        npc->npcRole = def->npcRole;
+        npc->teachesProfession = def->teaches;
+    }
 }
 
 // Rebuilds the entity array for a zone while carrying the player
@@ -607,13 +939,16 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     }
 
     // The party spawns around the player's entry point.
-    SpawnVekk((Vector2){ playerEntry.x - 50, playerEntry.y + 50 });
+    SpawnCynn((Vector2){ playerEntry.x - 50, playerEntry.y + 50 });
     if (g_thomHired) {
         SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
     }
 
     for (int i = 0; i < g_zone->spawnCount; i++) {
         const SpawnDef *def = &g_zone->spawns[i];
+        // Reforged Mode's additional Northlands spawns simply aren't
+        // there for anyone else.
+        if (def->reforgedOnly && !Character_IsReforged()) continue;
         switch (def->kind) {
             case SPAWN_MONSTER:
                 SpawnMonster(def);
@@ -637,9 +972,18 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     Save_Write();
 }
 
+bool World_ZoneUnlocked(ZoneId zone) {
+    // Piken Square is Reforged Mode's addition to pre-Searing. Everyone
+    // else never sees the portal at all - a locked door you can't ever
+    // open is worse than no door.
+    if (zone == ZONE_PIKEN_SQUARE) return Character_IsReforged();
+    return true;
+}
+
 void World_RestoreToOutpost(ZoneId zone) {
-    if (zone < 0 || zone >= ZONE_COUNT || g_zones[zone].mode != MODE_OUTPOST) {
-        zone = ZONE_ASHFORD_CAMP;
+    if (zone < 0 || zone >= ZONE_COUNT || g_zones[zone].mode != MODE_OUTPOST ||
+        !World_ZoneUnlocked(zone)) {
+        zone = ZONE_ASHFORD_ABBEY;
     }
     LoadZone(zone, (Vector2){ 0, 0 });
 }
@@ -648,7 +992,7 @@ void World_Init(void) {
     // Fresh-start state, so a New Game from the menu after a previous
     // run doesn't inherit the old party composition.
     g_thomHired = false;
-    g_lastOutpostId = ZONE_ASHFORD_CAMP;
+    g_lastOutpostId = ZONE_ASHFORD_ABBEY;
 
     // The persistent player, built from whatever the creator produced
     // (character.c). Every zone load carries this entity across.
@@ -767,7 +1111,7 @@ void World_Init(void) {
     Items_EquipWeapon(player, 0);
     Items_EquipArmor(player, 1);
 
-    LoadZone(ZONE_ASHFORD_CAMP, (Vector2){ 0, 0 });
+    LoadZone(ZONE_ASHFORD_ABBEY, (Vector2){ 0, 0 });
 }
 
 void World_Update(Entity *player, float dt) {
@@ -853,8 +1197,8 @@ void World_Update(Entity *player, float dt) {
     if (!player->alive) return;
 
     // --- Portals: walk into a gate and cross to its destination ---
-    for (int i = 0; i < g_zone->portalCount; i++) {
-        const ZonePortal *portal = &g_zone->portals[i];
+    for (int i = 0; i < World_GetPortalCount(); i++) {
+        const ZonePortal *portal = World_GetPortal(i);
         float dx = player->pos.x - portal->pos.x;
         float dy = player->pos.y - portal->pos.y;
         if (sqrtf(dx * dx + dy * dy) <= PORTAL_TRIGGER_RADIUS) {
