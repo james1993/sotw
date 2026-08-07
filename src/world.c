@@ -657,9 +657,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
 // Zone state + accessors
 // ---------------------------------------------------------------------
 
-static const ZoneDef *g_zone = &g_zones[ZONE_ASHFORD_ABBEY];
-static ZoneId g_zoneId = ZONE_ASHFORD_ABBEY;
-static ZoneId g_lastOutpostId = ZONE_ASHFORD_ABBEY;
+static const ZoneDef *g_zone = &g_zones[ZONE_ASCALON_CITY];
+static ZoneId g_zoneId = ZONE_ASCALON_CITY;
+static ZoneId g_lastOutpostId = ZONE_ASCALON_CITY;
 static bool g_thomHired = false;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
@@ -670,6 +670,16 @@ const char *World_GetZoneName(void) { return g_zone->name; }
 ZoneId World_GetZoneId(void) { return g_zoneId; }
 Color World_GetClearColor(void) { return g_zone->clearColor; }
 Color World_GetGridColor(void) { return g_zone->gridColor; }
+static bool g_searingHappened = false;
+
+bool World_SearingHappened(void) {
+    return g_searingHappened;
+}
+
+void World_SetSearingHappened(bool happened) {
+    g_searingHappened = happened;
+}
+
 bool World_IsThomHired(void) { return g_thomHired; }
 
 void World_SetThomHired(bool hired) {
@@ -1153,7 +1163,7 @@ bool World_ZoneUnlocked(ZoneId zone) {
 void World_RestoreToOutpost(ZoneId zone) {
     if (zone < 0 || zone >= ZONE_COUNT || g_zones[zone].mode != MODE_OUTPOST ||
         !World_ZoneUnlocked(zone)) {
-        zone = ZONE_ASHFORD_ABBEY;
+        zone = ZONE_ASCALON_CITY;
     }
     LoadZone(zone, (Vector2){ 0, 0 });
 }
@@ -1162,7 +1172,7 @@ void World_Init(void) {
     // Fresh-start state, so a New Game from the menu after a previous
     // run doesn't inherit the old party composition.
     g_thomHired = false;
-    g_lastOutpostId = ZONE_ASHFORD_ABBEY;
+    g_lastOutpostId = ZONE_ASCALON_CITY;
 
     // The persistent player, built from whatever the creator produced
     // (character.c). Every zone load carries this entity across.
@@ -1291,7 +1301,10 @@ void World_Init(void) {
     }
     for (int i = 0; i < g_inventoryCount; i++) Items_Equip(player, i);
 
-    LoadZone(ZONE_ASHFORD_ABBEY, (Vector2){ 0, 0 });
+    // A new Prophecies character opens in Ascalon City, after the
+    // intro cinematic - it is the capital, the hub, and where the
+    // main questline starts. Ashford Abbey is somewhere you go.
+    LoadZone(ZONE_ASCALON_CITY, (Vector2){ 0, 0 });
 }
 
 void World_Update(Entity *player, float dt) {

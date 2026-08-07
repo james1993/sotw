@@ -269,6 +269,33 @@ libxi-dev libxcursor-dev libxinerama-dev` on Debian/Ubuntu).
   pad glyphs the moment a controller is detected. Each panel also carries
   its own hotkey badge in its title bar and a close box.
 
+### Characters
+
+**Play** opens the roster, GW1's login screen: **six character slots**,
+each a whole character rather than a snapshot of one. That distinction
+is the point — a save slot you overwrite is a rewind, a character slot
+is a person you made, and six of them means a Monk and a Warrior
+without one costing you the other. Each card shows the name, the
+professions, the level, whether they took Reforged Mode, and whether
+they've been through the Searing. Empty slots go to the creator; a
+filled one can be deleted, with a confirm, because there's no undo.
+
+**Change Character** in the pause menu returns you to the roster, which
+is where logging out puts you in GW1.
+
+### The Searing
+
+The prototype **ends** where pre-Searing ends. Sir Tydus offers you the
+Ascalon Guards; take the trial at the **Ascalon Academy** and the Charr
+crystals fall while you're inside. In GW1 that is the point of no
+return, and everything this demake covers happens before it — so rather
+than pretend there's more, the game plays the Searing and stops.
+
+That quest needs the whole Ascalon City thread finished first. A
+character who's been through it stays finished: the roster marks them,
+and choosing them replays the ending rather than dropping them back
+into a county that no longer exists.
+
 ### Setting: Pre-Searing Ascalon
 
 The prototype is set in **pre-Searing Ascalon** — GW1 Prophecies' opening
@@ -278,9 +305,9 @@ out (research and the liberties taken are written up in
 
 | Zone | Kind | What's there |
 | --- | --- | --- |
-| **Ashford Abbey** | outpost | Where you start. Brother Mhenlo (Monk trainer), Abbot Ciglo, Merchant Niles, Armorer Dunda, Little Thom |
+| **Ashford Abbey** | outpost | Brother Mhenlo (Monk trainer), Abbot Ciglo, Merchant Niles, Armorer Dunda, Little Thom |
 | **Lakeside County** | explorable | The gentle first field: River Skale and Moa Birds |
-| **Ascalon City** | outpost | The capital and the hub. Sir Tydus, Prince Rurik, Halbrik (skills), Merchant Vassar, Armorer Gali |
+| **Ascalon City** | outpost | **Where you start.** The capital, the hub, and where the main questline runs. Sir Tydus, Prince Rurik, Halbrik (skills), Merchant Vassar, Armorer Gali |
 | **Green Hills County** | explorable | Warrior country and the theatre. Grawl warbands, Warmaster Grast (Warrior), Lady Althea (Mesmer) |
 | **Regent Valley** | explorable | Ranger country. Bandits and giant spiders, Master Ranger Nente (Ranger), Duke Barradin |
 | **Wizard's Folly** | explorable | Elementalist country. Aloes and skale, Elementalist Aziure |

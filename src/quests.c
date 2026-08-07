@@ -152,6 +152,28 @@ Quest g_quests[QUEST_COUNT] = {
         .state = QUEST_AVAILABLE,
         .prereq = -1,
     },
+    // --- Ascalon City: the end of pre-Searing ---
+    // Sir Tydus offers the Ascalon Guards, you take the Academy trial,
+    // and the Charr come. In GW1 this is the point of no return, which
+    // is why it needs every other thread finished first.
+    {
+        .name = "The Ascalon Academy",
+        .objective = "Take Sir Tydus' trial at the Ascalon Academy",
+        .offerText = "You've done enough for Ascalon to be asked properly. Take the "
+                     "trial at the Academy and you'll wear the Guards' colours. "
+                     "There's no coming back from it - once you're sworn, you're ours.",
+        .giverName = "Sir Tydus",
+        .type = QTYPE_KILL,
+        .killsRequired = 3,
+        .targetName = "Charr",
+        .rewardXP = 800,
+        .rewardGold = 400,
+        .rewardSkill = -1,
+        .state = QUEST_AVAILABLE,
+        .prereq = 3, // after Charr at the Gate - the whole city thread
+        .endsCampaign = true,
+    },
+
     {
         .name = "Hides for the Watch",
         .objective = "Bring 4 Charr Hides to Piken Square",
@@ -261,6 +283,11 @@ bool Quests_TurnIn(Entity *player, int index) {
     Audio_Play(SFX_QUEST_DONE);
     Progression_AwardXP(player, q->rewardXP); // Reforged's XP bonus is applied there
     g_gold += Character_IsReforged() ? (q->rewardGold * 105 / 100) : q->rewardGold;
+
+    // The end of pre-Searing. main.c watches this flag and hands over to
+    // the Searing; the flag is saved, so the character stays finished.
+    if (q->endsCampaign) World_SetSearingHappened(true);
+
     Save_Write();
     return true;
 }

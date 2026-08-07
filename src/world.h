@@ -127,6 +127,13 @@ bool World_ZoneUnlocked(ZoneId zone);
 
 // Whether Little Thom has been hired into the party (persists across
 // zone loads; GW1 henchmen stay in the party until dismissed).
+// The Searing. Pre-Searing ends when Sir Tydus' Academy trial is taken,
+// exactly as GW1 ends it - the Charr burn Ascalon and the campaign this
+// prototype covers is over. Once set, the character is finished: the
+// roster says so and the world stops accepting them.
+bool World_SearingHappened(void);
+void World_SetSearingHappened(bool happened);
+
 bool World_IsThomHired(void);
 void World_SetThomHired(bool hired);
 

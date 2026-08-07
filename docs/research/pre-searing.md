@@ -121,3 +121,21 @@ new content.
 - [Ashford Abbey – Guild Wars Wiki](https://wiki.guildwars.com/wiki/Ashford_Abbey)
 - [Regent Valley (Pre-Searing) – GuildWars Wiki (Fandom)](https://guildwars.fandom.com/wiki/Regent_Valley_(Pre-Searing))
 - [The Catacombs – GuildWars Wiki (Fandom)](https://guildwars.fandom.com/wiki/The_Catacombs)
+
+
+## Corrections made after playtesting
+
+Two things this document originally got wrong, both corrected against
+the wiki after the fact:
+
+- **The campaign starts in Ascalon City**, not at Ashford Abbey. A new
+  Prophecies character opens there after the intro cinematic; it is the
+  capital, the hub, and where the main questline runs. Ashford Abbey is
+  somewhere you travel to.
+- **Pre-Searing ends at the Ascalon Academy.** Sir Tydus offers the
+  Ascalon Guards; taking the trial is the point of no return, and the
+  Searing follows immediately. The prototype now ends there, which is
+  the natural boundary of everything this demake covers.
+
+Sources: [Ascalon City (pre-Searing)](https://wiki.guildwars.com/wiki/Ascalon_City_(pre-Searing)),
+[Pre-Searing Ascalon](https://guildwars.fandom.com/wiki/Pre-Searing_Ascalon).

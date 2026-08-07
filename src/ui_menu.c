@@ -91,9 +91,12 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     const char *labels[3];
     MenuAction actions[3];
     int count = 0;
-    if (hasSave) { labels[count] = "Continue"; actions[count++] = MENU_CONTINUE; }
-    labels[count] = "New Game"; actions[count++] = MENU_NEW_GAME;
-    labels[count] = "Quit";     actions[count++] = MENU_QUIT;
+    // One entry, not "Continue" plus "New Game": with six character
+    // slots the roster is where both of those decisions are made, and
+    // duplicating them here would only ask the same question twice.
+    (void)hasSave;
+    labels[count] = "Play";  actions[count++] = MENU_NEW_GAME;
+    labels[count] = "Quit";  actions[count++] = MENU_QUIT;
 
     // --- Selection movement: D-pad / left stick / arrow keys / W-S ---
     int nav = MenuNavStep();
@@ -175,7 +178,7 @@ static const PauseEntry g_pauseEntries[] = {
     // shows the current volume rather than just offering to change it.
     { "Sound",             NULL,  PAUSE_VOLUME },
     { NULL,                NULL,  PAUSE_NONE }, // separator
-    { "Quit to Main Menu", NULL,  PAUSE_QUIT_TO_MENU },
+    { "Change Character"  , NULL,  PAUSE_QUIT_TO_MENU },
     { "Quit Game",         NULL,  PAUSE_QUIT_GAME },
 };
 #define PAUSE_ENTRY_COUNT (int)(sizeof(g_pauseEntries) / sizeof(g_pauseEntries[0]))

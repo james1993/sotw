@@ -19,6 +19,10 @@
 // backing out of the screen can't leave a half-made character behind.
 static CharacterDef g_draft;
 static bool g_nameFocused = false;
+// The name starts as a placeholder. Typing REPLACES it the first time
+// rather than appending, or every character ends up called
+// "AscalonianRurik".
+static bool g_nameEdited = false;
 static float g_previewTime = 0.0f;
 
 // A standalone entity used only to render the preview. Building a real
@@ -29,6 +33,7 @@ static Entity g_previewEntity;
 
 void UI_CreateReset(void) {
     UINav_Clear(); // nothing highlighted until the player reaches for the D-pad
+    g_nameEdited = false;
     g_draft = Character_Default();
     g_nameFocused = false;
     g_previewTime = 0.0f;
@@ -403,6 +408,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         if (g_nameFocused) {
             int c = GetCharPressed();
             while (c > 0) {
+                if (!g_nameEdited) { g_draft.name[0] = '\0'; g_nameEdited = true; }
                 int len = (int)strlen(g_draft.name);
                 if (c >= 32 && c <= 126 && len < CHARACTER_NAME_MAX) {
                     g_draft.name[len] = (char)c;
@@ -411,6 +417,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
                 c = GetCharPressed();
             }
             if (IsKeyPressed(KEY_BACKSPACE)) {
+                if (!g_nameEdited) { g_draft.name[0] = '\0'; g_nameEdited = true; }
                 int len = (int)strlen(g_draft.name);
                 if (len > 0) g_draft.name[len - 1] = '\0';
             }
@@ -418,7 +425,7 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
 
         int tw = UITextWidth(g_draft.name, font);
         UI_TextShadow(g_draft.name, fx + UI_SP(scale, 3), y + (fieldH - font) / 2, font,
-                      UI_TEXT_PRIMARY);
+                      g_nameEdited ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
         // Blinking caret while focused.
         if (g_nameFocused && fmodf(g_previewTime, 1.0f) < 0.5f) {
             DrawRectangle(fx + UI_SP(scale, 3) + tw + 2, y + (fieldH - font) / 2,

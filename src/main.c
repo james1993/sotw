@@ -20,6 +20,8 @@
 #include "ui_map.h"
 #include "ui_menu.h"
 #include "ui_create.h"
+#include "ui_select.h"
+#include "ui_searing.h"
 #include "character.h"
 #include "ui_font.h"
 #include "ui_icons.h"
@@ -36,8 +38,10 @@
 
 typedef enum {
     APP_MENU,
-    APP_CREATE,   // character creation, between the menu and the world
-    APP_PLAYING
+    APP_SELECT,   // the character roster - six slots, GW1's login screen
+    APP_CREATE,   // character creation, reached from an empty slot
+    APP_PLAYING,
+    APP_SEARING   // the ending - pre-Searing stops here, so the game does
 } AppState;
 
 // Fresh-start (or save-restored) world. Reset order matters: globals
@@ -46,6 +50,11 @@ typedef enum {
 // Autosaving only turns on once the state on disk can't be clobbered
 // by defaults.
 static void StartGame(bool loadSave, Camera2D *camera) {
+    // Autosave OFF for the whole rebuild. World_Init's zone load calls
+    // Save_Write, and the flag survives from any previous character in
+    // this session - without this, picking a second character writes
+    // default state over their file before the load reads it.
+    Save_Disable();
     Items_Reset();
     Quests_Reset();
     Titles_Reset();
@@ -143,13 +152,53 @@ int main(void) {
             if (action == MENU_QUIT) {
                 quitRequested = true;
             } else if (action == MENU_NEW_GAME) {
-                // A new game goes through creation first - the world is
-                // built FROM the character, so it can't exist yet.
+                // "Play" opens the roster. Which character - or whether
+                // to make one - is a question the roster answers, so the
+                // title screen doesn't ask it twice.
+                UI_SelectReset();
+                app = APP_SELECT;
+            }
+            continue;
+        }
+
+        // --- Character selection: six slots, GW1's roster ---
+        if (app == APP_SELECT) {
+            UICursor_Update(dt, true);
+            BeginDrawing();
+            SelectAction sa = UI_DrawSelectScreen(screenWidth, screenHeight, dt);
+            UICursor_Draw(screenHeight);
+            EndDrawing();
+            if (sa == SELECT_PLAY) {
+                StartGame(true, &camera);
+                // A character who has been through the Searing is
+                // finished. Dropping them back into a county that no
+                // longer exists would be a lie, so they get the ending
+                // again instead.
+                if (World_SearingHappened()) {
+                    UI_SearingReset();
+                    app = APP_SEARING;
+                } else {
+                    app = APP_PLAYING;
+                }
+            } else if (sa == SELECT_CREATE) {
+                // The world is built FROM the character, so it can't
+                // exist until creation finishes.
                 UI_CreateReset();
                 app = APP_CREATE;
-            } else if (action == MENU_CONTINUE) {
-                StartGame(true, &camera);
-                app = APP_PLAYING;
+            } else if (sa == SELECT_BACK) {
+                app = APP_MENU;
+            }
+            continue;
+        }
+
+        // --- The Searing ---
+        if (app == APP_SEARING) {
+            BeginDrawing();
+            bool done = UI_DrawSearing(screenWidth, screenHeight, dt);
+            EndDrawing();
+            if (done) {
+                UI_SelectReset();
+                app = APP_SELECT;
             }
             continue;
         }
@@ -157,11 +206,11 @@ int main(void) {
         // --- Character creation ---
         if (app == APP_CREATE) {
             // The creator is a SPATIAL screen - three columns, a grid of
-            // colour swatches - so it gets the virtual cursor rather
-            // than list focus: steering a pointer is the right verb for
-            // picking a swatch, and stepping an index is not. This is
-            // the only place the cursor is driven from outside
-            // Input_Update, because APP_CREATE never reaches it.
+            // profession buttons, rows of swatches - so the D-pad steps
+            // between controls by geometry (ui_nav.c) rather than down a
+            // list. The stick still drives a pointer for anyone who
+            // wants one; the cursor is updated here because APP_CREATE
+            // never reaches Input_Update.
             UICursor_Update(dt, true);
             BeginDrawing();
             CreateAction ca = UI_DrawCreateScreen(screenWidth, screenHeight, dt);
@@ -171,7 +220,8 @@ int main(void) {
                 StartGame(false, &camera);
                 app = APP_PLAYING;
             } else if (ca == CREATE_CANCEL) {
-                app = APP_MENU;
+                UI_SelectReset(); // back to the roster, not past it
+                app = APP_SELECT;
             }
             continue;
         }
@@ -198,6 +248,17 @@ int main(void) {
             playerNow = Entity_Get(PLAYER_INDEX); // zone loads rebuild the array
             Items_UpdatePickup(playerNow);
             Quests_Update(playerNow);
+
+            // Turning in Sir Tydus' Academy trial sets this, and the
+            // county stops existing the moment it does. Checked here in
+            // the frame loop rather than from inside the turn-in, so the
+            // quest system never has to know about app states.
+            if (World_SearingHappened()) {
+                Save_Write();
+                UI_SearingReset();
+                app = APP_SEARING;
+                continue;
+            }
         }
         if (playerNow) camera.target = playerNow->pos;
 
@@ -288,9 +349,13 @@ int main(void) {
                     break; // stays paused, unlike every other entry
                 }
                 case PAUSE_QUIT_TO_MENU:
+                    // Out to the roster, which is where GW1 logging out
+                    // puts you - and the natural place to pick up a
+                    // different character.
                     Save_Write();
                     paused = false;
-                    app = APP_MENU;
+                    UI_SelectReset();
+                    app = APP_SELECT;
                     break;
                 case PAUSE_QUIT_GAME:
                     paused = false;

@@ -28,6 +28,15 @@
 static bool g_enabled = false;
 static char g_saveDir[448];
 static char g_savePath[512];
+// -1 until the selection screen picks one. Saving with no slot chosen
+// would have to invent a file, and inventing a character's home is
+// exactly the kind of guess that loses someone's save.
+static int g_slot = -1;
+
+static void SlotPath(int slot, char *out, size_t outSize) {
+    if (slot < 0) snprintf(out, outSize, "%s/char0.txt", g_saveDir);
+    else          snprintf(out, outSize, "%s/char%d.txt", g_saveDir, slot);
+}
 
 // Resolve the platform save directory once. Env-var based rather than
 // hardcoded paths - the same portability rule as the font loading.
@@ -59,7 +68,77 @@ static void ResolvePaths(void) {
     if (!base || !base[0]) base = GetApplicationDirectory();
 
     snprintf(g_saveDir, sizeof(g_saveDir), "%s/sotw-demake", base);
-    snprintf(g_savePath, sizeof(g_savePath), "%s/save.txt", g_saveDir);
+    SlotPath(g_slot, g_savePath, sizeof(g_savePath));
+
+    // One-time migration: a save written before slots existed becomes
+    // the first character rather than being orphaned.
+    char legacy[512];
+    snprintf(legacy, sizeof(legacy), "%s/save.txt", g_saveDir);
+    if (FileExists(legacy)) {
+        char first[512];
+        snprintf(first, sizeof(first), "%s/char0.txt", g_saveDir);
+        if (!FileExists(first)) {
+            rename(legacy, first);
+            TraceLog(LOG_INFO, "SAVE: migrated save.txt into slot 1");
+        }
+    }
+}
+
+void Save_SelectSlot(int slot) {
+    g_slot = (slot >= 0 && slot < SAVE_SLOT_COUNT) ? slot : -1;
+    // Force the next ResolvePaths to rebuild the path for the new slot.
+    g_savePath[0] = '\0';
+    ResolvePaths();
+}
+
+int Save_SelectedSlot(void) {
+    return g_slot;
+}
+
+bool Save_DeleteSlot(int slot) {
+    if (slot < 0 || slot >= SAVE_SLOT_COUNT) return false;
+    ResolvePaths();
+    char path[512];
+    SlotPath(slot, path, sizeof(path));
+    if (!FileExists(path)) return false;
+    return remove(path) == 0;
+}
+
+// Reads only the handful of keys the roster needs. Deliberately its own
+// tiny parser rather than a partial Save_LoadAndApply: loading a whole
+// character to draw one row would mean six characters loaded to draw
+// the screen, each one stomping the live world.
+bool Save_ReadSlotInfo(int slot, SaveSlotInfo *out) {
+    if (!out) return false;
+    memset(out, 0, sizeof(*out));
+    if (slot < 0 || slot >= SAVE_SLOT_COUNT) return false;
+
+    ResolvePaths();
+    char path[512];
+    SlotPath(slot, path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+
+    out->level = 1;
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        char *nl = strpbrk(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        const char *key = line, *val = eq + 1;
+        if (strcmp(key, "charName") == 0)        snprintf(out->name, sizeof(out->name), "%s", val);
+        else if (strcmp(key, "primary") == 0)    out->primary = atoi(val);
+        else if (strcmp(key, "secondary") == 0)  out->secondary = atoi(val);
+        else if (strcmp(key, "level") == 0)      out->level = atoi(val);
+        else if (strcmp(key, "reforged") == 0)   out->reforged = atoi(val) != 0;
+        else if (strcmp(key, "searing") == 0)    out->searingSurvived = atoi(val) != 0;
+    }
+    fclose(f);
+    out->used = true;
+    if (!out->name[0]) snprintf(out->name, sizeof(out->name), "Ascalonian");
+    return true;
 }
 
 const char *Save_GetPath(void) {
@@ -68,8 +147,13 @@ const char *Save_GetPath(void) {
 }
 
 bool Save_Exists(void) {
+    if (g_slot < 0) return false;
     ResolvePaths();
     return FileExists(g_savePath);
+}
+
+void Save_Disable(void) {
+    g_enabled = false;
 }
 
 void Save_Enable(void) {
@@ -78,6 +162,7 @@ void Save_Enable(void) {
 
 bool Save_Write(void) {
     if (!g_enabled) return false;
+    if (g_slot < 0) return false; // no character chosen - nothing to write to
     ResolvePaths();
 
     Entity *p = Entity_Get(PLAYER_INDEX);
@@ -98,6 +183,9 @@ bool Save_Write(void) {
     fprintf(f, "look=%d,%d,%d,%d\n", g_character.sex, g_character.skinTone,
             g_character.hairColor, g_character.hairStyle);
     fprintf(f, "reforged=%d\n", g_character.reforged ? 1 : 0);
+    // The campaign's end state. The roster reads it, so a character who
+    // has been through the Searing can say so on the selection screen.
+    fprintf(f, "searing=%d\n", World_SearingHappened() ? 1 : 0);
     fprintf(f, "titleWorn=%d\n", Titles_Displayed());
 
     // Skill templates: name, bar, spread. Written one line per slot so a
@@ -204,9 +292,10 @@ bool Save_LoadAndApply(void) {
     for (int i = 0; i < EQUIP_SLOT_COUNT; i++) g_equipped[i] = -1;
     g_gold = 0;
 
-    int outpost = (int)ZONE_ASHFORD_ABBEY;
+    int outpost = (int)ZONE_ASCALON_CITY;
     bool thomHired = false;
     int titleWorn = -1;
+    bool searingHappened = false;
     int equipWeapon = -1, equipArmor = -1; // legacy single-slot keys
     int equipped[EQUIP_SLOT_COUNT];
     bool sawEquipped = false;
@@ -239,6 +328,8 @@ bool Save_LoadAndApply(void) {
             g_character.skinTone = ClampInt(skin, 0, SKIN_TONE_COUNT - 1);
             g_character.hairColor = ClampInt(hair, 0, HAIR_COLOR_COUNT - 1);
             g_character.hairStyle = ClampInt(style, 0, HAIR_STYLE_COUNT - 1);
+        } else if (strcmp(key, "searing") == 0) {
+            searingHappened = atoi(val) != 0;
         } else if (strcmp(key, "reforged") == 0) {
             g_character.reforged = (atoi(val) != 0);
         } else if (strcmp(key, "charName") == 0) {
@@ -383,6 +474,7 @@ bool Save_LoadAndApply(void) {
     }
 
     World_SetThomHired(thomHired);
+    World_SetSearingHappened(searingHappened);
     // Only now, with the level restored, can the setter judge whether
     // the title was actually earned.
     Titles_Reset();

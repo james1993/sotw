@@ -42,6 +42,8 @@ add_executable(sotw_demake
     src/ui_nav.c
     src/audio.c
     src/ui_create.c
+    src/ui_select.c
+    src/ui_searing.c
     src/entity.c
     src/attributes.c
     src/skill.c
