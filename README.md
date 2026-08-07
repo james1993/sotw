@@ -543,6 +543,21 @@ live. Abbot Ciglo's *Tithe for Ashford Abbey* does the same with 3
 Skale Fins. Item rewards need a free bag slot, and each giver's green
 "!" only lights for their own work.
 
+### Titles
+
+**T** (or Titles in the pause menu) opens the title screen. Pre-Searing
+has exactly one track, and it is a single rank rather than a ladder:
+**Legendary Defender of Ascalon**, earned by reaching **level 20**
+without leaving pre-Searing - 140,600 experience in an area whose
+monsters cap out around level 8. The demake's XP curve is GW1's own
+formula (1400 + 600 x level), so that total is the real one.
+
+The track stays hidden until level 12, GW1's rule; before that the
+panel says a title exists rather than showing a bar you can't move.
+Once earned it can be **displayed**, and a displayed title sits in gold
+above your name in the world - the whole point of the achievement is
+that other people can see it.
+
 ### Death
 
 Dying costs a party member 15% of max health and energy (GW1's death

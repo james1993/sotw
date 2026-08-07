@@ -3,6 +3,7 @@
 #include "input.h"
 #include "items.h"
 #include "quests.h"
+#include "titles.h"
 #include "world.h"
 #include "ui_font.h"
 #include "ui_theme.h"
@@ -348,6 +349,18 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
                 int nameW = UITextWidth(e->name, nameFont);
                 UI_TextShadow(lvl, (int)(head.x + nameW / 2 + 5 * scale),
                               (int)(stackY + 1), smallFont, (Color){ 214, 176, 132, 255 });
+            }
+
+            // A displayed title sits above the name, GW1's placement -
+            // the whole point of Legendary Defender of Ascalon is that
+            // other people can see you wearing it.
+            if (i == PLAYER_INDEX) {
+                const char *title = Titles_DisplayedText(e);
+                if (title) {
+                    stackY -= smallFont + 2.0f * scale;
+                    UI_TextShadowCentered(title, (int)head.x, (int)stackY, smallFont,
+                                          (Color){ 224, 194, 112, 255 });
+                }
             }
 
             // NPCs advertise what they're for, so you know which one to

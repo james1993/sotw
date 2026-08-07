@@ -29,6 +29,7 @@ bool UI_IsInventoryOpen(void);
 bool UI_IsAttributesOpen(void);
 bool UI_IsEquipmentOpen(void);
 bool UI_IsSkillsOpen(void);
+bool UI_IsTitlesOpen(void);
 
 // Opens/closes the build editor (L on the keyboard, R3 on a pad).
 void UI_ToggleSkills(void);
@@ -39,7 +40,8 @@ typedef enum {
     PANEL_SKILLS = 0,
     PANEL_EQUIPMENT,
     PANEL_INVENTORY,
-    PANEL_ATTRIBUTES
+    PANEL_ATTRIBUTES,
+    PANEL_TITLES
 } PanelId;
 
 void UI_OpenPanel(PanelId panel);

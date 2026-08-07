@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "items.h"
 #include "quests.h"
+#include "titles.h"
 #include "world.h"
 #include "skill.h"
 #include "character.h"
@@ -96,6 +97,7 @@ bool Save_Write(void) {
     fprintf(f, "look=%d,%d,%d,%d\n", g_character.sex, g_character.skinTone,
             g_character.hairColor, g_character.hairStyle);
     fprintf(f, "reforged=%d\n", g_character.reforged ? 1 : 0);
+    fprintf(f, "titleWorn=%d\n", Titles_Displayed());
     fprintf(f, "charName=%s\n", g_character.name);
     fprintf(f, "outpost=%d\n", (int)World_GetLastOutpostId());
     fprintf(f, "level=%d\n", p->level);
@@ -186,6 +188,7 @@ bool Save_LoadAndApply(void) {
 
     int outpost = (int)ZONE_ASHFORD_ABBEY;
     bool thomHired = false;
+    int titleWorn = -1;
     int equipWeapon = -1, equipArmor = -1;
     bool sawSkillbook = false;
 
@@ -243,6 +246,11 @@ bool Save_LoadAndApply(void) {
             g_skillPoints = ClampInt(atoi(val), 0, 999);
         } else if (strcmp(key, "skillsBought") == 0) {
             g_skillsPurchased = ClampInt(atoi(val), 0, 999);
+        } else if (strcmp(key, "titleWorn") == 0) {
+            // Applied after the player's level is restored, below - the
+            // setter refuses a title that isn't earned yet, and at this
+            // point in the parse the level may still be the default.
+            titleWorn = atoi(val);
         } else if (strcmp(key, "thomHired") == 0) {
             thomHired = atoi(val) != 0;
         } else if (sscanf(key, "quest%d", &idx) == 1 && idx >= 0 && idx < QUEST_COUNT) {
@@ -324,6 +332,10 @@ bool Save_LoadAndApply(void) {
     }
 
     World_SetThomHired(thomHired);
+    // Only now, with the level restored, can the setter judge whether
+    // the title was actually earned.
+    Titles_Reset();
+    Titles_SetDisplayed(titleWorn);
     if (equipWeapon >= 0) Items_EquipWeapon(p, equipWeapon);
     if (equipArmor >= 0) Items_EquipArmor(p, equipArmor);
 

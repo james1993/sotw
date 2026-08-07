@@ -28,6 +28,7 @@
 #include "ui_world.h"
 #include "ui_hints.h"
 #include "ui_tooltip.h"
+#include "titles.h"
 #include "render.h"
 
 #define PLAYER_INDEX 0
@@ -46,6 +47,7 @@ typedef enum {
 static void StartGame(bool loadSave, Camera2D *camera) {
     Items_Reset();
     Quests_Reset();
+    Titles_Reset();
     g_entityCount = 0; // generation counters keep climbing, killing stale refs
 
     World_Init();
@@ -261,6 +263,10 @@ int main(void) {
                     break;
                 case PAUSE_OPEN_ATTRIBUTES:
                     UI_OpenPanel(PANEL_ATTRIBUTES);
+                    paused = false;
+                    break;
+                case PAUSE_OPEN_TITLES:
+                    UI_OpenPanel(PANEL_TITLES);
                     paused = false;
                     break;
                 case PAUSE_OPEN_MAP:

@@ -16,6 +16,7 @@
 #include "audio.h"
 #include "ui_focus.h"
 #include "ui_tooltip.h"
+#include "titles.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,9 +33,11 @@ static bool g_shopOpen = false;
 static bool g_craftOpen = false;
 static bool g_trainerOpen = false;
 static bool g_professionOpen = false;
+static bool g_titlesOpen = false;
 
 static Rectangle g_invRect, g_attrRect, g_dialogRect, g_shopRect, g_equipRect,
-                 g_craftRect, g_skillsRect, g_trainerRect, g_professionRect;
+                 g_craftRect, g_skillsRect, g_trainerRect, g_professionRect,
+                 g_titlesRect;
 
 // --- Prophecies pacing for the second profession ---------------------
 //
@@ -151,6 +154,7 @@ bool UI_IsInventoryOpen(void) { return g_invOpen; }
 bool UI_IsAttributesOpen(void) { return g_attrOpen; }
 bool UI_IsEquipmentOpen(void) { return g_equipOpen; }
 bool UI_IsSkillsOpen(void) { return g_skillsOpen; }
+bool UI_IsTitlesOpen(void) { return g_titlesOpen; }
 
 // The pad's route to the build editor - see UI_ToggleBags for the same
 // idea applied to inventory and gear.
@@ -165,6 +169,7 @@ void UI_OpenPanel(PanelId panel) {
         case PANEL_EQUIPMENT:  g_equipOpen = true; break;
         case PANEL_INVENTORY:  g_invOpen = true; break;
         case PANEL_ATTRIBUTES: g_attrOpen = true; break;
+        case PANEL_TITLES:     g_titlesOpen = true; break;
     }
 }
 
@@ -181,6 +186,7 @@ void UI_ClosePanels(void) {
     g_attrOpen = false;
     g_equipOpen = false;
     g_skillsOpen = false;
+    g_titlesOpen = false;
     g_armedKit = -1;
     g_armedBarSlot = -1;
 }
@@ -599,6 +605,101 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
             }
             break; // the list just changed - relayout next frame
         }
+        y += rowH;
+    }
+}
+
+
+// GW1's title screen, with the one track pre-Searing has. A title is
+// worn, not just collected, so the panel's real job is the toggle: the
+// point of Legendary Defender of Ascalon is that everyone can see it.
+static void DrawTitles(Entity *player, int screenWidth, int screenHeight) {
+    float scale = UI_Scale(screenHeight);
+    int font = (int)(12 * scale);
+    int small = (int)(10 * scale);
+    int pad = (int)(10 * scale);
+    int rowH = (int)(64 * scale);
+    int w = (int)(440 * scale);
+    int h = pad * 3 + font + TITLE_COUNT * rowH + pad;
+
+    g_titlesRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(120 * scale),
+                                (float)w, (float)h };
+    UIHit_Claim(g_titlesRect);
+    UI_ThemePanel(g_titlesRect, scale, pad + font + pad / 2);
+
+    if (PanelHeader(g_titlesRect, "Titles", "T", NULL, font, pad, scale)) {
+        g_titlesOpen = false;
+        return;
+    }
+
+    int x = (int)g_titlesRect.x + pad;
+    int y = (int)g_titlesRect.y + pad + font + pad;
+
+    bool click = UI_PointerClicked();
+    Vector2 mouse = UI_PointerPos();
+
+    for (int i = 0; i < TITLE_COUNT; i++) {
+        TitleId id = (TitleId)i;
+        bool revealed = Titles_IsRevealed(id, player);
+        bool earned = Titles_IsEarned(id, player);
+        bool worn = (Titles_Displayed() == i);
+
+        Rectangle row = { g_titlesRect.x + 4, (float)y - 2, g_titlesRect.width - 8, (float)rowH - 6 };
+        bool hovered = CheckCollisionPointRec(mouse, row);
+        bool focused = UIFocus_Item();
+        if (hovered || focused) DrawRectangleRec(row, (Color){ 46, 48, 64, 160 });
+        if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
+
+        if (!revealed) {
+            // GW1 doesn't list this track until level 12. Saying a title
+            // exists is more useful than an empty bar you can't move.
+            UIText("? ? ?", x, y, font, UI_TEXT_MUTED);
+            char note[96];
+            snprintf(note, sizeof(note),
+                     "A title is spoken of in Ascalon. It reveals itself at level %d.",
+                     TITLE_LDOA_REVEAL);
+            UIText(note, x, y + font + (int)(6 * scale), small, UI_TEXT_MUTED);
+            y += rowH;
+            continue;
+        }
+
+        UIText(Titles_Name(id), x, y, font, earned ? UI_GOLD : UI_TEXT_PRIMARY);
+
+        // Progress bar, in levels - the requirement is written in levels
+        // and that is the number the player is watching climb.
+        int barY = y + font + (int)(6 * scale);
+        int barW = (int)(g_titlesRect.width) - pad * 2 - (int)(96 * scale);
+        UI_ThemeBar((Rectangle){ (float)x, (float)barY, (float)barW, (float)(10 * scale) },
+                    Titles_Progress(id, player),
+                    earned ? UI_GOLD : (Color){ 90, 120, 170, 255 }, NULL, small);
+
+        char status[64];
+        if (earned) snprintf(status, sizeof(status), "Earned");
+        else snprintf(status, sizeof(status), "Level %d of %d", player->level, TITLE_LDOA_LEVEL);
+        UIText(status, x, barY + (int)(14 * scale), small,
+               earned ? UI_POSITIVE : UI_TEXT_SECOND);
+
+        // The display toggle.
+        int btnW = (int)(84 * scale), btnH = (int)(24 * scale);
+        Rectangle btn = { g_titlesRect.x + g_titlesRect.width - pad - btnW,
+                          (float)y + (float)(8 * scale), (float)btnW, (float)btnH };
+        bool btnHover = CheckCollisionPointRec(mouse, btn);
+        DrawRectangleRec(btn, !earned ? (Color){ 30, 31, 38, 255 }
+                            : worn ? (Color){ 92, 78, 40, 255 }
+                            : btnHover ? UI_SURFACE_HOVER : UI_SURFACE_RAISE);
+        DrawRectangleLinesEx(btn, 1.0f, earned ? UI_GOLD_DIM : (Color){ 60, 58, 54, 255 });
+        const char *label = !earned ? "locked" : worn ? "Displayed" : "Display";
+        int lw = UITextWidth(label, small);
+        UIText(label, (int)(btn.x + (btn.width - lw) / 2),
+               (int)(btn.y + (btn.height - small) / 2), small,
+               earned ? RAYWHITE : UI_TEXT_MUTED);
+
+        if (earned && ((btnHover && click) || (focused && UIFocus_Confirm()))) {
+            Titles_SetDisplayed(worn ? -1 : i);
+            Audio_Play(SFX_UI_CONFIRM);
+            Save_Write();
+        }
+
         y += rowH;
     }
 }
@@ -1299,6 +1400,7 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (IsKeyPressed(KEY_I)) g_invOpen = !g_invOpen;
     if (IsKeyPressed(KEY_K)) g_attrOpen = !g_attrOpen;
     if (IsKeyPressed(KEY_E)) g_equipOpen = !g_equipOpen;
+    if (IsKeyPressed(KEY_T)) g_titlesOpen = !g_titlesOpen;
     if (IsKeyPressed(KEY_L)) {
         g_skillsOpen = !g_skillsOpen;
         g_armedBarSlot = -1;
@@ -1306,13 +1408,14 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     // Focus navigation covers the NPC dialog and the windows it opens -
     // the parts of the game that are a list of choices. Only run while
     // one is up, or the arrow keys would be swallowed during play.
-    bool focusList = (g_dialogNpc >= 0);
+    bool focusList = (g_dialogNpc >= 0) || g_titlesOpen;
     if (focusList) UIFocus_Begin();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
     if (g_equipOpen) DrawEquipment(player, screenHeight);
     if (g_attrOpen) DrawAttributes(player, screenWidth, screenHeight);
     if (g_skillsOpen) DrawSkillsPanel(player, screenWidth, screenHeight);
+    if (g_titlesOpen) DrawTitles(player, screenWidth, screenHeight);
     if (g_dialogNpc >= 0) DrawNpcDialog(player, screenWidth, screenHeight);
     if (g_shopOpen && g_dialogNpc >= 0) DrawShop(screenWidth, screenHeight);
     if (g_craftOpen && g_dialogNpc >= 0) DrawCraft(player, screenWidth, screenHeight);

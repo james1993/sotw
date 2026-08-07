@@ -169,6 +169,7 @@ static const PauseEntry g_pauseEntries[] = {
     { "Equipment",         "E",   PAUSE_OPEN_EQUIPMENT },
     { "Inventory",         "I",   PAUSE_OPEN_INVENTORY },
     { "Attributes",        "K",   PAUSE_OPEN_ATTRIBUTES },
+    { "Titles",            "T",   PAUSE_OPEN_TITLES },
     { "Region Map",        "M",   PAUSE_OPEN_MAP },
     { NULL,                NULL,  PAUSE_NONE }, // separator
     // The label is rewritten each frame with the live value, so the row
