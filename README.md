@@ -314,11 +314,15 @@ Turning it on changes four things:
 
 ### Zones
 
-Every zone has a hard **boundary** - drawn as a wall line in the
-world, dashed on the compass, and framing the region map - so the
-instance's edges are never a mystery. Outposts have no combat and full
-service NPCs; explorables reload fresh on every entry, exactly like
-GW1's per-party instances. Returning to any outpost fully restores the
+Every zone is closed in by a **mountain ridge** rather than a drawn
+line. The ridge is generated around the zone's perimeter as a chain of
+overlapping rock masses, each set back from the edge by a different
+amount, so the walkable region is an irregular blob and what stops you
+is terrain you can see and walk up to. Gaps are carved around every
+portal and resurrection shrine, so the way out is never buried. The
+compass plots the ridge as stone, and the region map draws its real
+shape. Outposts have no combat and full service NPCs; explorables
+reload fresh on every entry, exactly like GW1's per-party instances. Returning to any outpost fully restores the
 party, and party members wait near the gate while you wander the outpost
 instead of trailing you around town - they only fall in behind you out
 in the field.

@@ -136,6 +136,63 @@ static void DrawCampfire(Vector2 pos, float scale) {
                  (Color){ 255, 214, 96, 255 });
 }
 
+
+// The zone edge, drawn as terrain. Three passes rather than one loop of
+// complete mountains: drawn whole, each mass would be outlined against
+// its neighbours and the ridge would read as a row of separate lumps.
+// Laying down every skirt, then every body, then every lit face merges
+// the chain into one landform.
+//
+// The foot is a flattened ellipse, not a circle. A circle the size of
+// the collision radius reads as a boulder with a cone balanced on it;
+// a skirt reads as the base of a slope seen from above.
+static void DrawZoneRidge(void) {
+    int count = World_GetBarrierCount();
+    if (count <= 0) return;
+
+    const Color kStoneDark = { 44, 45, 52, 255 };
+    const Color kStoneBody = { 66, 67, 76, 255 };
+    const Color kStoneLit  = { 92, 94, 104, 255 };
+    const Color kCap       = { 132, 134, 145, 255 };
+
+    // Pass 1: shadow and skirt, so the ridge sits ON the terrain.
+    for (int i = 0; i < count; i++) {
+        const ZoneBarrier *b = World_GetBarrier(i);
+        DrawEllipse((int)b->pos.x, (int)(b->pos.y + b->radius * 0.30f),
+                    b->radius * 1.15f, b->radius * 0.44f, (Color){ 0, 0, 0, 80 });
+        DrawEllipse((int)b->pos.x, (int)(b->pos.y + b->radius * 0.16f),
+                    b->radius * 1.06f, b->radius * 0.52f, kStoneDark);
+    }
+
+    // Pass 2: the slope itself - a broad low cone per mass, all in one
+    // value so overlapping neighbours fuse into a continuous wall.
+    for (int i = 0; i < count; i++) {
+        const ZoneBarrier *b = World_GetBarrier(i);
+        float peak = b->radius * (0.80f + 0.45f * b->height);
+        DrawTriangle((Vector2){ b->pos.x, b->pos.y - peak },
+                     (Vector2){ b->pos.x - b->radius * 1.05f, b->pos.y + b->radius * 0.36f },
+                     (Vector2){ b->pos.x + b->radius * 1.05f, b->pos.y + b->radius * 0.36f },
+                     kStoneBody);
+    }
+
+    // Pass 3: the lit west face and a scree cap. Every mass is lit from
+    // the same side, which is what makes flat grey read as rock.
+    for (int i = 0; i < count; i++) {
+        const ZoneBarrier *b = World_GetBarrier(i);
+        float peak = b->radius * (0.80f + 0.45f * b->height);
+        Vector2 top = { b->pos.x, b->pos.y - peak };
+        DrawTriangle(top,
+                     (Vector2){ b->pos.x - b->radius * 1.05f, b->pos.y + b->radius * 0.36f },
+                     (Vector2){ b->pos.x - b->radius * 0.06f, b->pos.y + b->radius * 0.36f },
+                     kStoneLit);
+        float capH = peak * 0.30f;
+        DrawTriangle(top,
+                     (Vector2){ b->pos.x - b->radius * 0.26f, b->pos.y - peak + capH },
+                     (Vector2){ b->pos.x + b->radius * 0.26f, b->pos.y - peak + capH },
+                     kCap);
+    }
+}
+
 static void DrawProps(const EnvProp *props, int count) {
     for (int i = 0; i < count; i++) {
         const EnvProp *p = &props[i];
@@ -298,18 +355,7 @@ void Render_World(Camera2D camera) {
         }
     }
 
-    // The instance boundary: a visible wall line at the playable edge,
-    // with a soft inner falloff so it reads as the edge of the world
-    // rather than a stray rectangle someone left on screen.
-    {
-        // One crisp edge line with a single soft band just inside it.
-        // Stacking several thin outlines instead produced visible
-        // stripes that read as a rendering artifact rather than a wall.
-        Rectangle b = World_GetBounds();
-        DrawRectangleLinesEx((Rectangle){ b.x + 11, b.y + 11, b.width - 22, b.height - 22 },
-                             22.0f, (Color){ 150, 70, 55, 28 });
-        DrawRectangleLinesEx(b, 4.0f, (Color){ 172, 86, 64, 225 });
-    }
+    DrawZoneRidge();
 
     DrawEnvironment();
     DrawDrops(GetTime());

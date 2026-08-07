@@ -165,6 +165,7 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
             if (player->pos.y < b.y) player->pos.y = b.y;
             if (player->pos.x > b.x + b.width) player->pos.x = b.x + b.width;
             if (player->pos.y > b.y + b.height) player->pos.y = b.y + b.height;
+            World_ResolveBarriers(&player->pos, player->radius);
             player->hasMoveTarget = false; // stick overrides any pending click-move
             // Steering is a cancel: GW1 lets you break off a charge by
             // simply walking, and the target stays selected on the HUD.

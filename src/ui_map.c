@@ -68,9 +68,20 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
     DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 150 });
     DrawRectangleRec(m.panel, (Color){ 22, 26, 22, 245 });
 
-    // The instance boundary (the panel edge IS the boundary, but the
-    // wall color ties it to what you see in the world and compass).
-    DrawRectangleLinesEx(m.panel, 4, (Color){ 150, 70, 55, 220 });
+    // The instance boundary. The panel edge is the outer backstop; the
+    // ridge drawn inside it is the shape the zone ACTUALLY has, which is
+    // the whole reason the edge isn't a rectangle any more.
+    DrawRectangleLinesEx(m.panel, 4, (Color){ 96, 92, 84, 220 }); // stone, not alarm-red
+    // Scissored to the panel: a mass sitting near the edge has a radius
+    // that reaches past the bounds, and unclipped it spilled the ridge
+    // out over the dimmed world outside the map.
+    BeginScissorMode((int)m.panel.x, (int)m.panel.y, (int)m.panel.width, (int)m.panel.height);
+    for (int i = 0; i < World_GetBarrierCount(); i++) {
+        const ZoneBarrier *b = World_GetBarrier(i);
+        Vector2 p = W2M(&m, b->pos);
+        DrawCircleV(p, b->radius * m.k, (Color){ 74, 74, 82, 255 });
+    }
+    EndScissorMode();
 
     // Gilt frame around the boundary wall, matching every other window.
     DrawRectangleLinesEx((Rectangle){ m.panel.x - 3, m.panel.y - 3,

@@ -704,6 +704,144 @@ const EnvProp *World_GetProps(int *count) {
     return g_zone->props;
 }
 
+
+// ---------------------------------------------------------------------
+// Zone edges: a generated ridge instead of a drawn rectangle
+//
+// Walking the perimeter and dropping overlapping rock masses, each
+// nudged inward by a different amount, gives every zone a ragged
+// non-rectangular edge without a hand-authored blocker table per zone -
+// and because the masses overlap, there is no seam to slip through.
+//
+// Spacing is deliberately well under twice the minimum radius. That
+// overlap IS the wall; widen the spacing and the ridge becomes a row of
+// boulders with gaps between them.
+
+#define BARRIER_SPACING     42.0f
+#define BARRIER_MIN_RADIUS  34.0f
+#define BARRIER_MAX_RADIUS  56.0f
+#define BARRIER_MAX_INSET   72.0f
+// How much room a portal (or the shrine) needs kept clear. Burying the
+// only way out of a zone under a mountain is the one failure mode this
+// generator has, so the carve-out is generous.
+#define BARRIER_CLEARANCE   110.0f
+
+static ZoneBarrier g_barriers[MAX_ZONE_BARRIERS];
+static int g_barrierCount = 0;
+
+// Deterministic value hash - the same zone always generates the same
+// ridge, so the world doesn't reshuffle every time you re-enter it.
+static float BarrierHash01(unsigned a, unsigned b) {
+    unsigned h = a * 374761393u + b * 668265263u;
+    h = (h ^ (h >> 13)) * 1274126177u;
+    h ^= h >> 16;
+    return (float)(h & 0xFFFFFFu) / (float)0xFFFFFF;
+}
+
+// Would a mass here block something the player has to reach?
+static bool BarrierWouldBlockExit(const ZoneDef *zone, Vector2 pos, float radius) {
+    for (int i = 0; i < zone->portalCount; i++) {
+        float dx = zone->portals[i].pos.x - pos.x;
+        float dy = zone->portals[i].pos.y - pos.y;
+        if (sqrtf(dx * dx + dy * dy) < radius + BARRIER_CLEARANCE) return true;
+    }
+    if (zone->hasShrine) {
+        float dx = zone->shrinePos.x - pos.x, dy = zone->shrinePos.y - pos.y;
+        if (sqrtf(dx * dx + dy * dy) < radius + BARRIER_CLEARANCE) return true;
+    }
+    return false;
+}
+
+static void AddBarrier(const ZoneDef *zone, unsigned zoneSeed, Vector2 pos, unsigned index) {
+    if (g_barrierCount >= MAX_ZONE_BARRIERS) return;
+    float r = BARRIER_MIN_RADIUS +
+              BarrierHash01(zoneSeed, index * 3u + 1u) * (BARRIER_MAX_RADIUS - BARRIER_MIN_RADIUS);
+    if (BarrierWouldBlockExit(zone, pos, r)) return;
+
+    // Corners are walked twice - once by the horizontal pass, once by the
+    // vertical - and without this the two chains pile up into a thicket
+    // of cones instead of turning a corner.
+    for (int i = 0; i < g_barrierCount; i++) {
+        float dx = g_barriers[i].pos.x - pos.x, dy = g_barriers[i].pos.y - pos.y;
+        if (dx * dx + dy * dy < (BARRIER_SPACING * 0.8f) * (BARRIER_SPACING * 0.8f)) return;
+    }
+
+    ZoneBarrier *b = &g_barriers[g_barrierCount++];
+    b->pos = pos;
+    b->radius = r;
+    // Taller masses read as peaks and shorter ones as foothills, which is
+    // what stops the ridge from looking like an extruded line.
+    b->height = 0.75f + BarrierHash01(zoneSeed, index * 3u + 2u) * 0.85f;
+    b->seed = (unsigned)(BarrierHash01(zoneSeed, index * 3u + 3u) * 100000.0f);
+}
+
+// Builds the ridge for a zone: four edges walked at a fixed spacing,
+// each mass set back from the edge by its own amount.
+static void BuildZoneBarriers(const ZoneDef *zone, ZoneId zoneId) {
+    g_barrierCount = 0;
+    unsigned seed = (unsigned)zoneId * 7919u + 13u;
+
+    Rectangle b = zone->bounds;
+    unsigned index = 0;
+
+    // Top and bottom edges.
+    int stepsX = (int)(b.width / BARRIER_SPACING) + 1;
+    for (int i = 0; i <= stepsX; i++) {
+        float x = b.x + (b.width * (float)i) / (float)stepsX;
+        float insetTop = BarrierHash01(seed, index) * BARRIER_MAX_INSET;
+        AddBarrier(zone, seed, (Vector2){ x, b.y + insetTop }, index);
+        index++;
+        float insetBot = BarrierHash01(seed, index) * BARRIER_MAX_INSET;
+        AddBarrier(zone, seed, (Vector2){ x, b.y + b.height - insetBot }, index);
+        index++;
+    }
+
+    // Left and right edges.
+    int stepsY = (int)(b.height / BARRIER_SPACING) + 1;
+    for (int i = 0; i <= stepsY; i++) {
+        float y = b.y + (b.height * (float)i) / (float)stepsY;
+        float insetL = BarrierHash01(seed, index) * BARRIER_MAX_INSET;
+        AddBarrier(zone, seed, (Vector2){ b.x + insetL, y }, index);
+        index++;
+        float insetR = BarrierHash01(seed, index) * BARRIER_MAX_INSET;
+        AddBarrier(zone, seed, (Vector2){ b.x + b.width - insetR, y }, index);
+        index++;
+    }
+}
+
+int World_GetBarrierCount(void) {
+    return g_barrierCount;
+}
+
+const ZoneBarrier *World_GetBarrier(int index) {
+    if (index < 0 || index >= g_barrierCount) return NULL;
+    return &g_barriers[index];
+}
+
+void World_ResolveBarriers(Vector2 *pos, float moverRadius) {
+    if (!pos) return;
+    // Two passes: pushing out of one mass can push you into its
+    // neighbour, and with overlapping circles a single pass leaves you
+    // wedged in the seam between two of them.
+    for (int pass = 0; pass < 2; pass++) {
+        for (int i = 0; i < g_barrierCount; i++) {
+            const ZoneBarrier *b = &g_barriers[i];
+            float dx = pos->x - b->pos.x, dy = pos->y - b->pos.y;
+            float minDist = b->radius + moverRadius;
+            float d2 = dx * dx + dy * dy;
+            if (d2 >= minDist * minDist) continue;
+            float d = sqrtf(d2);
+            if (d < 0.001f) {
+                // Dead centre: no direction to push along, so pick one.
+                pos->x = b->pos.x + minDist;
+                continue;
+            }
+            pos->x = b->pos.x + dx / d * minDist;
+            pos->y = b->pos.y + dy / d * minDist;
+        }
+    }
+}
+
 Rectangle World_GetBounds(void) {
     return g_zone->bounds;
 }
@@ -957,6 +1095,7 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
 
     g_zone = &g_zones[zoneId];
     g_zoneId = zoneId;
+    BuildZoneBarriers(g_zone, zoneId); // the ridge that shapes this zone's edge
     if (g_zone->mode == MODE_OUTPOST) g_lastOutpostId = zoneId;
     g_portalCooldown = PORTAL_COOLDOWN;
     g_wipeTimer = 0.0f;

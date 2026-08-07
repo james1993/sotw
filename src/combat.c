@@ -235,13 +235,16 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         }
     }
 
-    // The zone's playable area is a hard wall for everyone.
+    // The zone's edge. The bounds rectangle is an invisible backstop;
+    // what actually stops you is the ridge of rock generated inside it,
+    // which is why the walkable region isn't a rectangle.
     {
         Rectangle b = World_GetBounds();
         if (e->pos.x < b.x) e->pos.x = b.x;
         if (e->pos.y < b.y) e->pos.y = b.y;
         if (e->pos.x > b.x + b.width) e->pos.x = b.x + b.width;
         if (e->pos.y > b.y + b.height) e->pos.y = b.y + b.height;
+        World_ResolveBarriers(&e->pos, e->radius);
     }
 
     Entity *target = Entity_Resolve(e->targetRef);

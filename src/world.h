@@ -52,6 +52,34 @@ typedef struct {
 typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE } PropType;
 typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
 
+// --- Zone edges ------------------------------------------------------
+//
+// A zone's walkable area used to be its bounds rectangle, drawn as a red
+// line at the edge. That reads as a debug overlay, and it made every
+// zone the same shape. Instead the edge is now TERRAIN: a ridge of
+// overlapping rock masses generated around the perimeter, each one
+// pushed inward by a different amount, so the playable region is an
+// irregular blob and what stops you is a mountain you can see.
+//
+// The bounds rectangle survives as an invisible outer backstop - nothing
+// should ever reach it, because the ridge sits inside it.
+typedef struct {
+    Vector2 pos;
+    float radius;   // collision radius, and roughly the drawn footprint
+    float height;   // how tall the mass is drawn; varies along the ridge
+    unsigned seed;  // per-mass, so the silhouette is stable frame to frame
+} ZoneBarrier;
+
+#define MAX_ZONE_BARRIERS 256
+
+int World_GetBarrierCount(void);
+const ZoneBarrier *World_GetBarrier(int index);
+
+// Pushes `pos` out of every barrier it overlaps, given the mover's own
+// radius. Call after any movement; it is the only thing keeping anyone
+// inside the ridge.
+void World_ResolveBarriers(Vector2 *pos, float moverRadius);
+
 GameMode World_GetMode(void);
 const char *World_GetZoneName(void);
 

@@ -84,23 +84,17 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
 
     Vector2 p;
 
-    // The instance boundary, dashed - sampled along each edge so only
-    // the stretch inside compass range shows, like a radar wall.
+    // The zone edge, plotted as the terrain that actually forms it: one
+    // stone dot per rock mass in the ridge. It used to be a red dashed
+    // RECTANGLE, which both looked like a debug overlay and described a
+    // shape the zone no longer has.
     {
-        Rectangle b = World_GetBounds();
-        const float step = 30.0f;
-        Color wall = { 190, 90, 70, 230 };
-        for (float x = b.x; x <= b.x + b.width; x += step) {
-            if (WorldToCompass((Vector2){ x, b.y }, player->pos, center, radius, 3.0f, &p))
-                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
-            if (WorldToCompass((Vector2){ x, b.y + b.height }, player->pos, center, radius, 3.0f, &p))
-                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
-        }
-        for (float y = b.y; y <= b.y + b.height; y += step) {
-            if (WorldToCompass((Vector2){ b.x, y }, player->pos, center, radius, 3.0f, &p))
-                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
-            if (WorldToCompass((Vector2){ b.x + b.width, y }, player->pos, center, radius, 3.0f, &p))
-                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, wall);
+        Color stone = { 128, 130, 140, 225 };
+        for (int i = 0; i < World_GetBarrierCount(); i++) {
+            const ZoneBarrier *b = World_GetBarrier(i);
+            if (WorldToCompass(b->pos, player->pos, center, radius, 3.0f, &p)) {
+                DrawRectangle((int)p.x - 1, (int)p.y - 1, 3, 3, stone);
+            }
         }
     }
 
