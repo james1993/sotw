@@ -36,6 +36,7 @@ static int g_volume = 70;
 // Kenney (unmodified, so the CC0 provenance stays obvious), WAV for the
 // synthesised clips (tools/synth_sfx.py).
 static const char *g_files[SFX_COUNT] = {
+    "assets/audio/ui_move.ogg",
     "assets/audio/ui_click.ogg",
     "assets/audio/ui_open.ogg",
     "assets/audio/ui_close.ogg",
@@ -59,6 +60,7 @@ static const char *g_files[SFX_COUNT] = {
 // coin pickup has no business being as loud as a death. Tuned by ear is
 // the right way to set these; these are a starting point.
 static const float g_gain[SFX_COUNT] = {
+    0.30f, // ui move - fires on every step of a D-pad; must be a whisper
     0.45f, // ui click - fires constantly, must sit under everything
     0.50f, // ui open
     0.50f, // ui close

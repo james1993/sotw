@@ -186,7 +186,11 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
                 // Escape here by just closing it
                 UI_CloseMapOverlay();
             } else if (UI_IsNpcDialogOpen()) {
-                UI_CloseNpcDialog();
+                // Deliberately not handled here. ui_panels.c owns backing
+                // out of a conversation, because it is the only place
+                // that knows whether a shop or trainer window is layered
+                // on top and should close first. Closing the whole
+                // dialog from here would skip that step.
             } else if (UI_IsInventoryOpen() || UI_IsAttributesOpen() ||
                        UI_IsEquipmentOpen() || UI_IsSkillsOpen()) {
                 UI_ClosePanels();

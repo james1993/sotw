@@ -6,6 +6,8 @@
 #include "gwmath.h"
 #include "ui_font.h"
 #include "ui_theme.h"
+#include "ui_cursor.h"
+#include "audio.h"
 #include "raylib.h"
 #include <math.h>
 #include <stddef.h>
@@ -108,7 +110,7 @@ static void SyncPreview(void) {
 static int SwatchRow(int x, int y, int size, int gap, const Color *colors, int count,
                      int selected) {
     int clicked = -1;
-    Vector2 mouse = GetMousePosition();
+    Vector2 mouse = UI_PointerPos();
     for (int i = 0; i < count; i++) {
         Rectangle r = { (float)(x + i * (size + gap)), (float)y, (float)size, (float)size };
         DrawRectangleRec(r, colors[i]);
@@ -116,7 +118,10 @@ static int SwatchRow(int x, int y, int size, int gap, const Color *colors, int c
         DrawRectangleLinesEx(r, (i == selected) ? 3.0f : 1.0f,
                              (i == selected) ? UI_GOLD
                              : hovered ? (Color){ 220, 214, 196, 255 } : (Color){ 20, 20, 26, 255 });
-        if (hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) clicked = i;
+        if (hovered && UI_PointerClicked()) {
+            clicked = i;
+            Audio_Play(SFX_UI_CLICK);
+        }
     }
     return clicked;
 }
@@ -306,8 +311,8 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
                               UI_TEXT_SECOND);
 
         Rectangle field = { (float)fx, (float)y, (float)fieldW, (float)fieldH };
-        bool hovered = CheckCollisionPointRec(GetMousePosition(), field);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) g_nameFocused = hovered;
+        bool hovered = CheckCollisionPointRec(UI_PointerPos(), field);
+        if (UI_PointerClicked()) g_nameFocused = hovered;
 
         DrawRectangleRec(field, (Color){ 20, 21, 28, 255 });
         DrawRectangleLinesEx(field, g_nameFocused ? 2.0f : 1.0f,
@@ -362,7 +367,10 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         }
     }
 
-    if (IsKeyPressed(KEY_ESCAPE)) action = CREATE_CANCEL;
+    if (IsKeyPressed(KEY_ESCAPE) ||
+        (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT))) {
+        action = CREATE_CANCEL;
+    }
     if (action == CREATE_CONFIRM) g_character = g_draft;
     return action;
 }

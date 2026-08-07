@@ -14,6 +14,7 @@
 #include "ui_theme.h"
 #include "ui_hints.h"
 #include "audio.h"
+#include "ui_focus.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -112,17 +113,14 @@ static void BuildCraftList(Profession p, CraftEntry out[CRAFT_LIST_COUNT]) {
 // on. -1 = no kit armed. Cleared when panels close or the kit is spent.
 static int g_armedKit = -1;
 
-// Set on the frame a dialog opens so the very same X/Square press that
-// opened it can't also "click" its button (input runs before drawing,
-// IsGamepadButtonPressed stays true for the whole frame).
-static bool g_dialogOpenedThisFrame = false;
-
 void UI_OpenNpcDialog(int entityIndex) {
-    if (g_dialogNpc != entityIndex) Audio_Play(SFX_UI_OPEN);
+    if (g_dialogNpc != entityIndex) {
+        Audio_Play(SFX_UI_OPEN);
+        UIFocus_Clear(); // a new conversation starts at its first reply
+    }
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
     g_craftOpen = false;
-    g_dialogOpenedThisFrame = true;
 }
 
 bool UI_IsNpcDialogOpen(void) {
@@ -131,6 +129,7 @@ bool UI_IsNpcDialogOpen(void) {
 
 void UI_CloseNpcDialog(void) {
     if (g_dialogNpc >= 0) Audio_Play(SFX_UI_CLOSE);
+    UIFocus_Clear();
     g_dialogNpc = -1;
     g_shopOpen = false;
     g_craftOpen = false;
@@ -213,7 +212,9 @@ static bool PanelHeader(Rectangle rect, const char *title, const char *hotkey,
     DrawLineEx((Vector2){ close.x + box - inset, close.y + inset },
                (Vector2){ close.x + inset, close.y + box - inset }, 1.8f, mark);
 
-    return hovered && UI_PointerClicked();
+    bool closing = hovered && UI_PointerClicked();
+    if (closing) Audio_Play(SFX_UI_CLOSE);
+    return closing;
 }
 
 static void DrawInventory(Entity *player, int screenHeight) {
@@ -532,8 +533,10 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
         bool affordable = Skillbook_CanBuy(i, player->primaryProfession, player->secondaryProfession);
 
         Rectangle row = { g_trainerRect.x + 4, (float)y - 2, g_trainerRect.width - 8, (float)rowH };
+        bool focused = UIFocus_Item();
         bool hovered = CheckCollisionPointRec(mouse, row);
-        if (hovered && affordable) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if ((hovered || focused) && affordable) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
 
         Rectangle icon = { (float)x, (float)y - 1, (float)(rowH - 6), (float)(rowH - 6) };
         UI_DrawSkillIcon(i, icon);
@@ -550,7 +553,7 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
                y + (font - small) / 2, small,
                affordable ? (Color){ 140, 220, 150, 255 } : (Color){ 170, 120, 110, 255 });
 
-        if (hovered && click && affordable) {
+        if (((hovered && click) || (focused && UIFocus_Confirm())) && affordable) {
             if (Skillbook_Buy(i, player->primaryProfession, player->secondaryProfession)) {
                 Audio_Play(SFX_UI_CONFIRM);
                 char msg[96];
@@ -611,6 +614,7 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
             ? g_attrCumulativeCost[rank + 1] - g_attrCumulativeCost[rank] : 0;
 
         bool canUp = rank < ATTRIBUTE_RANK_CAP && player->attributePoints >= upCost;
+        if (click && !canUp && CheckCollisionPointRec(mouse, plus)) Audio_Play(SFX_UI_DENY);
         DrawRectangleRec(plus, canUp ? (Color){ 60, 100, 60, 255 } : (Color){ 45, 45, 45, 255 });
         DrawRectangleLinesEx(plus, 1, LIGHTGRAY);
         UIText("+", (int)plus.x + btn / 3, (int)plus.y + 2, font, RAYWHITE);
@@ -627,6 +631,7 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
         }
 
         if (click && canUp && CheckCollisionPointRec(mouse, plus)) {
+            Audio_Play(SFX_UI_CLICK);
             player->attributeRank[a]++;
             player->attributePoints -= upCost;
             // Energy Storage IS maximum energy, so the pool has to move
@@ -635,6 +640,7 @@ static void DrawAttributes(Entity *player, int screenWidth, int screenHeight) {
             Entity_RecomputeAttributeStats(player);
         }
         if (click && canDown && CheckCollisionPointRec(mouse, minus)) {
+            Audio_Play(SFX_UI_CLICK);
             int refund = g_attrCumulativeCost[rank] - g_attrCumulativeCost[rank - 1];
             player->attributeRank[a]--;
             player->attributePoints += refund;
@@ -661,26 +667,30 @@ static void QuestRewardSummary(const Quest *q, const Entity *player, char *out, 
     }
 }
 
-// The gamepad talk button doubles as "advance the conversation" while
-// a dialog is up - suppressed on the frame the dialog opened so one
-// press can't both open and confirm.
-static bool GamepadDialogConfirm(void) {
-    return !g_dialogOpenedThisFrame && IsGamepadAvailable(0) &&
-           IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
-}
-
 // One clickable dialog button; returns true when clicked this frame
 // (or, for the dialog's single action button, confirmed on the pad).
 static bool DialogButton(Rectangle rect, const char *label, int font, bool enabled) {
+    // Registered even when disabled: a reply you can't take yet is still
+    // a line the player steps past, and skipping it would make the
+    // highlight jump unpredictably as requirements are met.
+    bool focused = UIFocus_Item();
+
     Vector2 mouse = UI_PointerPos();
     bool hovered = enabled && CheckCollisionPointRec(mouse, rect);
     DrawRectangleRec(rect, !enabled ? (Color){ 40, 40, 40, 255 }
-                     : hovered ? (Color){ 80, 90, 120, 255 } : (Color){ 55, 60, 80, 255 });
-    DrawRectangleLinesEx(rect, 1, enabled ? UI_GOLD_DIM : (Color){ 70, 70, 70, 255 });
+                     : (hovered || focused) ? (Color){ 80, 90, 120, 255 }
+                                            : (Color){ 55, 60, 80, 255 });
+    DrawRectangleLinesEx(rect, focused ? 2.0f : 1.0f,
+                         !enabled ? (Color){ 70, 70, 70, 255 }
+                                  : (focused ? UI_GOLD : UI_GOLD_DIM));
     UIText(label, (int)rect.x + 8, (int)rect.y + ((int)rect.height - font) / 2, font,
            enabled ? RAYWHITE : GRAY);
-    if (enabled && GamepadDialogConfirm()) return true;
-    return hovered && UI_PointerClicked();
+
+    bool picked = (hovered && UI_PointerClicked()) ||
+                  (focused && enabled && UIFocus_Confirm());
+    if (picked) Audio_Play(SFX_UI_CLICK);
+    if (focused && !enabled && UIFocus_Confirm()) Audio_Play(SFX_UI_DENY);
+    return picked;
 }
 
 // Which merchant tab is showing: GW1's merchant window splits trade
@@ -722,10 +732,15 @@ static void DrawShop(int screenWidth, int screenHeight) {
         for (int t = 0; t < 2; t++) {
             Rectangle tab = { g_shopRect.x + pad + t * tabW, (float)y, tabW, (float)tabH };
             bool active = (g_shopTab == t);
+            // Registered unconditionally and BEFORE any short-circuiting
+            // test: the focus index is positional, so an item that skips
+            // registration on some frames shifts every item after it.
+            bool focused = UIFocus_Item();
             bool hovered = CheckCollisionPointRec(mouse, tab);
             DrawRectangleRec(tab, active ? (Color){ 60, 66, 90, 255 }
-                            : hovered ? (Color){ 45, 50, 70, 255 } : (Color){ 32, 35, 48, 255 });
-            DrawRectangleLinesEx(tab, 1, UI_GOLD_DIM);
+                            : (hovered || focused) ? (Color){ 45, 50, 70, 255 }
+                                                   : (Color){ 32, 35, 48, 255 });
+            DrawRectangleLinesEx(tab, focused ? 2.0f : 1.0f, focused ? UI_GOLD : UI_GOLD_DIM);
             if (active) {
                 // Gold underline marks the live tab.
                 DrawRectangle((int)tab.x, (int)(tab.y + tab.height - 3), (int)tab.width, 3, UI_GOLD);
@@ -733,7 +748,10 @@ static void DrawShop(int screenWidth, int screenHeight) {
             int tw = UITextWidth(names[t], font);
             UIText(names[t], (int)(tab.x + (tab.width - tw) / 2),
                    (int)(tab.y + (tab.height - font) / 2), font, active ? RAYWHITE : LIGHTGRAY);
-            if (hovered && click) g_shopTab = t;
+            if ((hovered && click) || (focused && UIFocus_Confirm())) {
+                if (g_shopTab != t) Audio_Play(SFX_UI_CLICK);
+                g_shopTab = t;
+            }
         }
         y += tabH + pad;
     }
@@ -744,8 +762,10 @@ static void DrawShop(int screenWidth, int screenHeight) {
             const ShopEntry *entry = &g_shopStock[i];
             Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
             bool canAfford = g_gold >= entry->price && g_inventoryCount < MAX_INVENTORY;
+            bool focused = UIFocus_Item();
             bool hovered = CheckCollisionPointRec(mouse, row);
-            if (hovered && canAfford) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+            if ((hovered || focused) && canAfford) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+            if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
 
             char label[80];
             if (entry->item.kind == ITEM_WEAPON) {
@@ -759,9 +779,10 @@ static void DrawShop(int screenWidth, int screenHeight) {
             }
             UIText(label, x, y, font, canAfford ? RAYWHITE : GRAY);
 
-            if (hovered && click && canAfford) {
+            if (((hovered && click) || (focused && UIFocus_Confirm())) && canAfford) {
                 g_gold -= entry->price;
                 Items_AddToInventory(entry->item);
+                Audio_Play(SFX_UI_CONFIRM);
             }
             y += rowH;
         }
@@ -774,8 +795,10 @@ static void DrawShop(int screenWidth, int screenHeight) {
             Item *it = &g_inventory[i];
             bool equipped = (i == g_equippedWeapon || i == g_equippedArmor);
             Rectangle row = { g_shopRect.x + 4, (float)y - 2, g_shopRect.width - 8, (float)rowH };
+            bool focused = UIFocus_Item();
             bool hovered = !equipped && CheckCollisionPointRec(mouse, row);
-            if (hovered) DrawRectangleRec(row, (Color){ 80, 60, 60, 255 });
+            if (hovered || (focused && !equipped)) DrawRectangleRec(row, (Color){ 80, 60, 60, 255 });
+            if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
 
             char label[80];
             if (it->kind == ITEM_MATERIAL) {
@@ -790,7 +813,8 @@ static void DrawShop(int screenWidth, int screenHeight) {
             }
             UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
 
-            if (hovered && click) {
+            if ((hovered && click) || (focused && !equipped && UIFocus_Confirm())) {
+                Audio_Play(SFX_UI_CONFIRM);
                 int value = Items_SellValue(it);
                 if (it->kind == ITEM_MATERIAL) {
                     // One hide per click, so a stack isn't dumped by accident.
@@ -877,7 +901,10 @@ static void DrawEquipment(Entity *player, int screenHeight) {
         }
         UIText(line, x, y + small + 3, font, idx >= 0 ? SKYBLUE : GRAY);
 
-        if (hovered && click) CycleEquip(player, kind);
+        if (hovered && click) {
+            Audio_Play(SFX_UI_CLICK);
+            CycleEquip(player, kind);
+        }
         y += rowH;
     }
 
@@ -925,15 +952,18 @@ static void DrawCraft(Entity *player, int screenWidth, int screenHeight) {
         bool canCraft = g_gold >= entry->gold &&
                         Items_CountMaterial(CRAFT_MATERIAL) >= entry->hides &&
                         g_inventoryCount < MAX_INVENTORY;
+        bool focused = UIFocus_Item();
         bool hovered = CheckCollisionPointRec(mouse, row);
-        if (hovered && canCraft) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if ((hovered || focused) && canCraft) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
 
         char label[112];
         snprintf(label, sizeof(label), "%s  -  %dg + %d %s", entry->item.name,
                  entry->gold, entry->hides, CRAFT_MATERIAL);
         UIText(label, x, y, font, canCraft ? RAYWHITE : GRAY);
 
-        if (hovered && click && canCraft) {
+        if (((hovered && click) || (focused && UIFocus_Confirm())) && canCraft) {
+            Audio_Play(SFX_UI_CONFIRM);
             if (Items_AddToInventory(entry->item)) {
                 g_gold -= entry->gold;
                 Items_ConsumeMaterial(CRAFT_MATERIAL, entry->hides);
@@ -986,8 +1016,10 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
 
         Rectangle row = { g_professionRect.x + 4, (float)y - 2,
                           g_professionRect.width - 8, (float)rowH };
+        bool focused = UIFocus_Item();
         bool hovered = CheckCollisionPointRec(mouse, row);
-        if (hovered && !current) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if ((hovered || focused) && !current) DrawRectangleRec(row, (Color){ 60, 60, 80, 255 });
+        if (focused) DrawRectangleLinesEx(row, 1.5f, UI_GOLD);
 
         char label[96];
         snprintf(label, sizeof(label), "%s / %s", Character_ProfessionAbbrev(player->primaryProfession),
@@ -1005,7 +1037,7 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
                    y + (font - small) / 2, small, UI_GOLD);
         }
 
-        if (hovered && click && !current) {
+        if (((hovered && click) || (focused && UIFocus_Confirm())) && !current) {
             // Points sunk into the OLD secondary's lines come back.
             // GW1 refunds them, and it has to: otherwise changing costs
             // you a chunk of your character with no way to earn it back.
@@ -1122,6 +1154,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             UIText("Weapons - fair prices, no haggling. Armor? See Dunda.", x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_shopOpen ? "Close shop" : "Browse wares", font, true)) {
                 g_shopOpen = !g_shopOpen;
+                UIFocus_Clear();
             }
             break;
         }
@@ -1129,6 +1162,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             UIText("Bring me Charr hides and coin - I'll fit you properly.", x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_craftOpen ? "Close crafting" : "Craft armor", font, true)) {
                 g_craftOpen = !g_craftOpen;
+                UIFocus_Clear();
             }
             break;
         }
@@ -1137,6 +1171,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                    x, y, font, LIGHTGRAY);
             if (DialogButton(btn, g_trainerOpen ? "Close training" : "Learn skills", font, true)) {
                 g_trainerOpen = !g_trainerOpen;
+                UIFocus_Clear();
             }
             break;
         }
@@ -1152,6 +1187,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                            x, y, font, LIGHTGRAY);
                     if (DialogButton(btn, "Choose a second profession", font, true)) {
                         g_professionOpen = !g_professionOpen;
+                        UIFocus_Clear();
                     }
                 } else {
                     UIText("Prove yourself first. Osric has work - finish it.",
@@ -1163,6 +1199,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 if (DialogButton(btn, g_professionOpen ? "Never mind" : "Change my second profession",
                                  font, true)) {
                     g_professionOpen = !g_professionOpen;
+                    UIFocus_Clear();
                 }
             } else {
                 char why[96];
@@ -1205,7 +1242,11 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
         g_skillsOpen = !g_skillsOpen;
         g_armedBarSlot = -1;
     }
-    if (IsKeyPressed(KEY_ESCAPE)) UI_CloseNpcDialog();
+    // Focus navigation covers the NPC dialog and the windows it opens -
+    // the parts of the game that are a list of choices. Only run while
+    // one is up, or the arrow keys would be swallowed during play.
+    bool focusList = (g_dialogNpc >= 0);
+    if (focusList) UIFocus_Begin();
 
     if (g_invOpen) DrawInventory(player, screenHeight);
     if (g_equipOpen) DrawEquipment(player, screenHeight);
@@ -1217,7 +1258,18 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
     if (g_trainerOpen && g_dialogNpc >= 0) DrawTrainer(player, screenWidth, screenHeight);
     if (g_professionOpen && g_dialogNpc >= 0) DrawProfessionPanel(player, screenWidth, screenHeight);
 
-    // The open-frame guard only needs to cover the frame the dialog
-    // appeared; from the next frame on the pad button confirms.
-    g_dialogOpenedThisFrame = false;
+    if (focusList) {
+        UIFocus_End();
+        // Back closes whatever is deepest, so a pad can always retreat
+        // without needing the mouse to find a close box.
+        if (UIFocus_Cancel()) {
+            if (g_shopOpen || g_craftOpen || g_trainerOpen || g_professionOpen) {
+                g_shopOpen = g_craftOpen = g_trainerOpen = g_professionOpen = false;
+                UIFocus_Clear();
+                Audio_Play(SFX_UI_CLOSE);
+            } else {
+                UI_CloseNpcDialog();
+            }
+        }
+    }
 }

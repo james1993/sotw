@@ -37,13 +37,16 @@ static int MenuNavStep(void) {
             g_stickLatched = true;
         }
     }
+    if (nav != 0) Audio_Play(SFX_UI_MOVE);
     return nav;
 }
 
 static bool MenuConfirm(void) {
-    return IsKeyPressed(KEY_ENTER) ||
-           (IsGamepadAvailable(GAMEPAD_ID) &&
-            IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
+    bool confirmed = IsKeyPressed(KEY_ENTER) ||
+                     (IsGamepadAvailable(GAMEPAD_ID) &&
+                      IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN));
+    if (confirmed) Audio_Play(SFX_UI_CLICK);
+    return confirmed;
 }
 
 static bool MenuButton(Rectangle r, const char *label, int font, bool selected) {
@@ -60,7 +63,9 @@ static bool MenuButton(Rectangle r, const char *label, int font, bool selected) 
     UIText(label, (int)(r.x + (r.width - tw) / 2),
            (int)(r.y + (r.height - font) / 2), font, RAYWHITE);
 
-    return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    bool clicked = hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    if (clicked) Audio_Play(SFX_UI_CLICK);
+    return clicked;
 }
 
 MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {

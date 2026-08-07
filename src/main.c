@@ -151,8 +151,16 @@ int main(void) {
 
         // --- Character creation ---
         if (app == APP_CREATE) {
+            // The creator is a SPATIAL screen - three columns, a grid of
+            // colour swatches - so it gets the virtual cursor rather
+            // than list focus: steering a pointer is the right verb for
+            // picking a swatch, and stepping an index is not. This is
+            // the only place the cursor is driven from outside
+            // Input_Update, because APP_CREATE never reaches it.
+            UICursor_Update(dt, true);
             BeginDrawing();
             CreateAction ca = UI_DrawCreateScreen(screenWidth, screenHeight, dt);
+            UICursor_Draw(screenHeight);
             EndDrawing();
             if (ca == CREATE_CONFIRM) {
                 StartGame(false, &camera);

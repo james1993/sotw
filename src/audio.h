@@ -13,7 +13,8 @@
 // getting none - which is exactly the failure the icons had before they
 // moved to an atlas.
 typedef enum {
-    SFX_UI_CLICK = 0,
+    SFX_UI_MOVE = 0,    // focus stepped to another item; the quietest thing here
+    SFX_UI_CLICK,
     SFX_UI_OPEN,
     SFX_UI_CLOSE,
     SFX_UI_DENY,        // can't afford it, can't do it

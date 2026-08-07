@@ -38,6 +38,7 @@ add_executable(sotw_demake
     src/ui_icons.c
     src/assets.c
     src/ground.c
+    src/ui_focus.c
     src/audio.c
     src/ui_create.c
     src/entity.c
@@ -92,3 +93,25 @@ endif()
 add_custom_command(TARGET sotw_demake POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:sotw_demake>/assets)
+
+# --- Tests -----------------------------------------------------------
+# Pure-logic tests only: things that can be checked without a window, an
+# audio device or a controller. ui_focus's index arithmetic qualifies and
+# is worth pinning, because a wrong index silently highlights the wrong
+# reply rather than crashing.
+#
+#   cmake --build build --target run_tests
+add_executable(test_ui_focus EXCLUDE_FROM_ALL
+    tests/test_ui_focus.c
+    src/ui_focus.c)
+target_include_directories(test_ui_focus PRIVATE src)
+target_link_libraries(test_ui_focus PRIVATE m)
+# raylib.h only - the test stubs every function it uses, so nothing links
+# against the library itself.
+target_include_directories(test_ui_focus PRIVATE
+    ${raylib_SOURCE_DIR}/src)
+
+add_custom_target(run_tests
+    COMMAND test_ui_focus
+    DEPENDS test_ui_focus
+    COMMENT "Running unit tests")
