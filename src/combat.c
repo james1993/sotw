@@ -234,14 +234,25 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             pips += fx->degenPips;
             if (fx->remaining <= 0.0f) fx->active = false;
         }
+        // Degeneration (conditions/hexes, positive pips) and regeneration
+        // (enchantments, negative pips) net against each other in this one
+        // sum, and the result is capped at +/-10 pips - GW1's health-drift
+        // arrows exactly. Positive drains, negative heals.
         if (pips > GW_MAX_DEGEN_PIPS) pips = GW_MAX_DEGEN_PIPS;
-        if (pips > 0.0f) {
+        if (pips < -GW_MAX_DEGEN_PIPS) pips = -GW_MAX_DEGEN_PIPS;
+        if (pips != 0.0f) {
             // Continuous, not one-second lumps: GW1's health bar slides.
             e->degenAccum += pips * GW_HEALTH_PER_PIP * dt;
             while (e->degenAccum >= 1.0f && e->alive) {
                 e->degenAccum -= 1.0f;
                 Entity_ApplyDamage(e, 1, NULL);
             }
+            while (e->degenAccum <= -1.0f && e->alive && e->hp < e->maxHp) {
+                e->degenAccum += 1.0f;
+                e->hp++;
+            }
+            // Don't bank regen once the bar is full - GW1 wastes the overflow.
+            if (e->hp >= e->maxHp && e->degenAccum < 0.0f) e->degenAccum = 0.0f;
         } else {
             e->degenAccum = 0.0f;
         }

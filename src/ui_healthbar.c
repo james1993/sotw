@@ -76,24 +76,39 @@ void UIHealthBar_Draw(Rectangle r, const Entity *e, int font, bool showValue) {
 }
 
 // A small downward triangle - GW1's shorthand for "something negative
-// is on this character".
+// is on this character". Vertices are wound clockwise in raylib's
+// y-down space; the other winding is back-face culled and draws nothing,
+// which is why these arrows were invisible before.
 static void Arrow(int x, int y, int size, Color color) {
     DrawTriangle((Vector2){ (float)x, (float)y },
-                 (Vector2){ (float)(x + size), (float)y },
                  (Vector2){ (float)(x + size / 2), (float)(y + size) },
+                 (Vector2){ (float)(x + size), (float)y },
+                 color);
+}
+
+// The upward twin - a boon rather than a bane. Same winding rule.
+static void ArrowUp(int x, int y, int size, Color color) {
+    DrawTriangle((Vector2){ (float)(x + size / 2), (float)y },
+                 (Vector2){ (float)x, (float)(y + size) },
+                 (Vector2){ (float)(x + size), (float)(y + size) },
                  color);
 }
 
 void UIHealthBar_DrawStatusArrows(int x, int y, int size, const Entity *e) {
     if (!e) return;
-    bool hasCondition = false, hasHex = false;
+    bool hasCondition = false, hasHex = false, hasEnchant = false;
     for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
         if (!e->effects[i].active) continue;
-        if (e->effects[i].category == EFFECT_HEX) hasHex = true;
-        else hasCondition = true;
+        switch (e->effects[i].category) {
+            case EFFECT_HEX:         hasHex = true; break;
+            case EFFECT_ENCHANTMENT: hasEnchant = true; break;
+            default:                 hasCondition = true; break;
+        }
     }
-    // GW1's colours: grey for a condition, purple for a hex. The brown
-    // this used to draw wasn't either of them.
-    if (hasCondition) Arrow(x, y, size, (Color){ 176, 176, 182, 255 });
-    if (hasHex) Arrow(x, y + (hasCondition ? size + 2 : 0), size, (Color){ 150, 70, 200, 255 });
+    // GW1's colours: grey down for a condition, purple down for a hex,
+    // green UP for an enchantment (a boon, so it points the other way).
+    int row = 0;
+    if (hasCondition) { Arrow(x, y + row, size, (Color){ 176, 176, 182, 255 }); row += size + 2; }
+    if (hasHex)       { Arrow(x, y + row, size, (Color){ 150, 70, 200, 255 }); row += size + 2; }
+    if (hasEnchant)   { ArrowUp(x, y + row, size, (Color){ 120, 210, 130, 255 }); }
 }

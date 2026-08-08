@@ -56,12 +56,19 @@ static float AfflictionDegenPips(EffectCategory category, int kind) {
 // Applies a condition or hex, refreshing rather than stacking when the
 // same affliction is already present - GW1's rule, and the reason
 // spamming one skill doesn't multiply its degeneration.
-static void ApplyAffliction(Entity *target, EffectCategory category, int kind, float duration) {
+static void ApplyAffliction(Entity *target, EffectCategory category, int kind,
+                            float duration, float magnitude) {
     ActiveEffect *free = NULL;
     for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
         ActiveEffect *fx = &target->effects[i];
         if (fx->active && fx->category == category && fx->kind == kind) {
             if (duration > fx->remaining) fx->remaining = duration;
+            // A recast refreshes the magnitude too (a stronger Mending
+            // replaces a weaker one rather than being ignored).
+            fx->magnitude = magnitude;
+            if (category == EFFECT_ENCHANTMENT && kind == ENCH_REGEN) {
+                fx->degenPips = -magnitude;
+            }
             return;
         }
         if (!free && !fx->active) free = fx;
@@ -71,7 +78,14 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind, f
     free->category = category;
     free->kind = kind;
     free->remaining = duration;
-    free->degenPips = AfflictionDegenPips(category, kind);
+    free->magnitude = magnitude;
+    // Regenerating enchantments feed the same health-drift sum as
+    // degeneration, but with the opposite sign.
+    if (category == EFFECT_ENCHANTMENT) {
+        free->degenPips = (kind == ENCH_REGEN) ? -magnitude : 0.0f;
+    } else {
+        free->degenPips = AfflictionDegenPips(category, kind);
+    }
     // Deep Wound changes the health CEILING, so the derived stats have
     // to move with it rather than at the next thing that happens to
     // recompute them.
@@ -119,7 +133,17 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // share a numeric kind are still distinct effects.
             EffectCategory category =
                 (step->kind == FX_APPLY_HEX) ? EFFECT_HEX : EFFECT_CONDITION;
-            ApplyAffliction(target, category, step->conditionKind, step->duration);
+            ApplyAffliction(target, category, step->conditionKind, step->duration, 0.0f);
+            break;
+        }
+        case FX_APPLY_ENCHANTMENT: {
+            // Lands on an ally or the caster (enchantments never target a
+            // foe). The magnitude is rank-scaled, so a higher Healing
+            // Prayers gives more regeneration.
+            float mag = RankScaledValue(step, caster, skill->attribute);
+            ApplyAffliction(target, EFFECT_ENCHANTMENT, step->conditionKind,
+                            step->duration, mag);
+            Fx_Heal(target->pos);
             break;
         }
         case FX_REMOVE_CONDITION:
@@ -146,6 +170,20 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                     if (target->hp > target->maxHp) target->hp = target->maxHp;
                     Fx_Heal(target->pos);
                 }
+            }
+            break;
+        }
+        case FX_REMOVE_ENCHANTMENT: {
+            // Enchantment stripping - the counter to the whole system, and
+            // aimed at a FOE. Shatter Enchantment's damage-on-removal lives
+            // in baseValue, so it fires only when something was actually
+            // torn off.
+            int want = (step->conditionKind > 0) ? step->conditionKind : 1;
+            int removed = Entity_RemoveEffects(target, EFFECT_ENCHANTMENT, want);
+            if (removed > 0) {
+                Fx_Burst(target->pos, (Color){ 120, 210, 130, 255 });
+                int dmg = (int)RankScaledValue(step, caster, skill->attribute);
+                if (dmg > 0) Entity_ApplyDamage(target, dmg, caster);
             }
             break;
         }

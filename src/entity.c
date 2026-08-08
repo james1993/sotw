@@ -208,9 +208,20 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
 
     // A defensive stance's armor bonus rides on top of worn AL while it
     // holds - Disciplined Stance's +10 is the reason it blunts a spike
-    // and not just the attacks it happens to block.
-    int armor = e->armor + (e->stanceTimer > 0.0f ? e->stanceArmorBonus : 0);
+    // and not just the attacks it happens to block - and so does an armor
+    // enchantment (Armor of Earth).
+    int armor = e->armor + (e->stanceTimer > 0.0f ? e->stanceArmorBonus : 0) + Entity_BonusArmor(e);
     int finalDamage = GW_ArmorScaledDamage(amount, armor, armorPenetration);
+
+    // Protective Spirit and its kin cap a single hit at a fraction of max
+    // health - applied after armor, so it is a true ceiling on the blow
+    // no matter how it was calculated.
+    float capFrac = Entity_DamageCapFraction(e);
+    if (capFrac < 1.0f) {
+        int cap = (int)(capFrac * (float)e->maxHp);
+        if (cap < 1) cap = 1;
+        if (finalDamage > cap) finalDamage = cap;
+    }
 
     // Only struck blows are audible. Condition ticks pass attacker=NULL
     // and would otherwise fire an impact every second, per affliction,
@@ -289,6 +300,50 @@ bool Entity_HasHex(const Entity *e, HexKind kind) {
     return false;
 }
 
+bool Entity_IsEnchanted(const Entity *e) {
+    if (!e) return false;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        if (e->effects[i].active && e->effects[i].category == EFFECT_ENCHANTMENT) return true;
+    }
+    return false;
+}
+
+float Entity_BlockChance(const Entity *e) {
+    if (!e) return 0.0f;
+    // A stance and an enchantment can both grant block; the higher wins
+    // rather than the two adding, matching GW1 (block sources don't stack).
+    float best = (e->stanceTimer > 0.0f) ? e->blockChance : 0.0f;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_ENCHANTMENT && fx->kind == ENCH_BLOCK &&
+            fx->magnitude > best) best = fx->magnitude;
+    }
+    return best;
+}
+
+int Entity_BonusArmor(const Entity *e) {
+    if (!e) return 0;
+    int bonus = 0;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_ENCHANTMENT && fx->kind == ENCH_ARMOR) {
+            bonus += (int)fx->magnitude;
+        }
+    }
+    return bonus;
+}
+
+float Entity_DamageCapFraction(const Entity *e) {
+    if (!e) return 1.0f;
+    float cap = 1.0f;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        const ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_ENCHANTMENT && fx->kind == ENCH_DAMAGE_CAP &&
+            fx->magnitude < cap) cap = fx->magnitude;
+    }
+    return cap;
+}
+
 int Entity_CountEffects(const Entity *e, EffectCategory category) {
     if (!e) return 0;
     int n = 0;
@@ -364,13 +419,16 @@ AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender) {
         if (defender) defender->blindMissFlashTimer = 1.0f;
         return ATTACK_MISS_BLIND;
     }
-    // Block is the defender's: a stance that's still up rolls its chance
-    // against this one attack. Spells don't reach here, so a block stance
-    // stops swings and arrows but never a Fire Bolt - exactly GW1.
-    if (defender && defender->stanceTimer > 0.0f && defender->blockChance > 0.0f &&
-        GetRandomValue(1, 100) <= (int)(defender->blockChance * 100.0f)) {
-        defender->blockFlashTimer = 1.0f;
-        return ATTACK_BLOCKED;
+    // Block is the defender's: a stance (Disciplined Stance) or a block
+    // enchantment (Guardian) rolls its chance against this one attack.
+    // Spells don't reach here, so block stops swings and arrows but never
+    // a Fire Bolt - exactly GW1.
+    if (defender) {
+        float block = Entity_BlockChance(defender);
+        if (block > 0.0f && GetRandomValue(1, 100) <= (int)(block * 100.0f)) {
+            defender->blockFlashTimer = 1.0f;
+            return ATTACK_BLOCKED;
+        }
     }
     return ATTACK_LANDS;
 }
@@ -426,6 +484,15 @@ int Entity_EffectiveRank(const Entity *e, AttributeKind attr) {
 
 const char *Entity_EffectName(const ActiveEffect *fx) {
     if (!fx || !fx->active) return "";
+    if (fx->category == EFFECT_ENCHANTMENT) {
+        switch ((EnchantKind)fx->kind) {
+            case ENCH_REGEN:      return "Regeneration";
+            case ENCH_BLOCK:      return "Guardian";
+            case ENCH_DAMAGE_CAP: return "Protective Spirit";
+            case ENCH_ARMOR:      return "Armor";
+            default: return "Enchantment";
+        }
+    }
     if (fx->category == EFFECT_HEX) {
         switch ((HexKind)fx->kind) {
             case HEX_FALTERING: return "Faltering";
@@ -448,8 +515,10 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
 
 Color Entity_EffectColor(const ActiveEffect *fx) {
     if (!fx || !fx->active) return (Color){ 200, 200, 200, 255 };
-    // Hexes read purple, conditions read by their own flavor - the same
-    // language the party window has always used for its status arrows.
+    // Enchantments read green (the boon), hexes purple, conditions by
+    // their own flavor - the same language the party window's status
+    // arrows use.
+    if (fx->category == EFFECT_ENCHANTMENT) return (Color){ 120, 210, 130, 255 };
     if (fx->category == EFFECT_HEX) return (Color){ 178, 118, 220, 255 };
     switch ((ConditionKind)fx->kind) {
         case COND_BLEEDING:   return (Color){ 208, 70, 70, 255 };

@@ -386,12 +386,13 @@ void SkillDB_Init(void) {
     RegisterAs(SK_CRUSHING_BLOW, s);
 
     // --- Monk: Protection Prayers ------------------------------------
-    // The Protection line was empty. Guardian grants an ALLY a block
-    // chance - the same block mechanic Disciplined Stance uses, aimed
-    // outward, which is exactly what a protection Monk does.
+    // The Protection line was empty. Guardian is a block ENCHANTMENT (not
+    // a stance): it puts a block chance on an ally and, being an
+    // enchantment, can be torn off by enchantment removal - the
+    // counterplay that makes the whole category matter.
     s = MakeSkill("Guardian", SKILLTYPE_SPELL, ATTR_PROTECTION_PRAYERS,
-                  5, 0, 0.25f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
-    AddStep(&s, FX_STANCE_BLOCK, 0.5f, 0.0f, 0, 8.0f);
+                  5, 0, 1.0f, 6.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 0.5f, 0.0f, ENCH_BLOCK, 7.0f);
     RegisterAs(SK_GUARDIAN, s);
 
     // --- Necromancer: Death Magic ------------------------------------
@@ -439,4 +440,44 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_DAMAGE, 10, 2.0f, 0, 0);
     AddSelfStep(&s, FX_ENERGY_DELTA, 5, 0.0f);
     RegisterAs(SK_FEROCIOUS_STRIKE, s);
+
+    // --- Enchantments ------------------------------------------------
+    // The third affliction category. Each one exercises a different one
+    // of the four enchantment mechanics, and Shatter Enchantment answers
+    // all of them - which is the point of making them a removable class
+    // rather than four ad-hoc buffs.
+
+    // Regeneration: the magnitude IS the pip count, scaled by Healing
+    // Prayers. Long duration stands in for GW1's maintained upkeep, which
+    // the demake has no energy-drain system for.
+    s = MakeSkill("Mending", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
+                  10, 0, 2.0f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 2.0f, 0.2f, ENCH_REGEN, 30.0f);
+    RegisterAs(SK_MENDING, s);
+
+    s = MakeSkill("Healing Breeze", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
+                  10, 0, 1.0f, 5.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 4.0f, 0.4f, ENCH_REGEN, 15.0f);
+    RegisterAs(SK_HEALING_BREEZE, s);
+
+    // Damage cap: magnitude is the fraction of max health a single hit is
+    // clipped to. GW1's Protective Spirit is a flat 10%.
+    s = MakeSkill("Protective Spirit", SKILLTYPE_SPELL, ATTR_PROTECTION_PRAYERS,
+                  10, 0, 0.25f, 5.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 0.10f, 0.0f, ENCH_DAMAGE_CAP, 8.0f);
+    RegisterAs(SK_PROTECTIVE_SPIRIT, s);
+
+    // Armor: magnitude is the flat AL bonus. Self-cast, like the real
+    // Armor of Earth (its movement penalty is not modelled).
+    s = MakeSkill("Armor of Earth", SKILLTYPE_SPELL, ATTR_EARTH_MAGIC,
+                  10, 0, 0.75f, 15.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 24.0f, 3.0f, ENCH_ARMOR, 30.0f);
+    RegisterAs(SK_ARMOR_OF_EARTH, s);
+
+    // The counter: strips one enchantment off a foe and, only when it
+    // took something, deals the removal damage (baseValue).
+    s = MakeSkill("Shatter Enchantment", SKILLTYPE_SPELL, ATTR_DOMINATION_MAGIC,
+                  10, 0, 1.0f, 20.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_REMOVE_ENCHANTMENT, 14.0f, 6.0f, 1, 0.0f);
+    RegisterAs(SK_SHATTER_ENCHANTMENT, s);
 }

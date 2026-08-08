@@ -69,6 +69,12 @@ typedef enum {
     SK_SHARD_STORM,         // Water Magic damage + Cripple
     SK_STONING,             // Earth Magic damage + knockdown
     SK_FEROCIOUS_STRIKE,    // Beast Mastery attack
+    // Enchantments
+    SK_MENDING,             // Healing Prayers: sustained health regen
+    SK_HEALING_BREEZE,      // Healing Prayers: strong short regen
+    SK_PROTECTIVE_SPIRIT,   // Protection: caps each hit at 10% max health
+    SK_ARMOR_OF_EARTH,      // Earth Magic: big armor bonus
+    SK_SHATTER_ENCHANTMENT, // Domination: strips an enchantment + damage
     SK_COUNT
 } SkillId;
 
@@ -101,8 +107,15 @@ typedef enum {
     // cannot touch them and FX_REMOVE_HEX cannot touch a condition, so
     // a build has to answer both rather than packing one cure-all.
     FX_APPLY_HEX,
+    // Enchantments are the third affliction category. conditionKind
+    // carries an EnchantKind, baseValue/perAttributeRank the mechanic's
+    // magnitude (regen pips, block chance, damage-cap fraction, armor),
+    // duration the length. Removal is its own step, and - like the other
+    // two categories - cannot touch a condition or a hex.
+    FX_APPLY_ENCHANTMENT,
     FX_REMOVE_CONDITION,
     FX_REMOVE_HEX,
+    FX_REMOVE_ENCHANTMENT,
     FX_ENERGY_DELTA,
     FX_ADRENALINE_DELTA,
     FX_KNOCKDOWN,

@@ -91,8 +91,23 @@ typedef enum {
 
 typedef enum {
     EFFECT_CONDITION = 0,
-    EFFECT_HEX
+    EFFECT_HEX,
+    // The third category GW1 builds its counterplay around: mostly
+    // beneficial, always removable (by enchantment removal, which cannot
+    // touch a condition or a hex, and vice versa). Modelled by MECHANIC,
+    // like the others - one ENCH kind per behaviour, shared across every
+    // skill that does that thing.
+    EFFECT_ENCHANTMENT
 } EffectCategory;
+
+typedef enum {
+    ENCH_NONE = 0,
+    ENCH_REGEN,       // health regeneration, in pips (Mending, Healing Breeze)
+    ENCH_BLOCK,       // a chance to block attacks (Guardian)
+    ENCH_DAMAGE_CAP,  // caps each hit at magnitude * max health (Protective Spirit)
+    ENCH_ARMOR,       // flat bonus armor while it holds (Armor of Earth)
+    ENCH_COUNT
+} EnchantKind;
 
 typedef struct {
     bool active;
@@ -104,7 +119,14 @@ typedef struct {
     // Health degeneration in GW1's PIPS, not health per second - one pip
     // is 2 health a second, and the whole point of the unit is that
     // every source stacks into one capped total (see Combat_UpdateEntity).
+    // A regenerating enchantment carries a NEGATIVE value here, so degen
+    // and regen net against each other in the same summation - exactly
+    // how GW1's health-drift arrows work.
     float degenPips;
+    // Enchantments only: the mechanic's parameter - block chance, the
+    // damage-cap fraction, or the bonus armor. Conditions and hexes leave
+    // it 0.
+    float magnitude;
 } ActiveEffect;
 
 
@@ -331,6 +353,20 @@ void Entity_RecomputePenalizedStats(Entity *e);
 
 bool Entity_HasCondition(const Entity *e, ConditionKind kind);
 bool Entity_HasHex(const Entity *e, HexKind kind);
+bool Entity_IsEnchanted(const Entity *e);
+
+// The best block chance from any source right now: a defensive stance
+// (Disciplined Stance) or a block enchantment (Guardian), whichever is
+// higher. Attacks roll against this in Entity_ResolveAttack.
+float Entity_BlockChance(const Entity *e);
+
+// Sum of ENCH_ARMOR bonuses currently on the entity - added to worn AL
+// in the damage formula.
+int Entity_BonusArmor(const Entity *e);
+
+// The tightest per-hit damage cap as a fraction of max health (Protective
+// Spirit is 0.10), or 1.0 when nothing caps damage.
+float Entity_DamageCapFraction(const Entity *e);
 
 // The outcome of an ATTACK (a basic swing/shot or an attack skill) once
 // Blind and block are accounted for. Spells never go through this - GW1's
