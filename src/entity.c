@@ -430,6 +430,7 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
         switch ((HexKind)fx->kind) {
             case HEX_FALTERING: return "Faltering";
             case HEX_BACKLASH:  return "Backlash";
+            case HEX_PHANTASM:  return "Phantasm";
             default: return "Hex";
         }
     }

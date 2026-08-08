@@ -53,6 +53,13 @@ typedef enum {
     ATTR_WATER_MAGIC,
     ATTR_AIR_MAGIC,
     ATTR_EARTH_MAGIC,
+    // Warrior's other two weapon lines. Appended here rather than beside
+    // Swordsmanship on purpose: attributeRank is saved as a positional
+    // array (attr0..attrN), so inserting mid-enum would misread every
+    // existing save. At the end, the only index that shifts is Monstrous,
+    // which players always hold at 0.
+    ATTR_AXE_MASTERY,
+    ATTR_HAMMER_MASTERY,
     // Not a GW1 attribute. Monster skills live here so they belong to no
     // profession, which is what keeps Claw Swipe and friends out of
     // every trainer list and attribute panel automatically - the check

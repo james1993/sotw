@@ -85,6 +85,7 @@ typedef enum {
     HEX_NONE = 0,
     HEX_FALTERING,  // attacks come slower, and the hex bleeds you slowly
     HEX_BACKLASH,   // attacking costs the hexed target health
+    HEX_PHANTASM,   // pure health degeneration (Illusion: Conjure Phantasm)
     HEX_COUNT
 } HexKind;
 

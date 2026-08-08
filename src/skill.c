@@ -331,4 +331,112 @@ void SkillDB_Init(void) {
                   10, 0, 0.75f, 8.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLIND, 5.0f);
     RegisterAs(SK_BLINDING_FLASH, s);
+
+    // --- Warrior: Axe Mastery ----------------------------------------
+    // These are what the Axe line was missing. Adrenal attack skills, no
+    // recharge (adrenaline is their gate, GW1-style). Eviscerate is the
+    // Axe elite and the other half of the Deep Wound answer to "many
+    // Warrior skills inflict it" - Gash is Sword, this is Axe.
+    s = MakeSkill("Eviscerate", SKILLTYPE_ATTACK_SKILL, ATTR_AXE_MASTERY,
+                  0, 50, 0.0f, 0.0f, 28.0f, true, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 14, 2.2f, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DEEP_WOUND, 10.0f);
+    RegisterAs(SK_EVISCERATE, s);
+
+    s = MakeSkill("Executioner's Strike", SKILLTYPE_ATTACK_SKILL, ATTR_AXE_MASTERY,
+                  0, 50, 0.0f, 0.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 14, 2.0f, 0, 0);
+    RegisterAs(SK_EXECUTIONERS_STRIKE, s);
+
+    // Hits every foe adjacent to the swing - the Axe line's answer to a
+    // mob, and the reason a Warrior can hold a chokepoint.
+    s = MakeSkill("Cyclone Axe", SKILLTYPE_ATTACK_SKILL, ATTR_AXE_MASTERY,
+                  5, 0, 0.0f, 4.0f, 28.0f, false, TARGET_AOE_FOES);
+    s.aoeRadius = 44.0f; // "adjacent", not a Meteor-sized blast
+    AddStep(&s, FX_DAMAGE, 5, 0.7f, 0, 0);
+    RegisterAs(SK_CYCLONE_AXE, s);
+
+    s = MakeSkill("Penetrating Blow", SKILLTYPE_ATTACK_SKILL, ATTR_AXE_MASTERY,
+                  0, 25, 0.0f, 0.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    s.armorPen = 0.20f; // its whole point: 20% armor penetration, no Strength needed
+    AddStep(&s, FX_DAMAGE, 8, 1.4f, 0, 0);
+    RegisterAs(SK_PENETRATING_BLOW, s);
+
+    // --- Warrior: Hammer Mastery -------------------------------------
+    // The Hammer line trades the Axe's raw numbers for control: knockdown
+    // is what a hammer does that nothing else can.
+    s = MakeSkill("Hammer Bash", SKILLTYPE_ATTACK_SKILL, ATTR_HAMMER_MASTERY,
+                  0, 25, 0.0f, 0.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 4, 0.5f, 0, 0);
+    AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
+    RegisterAs(SK_HAMMER_BASH, s);
+
+    s = MakeSkill("Mighty Blow", SKILLTYPE_ATTACK_SKILL, ATTR_HAMMER_MASTERY,
+                  0, 50, 0.0f, 0.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 14, 2.0f, 0, 0);
+    RegisterAs(SK_MIGHTY_BLOW, s);
+
+    // GW1's Crushing Blow inflicts Deep Wound only on a knocked-down
+    // foe; the demake applies it outright, the same simplification Gash
+    // already uses (it dropped Gash's "if Bleeding" rider).
+    s = MakeSkill("Crushing Blow", SKILLTYPE_ATTACK_SKILL, ATTR_HAMMER_MASTERY,
+                  5, 0, 0.0f, 10.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 10, 1.2f, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DEEP_WOUND, 10.0f);
+    RegisterAs(SK_CRUSHING_BLOW, s);
+
+    // --- Monk: Protection Prayers ------------------------------------
+    // The Protection line was empty. Guardian grants an ALLY a block
+    // chance - the same block mechanic Disciplined Stance uses, aimed
+    // outward, which is exactly what a protection Monk does.
+    s = MakeSkill("Guardian", SKILLTYPE_SPELL, ATTR_PROTECTION_PRAYERS,
+                  5, 0, 0.25f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_STANCE_BLOCK, 0.5f, 0.0f, 0, 8.0f);
+    RegisterAs(SK_GUARDIAN, s);
+
+    // --- Necromancer: Death Magic ------------------------------------
+    // Death Magic proper is minions, which the demake has no system for;
+    // Deathly Swarm is its direct-damage face and needs none.
+    s = MakeSkill("Deathly Swarm", SKILLTYPE_SPELL, ATTR_DEATH_MAGIC,
+                  15, 0, 1.0f, 5.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 10, 2.5f, 0, 0);
+    RegisterAs(SK_DEATHLY_SWARM, s);
+
+    // --- Mesmer: Illusion Magic --------------------------------------
+    // A pure-degeneration hex - distinct from Faltering (which slows
+    // attacks) and Backlash (which punishes them). This just wears the
+    // target down, which is Illusion's whole idea.
+    s = MakeSkill("Conjure Phantasm", SKILLTYPE_SPELL, ATTR_ILLUSION_MAGIC,
+                  10, 0, 1.0f, 5.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_PHANTASM, 8.0f);
+    RegisterAs(SK_CONJURE_PHANTASM, s);
+
+    // --- Elementalist: Water Magic -----------------------------------
+    // Water's identity is the snare: damage plus Crippled, so a kiting
+    // caster can keep a melee foe off them.
+    s = MakeSkill("Shard Storm", SKILLTYPE_SPELL, ATTR_WATER_MAGIC,
+                  10, 0, 1.0f, 5.0f, 200.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 8, 1.8f, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_CRIPPLED, 5.0f);
+    RegisterAs(SK_SHARD_STORM, s);
+
+    // --- Elementalist: Earth Magic -----------------------------------
+    // Earth's is the knockdown: less damage than Fire, but it buys time.
+    s = MakeSkill("Stoning", SKILLTYPE_SPELL, ATTR_EARTH_MAGIC,
+                  5, 0, 1.0f, 5.0f, 200.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 7, 1.5f, 0, 0);
+    AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 2.0f);
+    RegisterAs(SK_STONING, s);
+
+    // --- Ranger: Beast Mastery ---------------------------------------
+    // Beast Mastery is really the pet line, which the demake has no
+    // system for; this stands in as a melee strike that feeds the
+    // Ranger energy, so the attribute is at least represented and
+    // buyable. (GW1's Ferocious Strike is elite; kept non-elite here so
+    // it isn't stranded behind a boss the demake never gives it to.)
+    s = MakeSkill("Ferocious Strike", SKILLTYPE_ATTACK_SKILL, ATTR_BEAST_MASTERY,
+                  0, 25, 0.0f, 0.0f, 28.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_DAMAGE, 10, 2.0f, 0, 0);
+    AddSelfStep(&s, FX_ENERGY_DELTA, 5, 0.0f);
+    RegisterAs(SK_FEROCIOUS_STRIKE, s);
 }

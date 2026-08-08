@@ -9,7 +9,12 @@
 // fraction of the target's armor to ignore.
 static float AttackPenetration(const Entity *caster, const Skill *skill) {
     if (skill->type != SKILLTYPE_ATTACK_SKILL) return 0.0f;
-    return GW_STRENGTH_PENETRATION_PER_RANK * (float)Entity_EffectiveRank(caster, ATTR_STRENGTH);
+    // A skill's own penetration (Penetrating Blow) plus Strength's, which
+    // GW1 grants only on attack skills. Capped at 1 so nothing goes past
+    // ignoring all armor.
+    float pen = skill->armorPen +
+                GW_STRENGTH_PENETRATION_PER_RANK * (float)Entity_EffectiveRank(caster, ATTR_STRENGTH);
+    return pen > 1.0f ? 1.0f : pen;
 }
 
 // Divine Favor fires on Monk SPELLS cast on an ally - not on signets,
@@ -34,7 +39,11 @@ static float RankScaledValue(const EffectStep *step, const Entity *caster, Attri
 // conversion lives in Combat_UpdateEntity, once.
 static float AfflictionDegenPips(EffectCategory category, int kind) {
     if (category == EFFECT_HEX) {
-        return ((HexKind)kind == HEX_FALTERING) ? 1.0f : 0.0f;
+        switch ((HexKind)kind) {
+            case HEX_FALTERING: return 1.0f;
+            case HEX_PHANTASM:  return GW_PIPS_PHANTASM;
+            default:            return 0.0f;
+        }
     }
     switch ((ConditionKind)kind) {
         case COND_BLEEDING: return GW_PIPS_BLEEDING;

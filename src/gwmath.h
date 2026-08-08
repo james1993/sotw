@@ -47,6 +47,9 @@
 #define GW_PIPS_BLEEDING 3.0f
 #define GW_PIPS_BURNING  7.0f
 #define GW_PIPS_POISON   4.0f
+// Conjure Phantasm's health degeneration (Illusion Magic), scaling to
+// GW1's roughly -3..-5 pips; the demake fixes it at a representative -3.
+#define GW_PIPS_PHANTASM 3.0f
 
 // Weakness cuts weapon damage by 66% (bonus damage from attack skills
 // is untouched) and drops every non-zero attribute by 1.

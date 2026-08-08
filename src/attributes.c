@@ -25,6 +25,8 @@ const char *g_attributeNames[ATTR_COUNT] = {
     "Water Magic",
     "Air Magic",
     "Earth Magic",
+    "Axe Mastery",
+    "Hammer Mastery",
     "Monstrous",
 };
 
@@ -53,6 +55,8 @@ const Profession g_attributeProfession[ATTR_COUNT] = {
     PROF_ELEMENTALIST, // Water Magic
     PROF_ELEMENTALIST, // Air Magic
     PROF_ELEMENTALIST, // Earth Magic
+    PROF_WARRIOR,      // Axe Mastery
+    PROF_WARRIOR,      // Hammer Mastery
     PROF_COUNT,        // Monstrous - owned by no profession, on purpose
 };
 
@@ -81,6 +85,8 @@ const bool g_attributeIsPrimary[ATTR_COUNT] = {
     false, // Water Magic
     false, // Air Magic
     false, // Earth Magic
+    false, // Axe Mastery
+    false, // Hammer Mastery
     false, // Monstrous
 };
 

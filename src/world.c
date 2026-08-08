@@ -270,9 +270,11 @@ static const SpawnDef g_greenHillsSpawns[] = {
       .strengthRank = 3, .species = SPECIES_MOA },
 
     // A grawl chief holds the high ground: the elite in Warrior country.
+    // He teaches Eviscerate, the real Axe Mastery elite - the one skill
+    // a Warrior most wants and can only get by capping it off a boss.
     { .kind = SPAWN_MONSTER, .name = "Ulrick Grawl Chief", .pos = { 420, 160 },
       .level = 6, .hp = 320, .armor = 45, .aggro = 140.0f, .strengthRank = 8,
-      .withHowl = true, .boss = true, .capSkill = SK_DEATHBLOW,
+      .withHowl = true, .boss = true, .capSkill = SK_EVISCERATE,
       .species = SPECIES_GRAWL, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 350, 230 },
       .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,

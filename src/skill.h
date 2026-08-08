@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "attributes.h"
 
-#define MAX_SKILLS 48
+#define MAX_SKILLS 80
 #define MAX_STEPS_PER_SKILL 3
 
 // Stable names for every skill in the DB. SkillDB_Init registers in
@@ -53,6 +53,22 @@ typedef enum {
     SK_DISCIPLINED_STANCE,
     // Elementalist Air Magic - Blinding Flash, the game's iconic Blind.
     SK_BLINDING_FLASH,
+    // Warrior Axe Mastery
+    SK_EVISCERATE,          // elite: heavy damage + Deep Wound
+    SK_EXECUTIONERS_STRIKE,
+    SK_CYCLONE_AXE,         // hits all adjacent foes
+    SK_PENETRATING_BLOW,    // inherent armor penetration
+    // Warrior Hammer Mastery
+    SK_HAMMER_BASH,         // knockdown
+    SK_MIGHTY_BLOW,
+    SK_CRUSHING_BLOW,       // Deep Wound
+    // The empty lines, filled out
+    SK_GUARDIAN,            // Protection Prayers: grants an ally block
+    SK_DEATHLY_SWARM,       // Death Magic damage
+    SK_CONJURE_PHANTASM,    // Illusion Magic degen hex
+    SK_SHARD_STORM,         // Water Magic damage + Cripple
+    SK_STONING,             // Earth Magic damage + knockdown
+    SK_FEROCIOUS_STRIKE,    // Beast Mastery attack
     SK_COUNT
 } SkillId;
 
@@ -127,6 +143,10 @@ typedef struct {
     float range;
     float aoeRadius; // TARGET_AOE_FOES: blast radius around the target
     bool isElite;
+    // Inherent armor penetration (0..1) this skill carries regardless of
+    // Strength - Penetrating Blow and the like. Strength's penetration is
+    // added on top of this in the effect VM.
+    float armorPen;
     TargetKind targeting;
     EffectStep steps[MAX_STEPS_PER_SKILL];
     int stepCount;
