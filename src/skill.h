@@ -47,6 +47,12 @@ typedef enum {
     SK_ETHER_FEAST,
     SK_EMPATHY,
     SK_SHATTER_DELUSIONS,
+    // Appended, not inserted, so every existing SkillId keeps its number
+    // and old saved skill bars still point where they meant to.
+    // Warrior Tactics defensive stance - the home of the block mechanic.
+    SK_DISCIPLINED_STANCE,
+    // Elementalist Air Magic - Blinding Flash, the game's iconic Blind.
+    SK_BLINDING_FLASH,
     SK_COUNT
 } SkillId;
 
@@ -84,6 +90,11 @@ typedef enum {
     FX_ENERGY_DELTA,
     FX_ADRENALINE_DELTA,
     FX_KNOCKDOWN,
+    // A defensive stance on the caster: baseValue is the block chance
+    // (0..1), conditionKind carries a flat armor bonus, duration is how
+    // long it holds. Blocking is a genuine GW1 mechanic in its own right,
+    // not a condition or a hex, so it needs its own primitive.
+    FX_STANCE_BLOCK,
     // Cancels the target's current cast (if any) and applies an extra
     // recharge penalty to the interrupted skill, same as GW1's interrupt
     // skills - the whole reason cast time exists as a distinct mechanic

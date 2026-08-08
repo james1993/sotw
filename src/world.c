@@ -906,6 +906,9 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     p->lastCastSkillSlot = -1;
     p->postCastDisplayTimer = 0.0f;
     p->interruptFlashTimer = 0.0f;
+    p->blindMissFlashTimer = 0.0f;
+    p->blockFlashTimer = 0.0f;
+    Entity_BreakStance(p);
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->adrenaline[i] = 0;
     p->alive = true;
     p->deathPenalty = 0;

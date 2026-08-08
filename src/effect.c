@@ -162,6 +162,17 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             Fx_Stars(target->pos);
             break;
         }
+        case FX_STANCE_BLOCK: {
+            // A self-buff, always landing on the caster (stances are
+            // TARGET_SELF). Duration scales with the skill's attribute -
+            // Disciplined Stance holds longer the more Tactics you have.
+            int rank = Entity_EffectiveRank(caster, skill->attribute);
+            target->blockChance = step->baseValue;
+            target->stanceArmorBonus = step->conditionKind;
+            target->stanceTimer = step->duration + step->perAttributeRank * (float)rank;
+            Fx_Ring(target->pos, target->radius + 10.0f, (Color){ 150, 200, 240, 255 });
+            break;
+        }
         case FX_INTERRUPT: {
             if (target->castingSlot >= 0) {
                 int slot = target->castingSlot;
@@ -185,6 +196,21 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
 }
 
 void Effect_Execute(Entity *caster, const Skill *skill, Entity *target) {
+    // An attack skill is still an ATTACK: it can be missed because the
+    // caster is Blind, or blocked by the target's stance, and when it is,
+    // NONE of its steps land - a blocked Gash deals no damage and inflicts
+    // no Deep Wound. Spells and shouts skip this entirely, exactly as in
+    // GW1, which is why a Blinded Elementalist still casts fine.
+    if (skill->type == SKILLTYPE_ATTACK_SKILL &&
+        (skill->targeting == TARGET_SINGLE_FOE || skill->targeting == TARGET_AOE_FOES) &&
+        target && target->alive && target->team != caster->team) {
+        AttackOutcome outcome = Entity_ResolveAttack(caster, target);
+        if (outcome != ATTACK_LANDS) {
+            Fx_Burst(target->pos, (Color){ 200, 200, 210, 200 });
+            return;
+        }
+    }
+
     for (int i = 0; i < skill->stepCount; i++) {
         const EffectStep *step = &skill->steps[i];
 

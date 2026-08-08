@@ -58,6 +58,11 @@
 #define GW_DEEP_WOUND_HEALTH_LOSS 0.20f
 #define GW_DEEP_WOUND_HEAL_LOSS   0.20f
 
+// Blind: attacks (melee and missile) miss 90% of the time. The exact
+// GW1 figure, and the whole reason a single Blinding Flash can neuter a
+// physical attacker for the length of the condition.
+#define GW_BLIND_MISS_PERCENT 90
+
 // --- Adrenaline ------------------------------------------------------
 // GW1 counts adrenaline in STRIKES, worth 25 points each, and every
 // adrenal skill carries its OWN pool. Landing a hit gives one strike to

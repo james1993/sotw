@@ -206,7 +206,11 @@ void Entity_ApplyDamage(Entity *e, int amount, Entity *attacker) {
 void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorPenetration) {
     if (!e->alive) return;
 
-    int finalDamage = GW_ArmorScaledDamage(amount, e->armor, armorPenetration);
+    // A defensive stance's armor bonus rides on top of worn AL while it
+    // holds - Disciplined Stance's +10 is the reason it blunts a spike
+    // and not just the attacks it happens to block.
+    int armor = e->armor + (e->stanceTimer > 0.0f ? e->stanceArmorBonus : 0);
+    int finalDamage = GW_ArmorScaledDamage(amount, armor, armorPenetration);
 
     // Only struck blows are audible. Condition ticks pass attacker=NULL
     // and would otherwise fire an impact every second, per affliction,
@@ -344,6 +348,33 @@ int Entity_ScaleOutgoingDamage(const Entity *e, int damage) {
     return damage;
 }
 
+void Entity_BreakStance(Entity *e) {
+    if (!e) return;
+    e->stanceTimer = 0.0f;
+    e->blockChance = 0.0f;
+    e->stanceArmorBonus = 0;
+}
+
+AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender) {
+    // Blind is checked first and on the ATTACKER: a blinded swing misses
+    // before the defender's stance ever matters. GW1's number is a flat
+    // 90% miss, unaffected by anything the defender does.
+    if (attacker && Entity_HasCondition(attacker, COND_BLIND) &&
+        GetRandomValue(1, 100) <= GW_BLIND_MISS_PERCENT) {
+        if (defender) defender->blindMissFlashTimer = 1.0f;
+        return ATTACK_MISS_BLIND;
+    }
+    // Block is the defender's: a stance that's still up rolls its chance
+    // against this one attack. Spells don't reach here, so a block stance
+    // stops swings and arrows but never a Fire Bolt - exactly GW1.
+    if (defender && defender->stanceTimer > 0.0f && defender->blockChance > 0.0f &&
+        GetRandomValue(1, 100) <= (int)(defender->blockChance * 100.0f)) {
+        defender->blockFlashTimer = 1.0f;
+        return ATTACK_BLOCKED;
+    }
+    return ATTACK_LANDS;
+}
+
 // Only adrenal skills charge, so a bar with none of them never
 // accumulates anything - which is exactly right: adrenaline is a
 // Warrior mechanic, not a universal resource.
@@ -403,10 +434,13 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
         }
     }
     switch ((ConditionKind)fx->kind) {
-        case COND_BLEEDING: return "Bleeding";
-        case COND_BURNING:  return "Burning";
-        case COND_CRIPPLED: return "Crippled";
-        case COND_WEAKNESS: return "Weakness";
+        case COND_BLEEDING:   return "Bleeding";
+        case COND_BURNING:    return "Burning";
+        case COND_POISON:     return "Poison";
+        case COND_CRIPPLED:   return "Crippled";
+        case COND_WEAKNESS:   return "Weakness";
+        case COND_BLIND:      return "Blind";
+        case COND_DEEP_WOUND: return "Deep Wound";
         default: return "Condition";
     }
 }
@@ -417,10 +451,13 @@ Color Entity_EffectColor(const ActiveEffect *fx) {
     // language the party window has always used for its status arrows.
     if (fx->category == EFFECT_HEX) return (Color){ 178, 118, 220, 255 };
     switch ((ConditionKind)fx->kind) {
-        case COND_BLEEDING: return (Color){ 208, 70, 70, 255 };
-        case COND_BURNING:  return (Color){ 240, 140, 50, 255 };
-        case COND_CRIPPLED: return (Color){ 190, 150, 90, 255 };
-        case COND_WEAKNESS: return (Color){ 150, 150, 160, 255 };
+        case COND_BLEEDING:   return (Color){ 208, 70, 70, 255 };
+        case COND_BURNING:    return (Color){ 240, 140, 50, 255 };
+        case COND_POISON:     return (Color){ 96, 168, 78, 255 };
+        case COND_CRIPPLED:   return (Color){ 190, 150, 90, 255 };
+        case COND_WEAKNESS:   return (Color){ 150, 150, 160, 255 };
+        case COND_BLIND:      return (Color){ 90, 90, 100, 255 };
+        case COND_DEEP_WOUND: return (Color){ 150, 40, 40, 255 };
         default: return (Color){ 190, 150, 90, 255 };
     }
 }

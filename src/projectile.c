@@ -50,6 +50,11 @@ static void Impact(Projectile *p) {
         return;
     }
 
+    // A missile is an attack, so Blind (on the shooter) and a block stance
+    // (on the target) can still stop it at the last moment - a blocked
+    // arrow does no damage and earns the shooter no adrenaline.
+    if (shooter && Entity_ResolveAttack(shooter, target) != ATTACK_LANDS) return;
+
     Entity_ApplyDamage(target, p->damage, shooter);
     Fx_Burst(target->pos, p->color);
     if (shooter && shooter->alive) {

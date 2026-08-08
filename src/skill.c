@@ -300,4 +300,35 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
     AddStep(&s, FX_DAMAGE, 12, 2.0f, 0, 0);
     RegisterAs(SK_SHATTER_DELUSIONS, s);
+
+    // --- Block: Warrior defensive stance -----------------------------
+    // The engine had no way to block an attack, which meant a whole GW1
+    // defensive layer - stances, shields, "block chance" - simply didn't
+    // exist. Disciplined Stance is where it starts: for a few seconds you
+    // block 75% of attacks and gain +10 armor, and it ends the instant
+    // you use an adrenal skill (handled in Combat_ActivateSkill). Real
+    // GW1 numbers: 5 energy, 15s recharge, 1..4s duration by Tactics.
+    // baseValue carries the block fraction, conditionKind the armor
+    // bonus, duration the length (scaled by Tactics rank at run time via
+    // perAttributeRank).
+    // The stance's duration is the one thing here that scales with the
+    // attribute: baseValue is the block fraction, conditionKind the flat
+    // armor bonus, duration the base seconds and perAttributeRank the
+    // extra seconds per rank of Tactics (the effect handler reads both).
+    s = MakeSkill("Disciplined Stance", SKILLTYPE_STANCE, ATTR_TACTICS,
+                  5, 0, 0.0f, 15.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_STANCE_BLOCK, 0.75f, 0.25f, 10, 1.0f);
+    RegisterAs(SK_DISCIPLINED_STANCE, s);
+
+    // --- Blind: Elementalist Air Magic -------------------------------
+    // Nothing in the game applied Blind, so the 90% miss mechanic that
+    // makes a physical attacker suddenly useless had no way to happen.
+    // Blinding Flash is its canonical source. Real GW1 numbers: 10
+    // energy, 8s recharge; GW1's Blind runs 3..8s with Air Magic, and
+    // the demake fixes condition durations (as it does for every other
+    // condition) at a representative 5s.
+    s = MakeSkill("Blinding Flash", SKILLTYPE_SPELL, ATTR_AIR_MAGIC,
+                  10, 0, 0.75f, 8.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_BLIND, 5.0f);
+    RegisterAs(SK_BLINDING_FLASH, s);
 }

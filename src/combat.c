@@ -78,7 +78,12 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     }
 
     caster->energy -= energyCost;
-    if (skill->adrenalineCost > 0) Entity_SpendAdrenaline(caster, slot);
+    if (skill->adrenalineCost > 0) {
+        Entity_SpendAdrenaline(caster, slot);
+        // Disciplined Stance ends the instant you throw an adrenal skill -
+        // the trade GW1 makes you weigh between defending and swinging.
+        Entity_BreakStance(caster);
+    }
 
     // Which skill the target panel shows as "current/recent" - set here so
     // it covers both branches below, not just cast-time skills.
@@ -177,6 +182,24 @@ void Combat_UpdateEntity(Entity *e, float dt) {
     if (e->dodgeFlashTimer > 0.0f) {
         e->dodgeFlashTimer -= dt;
         if (e->dodgeFlashTimer < 0.0f) e->dodgeFlashTimer = 0.0f;
+    }
+
+    if (e->blindMissFlashTimer > 0.0f) {
+        e->blindMissFlashTimer -= dt;
+        if (e->blindMissFlashTimer < 0.0f) e->blindMissFlashTimer = 0.0f;
+    }
+
+    if (e->blockFlashTimer > 0.0f) {
+        e->blockFlashTimer -= dt;
+        if (e->blockFlashTimer < 0.0f) e->blockFlashTimer = 0.0f;
+    }
+
+    // A defensive stance runs on its own clock and simply lapses when it
+    // runs out (it also ends early if the holder uses an adrenal skill -
+    // see Combat_ActivateSkill).
+    if (e->stanceTimer > 0.0f) {
+        e->stanceTimer -= dt;
+        if (e->stanceTimer <= 0.0f) Entity_BreakStance(e);
     }
 
     if (e->postCastDisplayTimer > 0.0f) {
@@ -300,7 +323,11 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     // impact - or not at all, if they dodge (projectile.c).
                     Projectile_Spawn((int)(e - g_entities), Entity_RefIndex(e->targetRef), dmg);
                 } else {
-                    Entity_ApplyDamage(target, dmg, e);
+                    // Melee still swings - the arc plays and a sleeping
+                    // monster wakes to it - but Blind (attacker) and a
+                    // block stance (target) can rob it of its damage. A
+                    // missed or blocked swing earns no adrenaline in GW1.
+                    AttackOutcome outcome = Entity_ResolveAttack(e, target);
                     Fx_Slash(target->pos, atan2f(target->pos.y - e->pos.y,
                                                  target->pos.x - e->pos.x));
                     if (target->kind == ENT_MONSTER && !target->aggroed) {
@@ -310,7 +337,10 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         // Group members join in, GW1-style.
                         Entity_WakeMonsterGroup(target, Entity_RefOf((int)(e - g_entities)));
                     }
-                    Entity_GainAdrenalineStrike(e); // one strike, GW1's unit
+                    if (outcome == ATTACK_LANDS) {
+                        Entity_ApplyDamage(target, dmg, e);
+                        Entity_GainAdrenalineStrike(e); // one strike, GW1's unit
+                    }
                 }
                 e->attackTimer = Entity_AttackInterval(e); // slowed while hexed
             }

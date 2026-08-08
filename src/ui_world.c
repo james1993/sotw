@@ -392,6 +392,14 @@ void UIWorld_Draw(Camera2D camera, int screenWidth, int screenHeight) {
         if (e->interruptFlashTimer > 0.0f) {
             UI_TextShadowCentered("INTERRUPTED", (int)head.x,
                                   (int)(stackY - nameFont - 6 * scale), smallFont, UI_GOLD);
+        } else if (e->blockFlashTimer > 0.0f) {
+            UI_TextShadowCentered("BLOCKED", (int)head.x,
+                                  (int)(stackY - nameFont - 6 * scale), smallFont,
+                                  (Color){ 150, 200, 240, 255 });
+        } else if (e->blindMissFlashTimer > 0.0f) {
+            UI_TextShadowCentered("MISS", (int)head.x,
+                                  (int)(stackY - nameFont - 6 * scale), smallFont,
+                                  (Color){ 205, 210, 225, 255 });
         } else if (e->dodgeFlashTimer > 0.0f) {
             UI_TextShadowCentered("DODGED", (int)head.x,
                                   (int)(stackY - nameFont - 6 * scale), smallFont,

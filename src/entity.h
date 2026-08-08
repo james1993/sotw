@@ -57,6 +57,12 @@ typedef enum {
     COND_POISON,     // -4 pips, and it overrides Bleeding's bar tint
     COND_CRIPPLED,
     COND_WEAKNESS,
+    // Blind: your melee and missile ATTACKS have a 90% chance to miss
+    // (GW1's exact number). It does no degeneration - like Crippled and
+    // Weakness it impairs rather than wears down - and it only touches
+    // attacks, never spells, which is why an Air Elementalist's Blinding
+    // Flash shuts down a Warrior but does nothing to a caster.
+    COND_BLIND,
     // Deep Wound is the odd one out: it does no degeneration at all.
     // It takes 20% off maximum health and 20% off healing received,
     // which is why a Warrior applies it before a spike rather than as
@@ -198,6 +204,18 @@ typedef struct Entity {
 
     float interruptFlashTimer; // > 0 briefly after being interrupted, for UI feedback
     float dodgeFlashTimer;     // > 0 briefly after dodging a projectile
+    float blindMissFlashTimer; // > 0 briefly after an attacker's Blind made them miss us
+    float blockFlashTimer;     // > 0 briefly after a defensive stance blocked an attack
+
+    // Defensive stance state. A stance is neither a condition nor a hex -
+    // it is a self-buff a Warrior presses to survive a spike, with its
+    // own timer. While it holds, incoming ATTACKS (not spells) are rolled
+    // against blockChance and armor gets stanceArmorBonus. Disciplined
+    // Stance's real drawback is that it ends the moment you use an
+    // adrenal skill, so this is cleared there too.
+    float stanceTimer;
+    float blockChance;      // 0..1 chance to block an incoming attack
+    int   stanceArmorBonus; // added to armor while the stance holds
 
     // Target-panel display: which skill to show as "currently/recently
     // used" (see ui_target.c). Set whenever a skill is activated; the
@@ -312,6 +330,25 @@ void Entity_RecomputePenalizedStats(Entity *e);
 
 bool Entity_HasCondition(const Entity *e, ConditionKind kind);
 bool Entity_HasHex(const Entity *e, HexKind kind);
+
+// The outcome of an ATTACK (a basic swing/shot or an attack skill) once
+// Blind and block are accounted for. Spells never go through this - GW1's
+// Blind and block only ever touch attacks.
+typedef enum {
+    ATTACK_LANDS,
+    ATTACK_MISS_BLIND,  // the attacker was Blind and rolled the 90% miss
+    ATTACK_BLOCKED      // the defender's stance blocked it
+} AttackOutcome;
+
+// Rolls Blind (attacker) then block (defender) for one attack. On a
+// miss or block it sets the matching flash timer on `defender` for the
+// on-screen callout and returns why; callers apply damage only on
+// ATTACK_LANDS. Pure attacks only - do not call this for spells.
+AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender);
+
+// Ends any defensive stance immediately (Disciplined Stance's "ends if
+// you use an adrenal skill" rule, and zone/respawn cleanup).
+void Entity_BreakStance(Entity *e);
 
 // How many conditions / hexes are currently on this character - drives
 // both the nameplate pips and what a removal skill has to work with.
