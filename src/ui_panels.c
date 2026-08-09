@@ -428,8 +428,11 @@ static void DrawInventory(Entity *player, int screenHeight) {
                 int next = Items_UseKitOn(g_armedKit, i);
                 g_armedKit = (next >= 0) ? next : -1;
                 Audio_Play(next == -2 ? SFX_UI_DENY : SFX_UI_CONFIRM);
+                // A rune slotted into a worn piece has to take effect now.
+                Items_RecomputeEquipped(player);
                 Save_Write();
-            } else if (it->kind == ITEM_KIT_ID || it->kind == ITEM_KIT_SALVAGE) {
+            } else if (it->kind == ITEM_KIT_ID || it->kind == ITEM_KIT_SALVAGE ||
+                       it->kind == ITEM_RUNE || it->kind == ITEM_INSIGNIA) {
                 g_armedKit = armed ? -1 : i;
                 Audio_Play(SFX_UI_CLICK);
             } else if (worn) {

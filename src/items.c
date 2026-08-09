@@ -29,6 +29,18 @@ static const Item g_weaponTable[] = {
 };
 #define WEAPON_TABLE_COUNT (int)(sizeof(g_weaponTable) / sizeof(g_weaponTable[0]))
 
+// Armour upgrades that drop in the field and are slotted into a worn
+// piece. Vigor/Vitae add health, an attribute rune boosts a line, and an
+// insignia adds armour - GW1's three upgrade shapes in miniature.
+static const Item g_runeTable[] = {
+    { .kind = ITEM_RUNE, .name = "Rune of Vigor", .count = 1, .runeAttr = -1, .runeHealth = 30 },
+    { .kind = ITEM_RUNE, .name = "Rune of Vitae", .count = 1, .runeAttr = -1, .runeHealth = 10 },
+    { .kind = ITEM_RUNE, .name = "Rune of Minor Tactics", .count = 1,
+      .runeAttr = ATTR_TACTICS, .runeAttrBonus = 1, .runeHealth = 0 },
+    { .kind = ITEM_INSIGNIA, .name = "Reinforced Insignia", .count = 1, .insigniaArmor = 10 },
+};
+#define RUNE_TABLE_COUNT (int)(sizeof(g_runeTable) / sizeof(g_runeTable[0]))
+
 // The crafting material Charr leave behind - the Armorer turns these
 // (plus gold) into armor, GW1's craft-only armor economy in miniature.
 static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Carving", .count = 1 };
@@ -183,6 +195,19 @@ int Items_UseKitOn(int kitIndex, int targetIndex) {
     if (kit->kind == ITEM_KIT_ID) {
         if (target->kind == ITEM_WEAPON && target->unidentified) {
             target->unidentified = false;
+            used = true;
+        }
+    } else if (kit->kind == ITEM_RUNE || kit->kind == ITEM_INSIGNIA) {
+        // Slot the upgrade into an armour piece, replacing any it held
+        // (GW1 overwrites the old rune/insignia). Consumes the rune.
+        if (target->kind == ITEM_ARMOR) {
+            if (kit->kind == ITEM_RUNE) {
+                target->runeAttr = kit->runeAttr;
+                target->runeAttrBonus = kit->runeAttrBonus;
+                target->runeHealth = kit->runeHealth;
+            } else {
+                target->insigniaArmor = kit->insigniaArmor;
+            }
             used = true;
         }
     } else if (kit->kind == ITEM_KIT_SALVAGE) {
@@ -403,6 +428,18 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
                 d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
                 d->item = *material;
             }
+        }
+    }
+
+    // A rarer prize: an armour upgrade (rune or insignia) to slot into a
+    // worn piece. Its own roll so it can co-drop with the above.
+    if (GetRandomValue(1, 100) <= 8 && DropIsMine(party)) {
+        d = FindFreeDrop();
+        if (d) {
+            memset(d, 0, sizeof(GroundDrop));
+            d->active = true;
+            d->pos = (Vector2){ pos.x - 14, pos.y - 8 };
+            d->item = g_runeTable[GetRandomValue(0, RUNE_TABLE_COUNT - 1)];
         }
     }
 }
