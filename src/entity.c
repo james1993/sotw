@@ -165,7 +165,10 @@ int Entity_ScaleIncomingHeal(const Entity *e, int amount) {
 
 void Entity_RecomputeAttributeStats(Entity *e) {
     if (!e) return;
-    e->baseMaxHp = GW_BASE_HEALTH + GW_HEALTH_PER_LEVEL * (e->level - 1);
+    // Gear health (Vigor and Fortitude add, attribute runes subtract)
+    // rides on top of the level-scaled base.
+    e->baseMaxHp = GW_BASE_HEALTH + GW_HEALTH_PER_LEVEL * (e->level - 1) + e->gearHealthBonus;
+    if (e->baseMaxHp < 1) e->baseMaxHp = 1;
     e->baseMaxEnergy = GW_MaxEnergy(e->attributeRank[ATTR_ENERGY_STORAGE]);
     Entity_RecomputePenalizedStats(e);
 }
@@ -550,7 +553,9 @@ void Entity_SpendAdrenaline(Entity *e, int slot) {
 
 int Entity_EffectiveRank(const Entity *e, AttributeKind attr) {
     if (!e || attr < 0 || attr >= ATTR_COUNT) return 0;
-    int rank = e->attributeRank[attr];
+    // A rune of the attribute adds to its rank (GW1 lets runes push a
+    // line past what points alone could buy).
+    int rank = e->attributeRank[attr] + e->gearAttrBonus[attr];
     if (rank > 0 && Entity_HasCondition(e, COND_WEAKNESS)) rank--;
     return rank;
 }

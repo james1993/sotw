@@ -55,9 +55,15 @@ static void Impact(Projectile *p) {
     // arrow does no damage and earns the shooter no adrenaline.
     if (shooter && Entity_ResolveAttack(shooter, target) != ATTACK_LANDS) return;
 
-    Entity_ApplyDamage(target, p->damage, shooter);
+    // Weapon mods ride the shot too, read off the shooter at impact.
+    float pen = shooter ? shooter->weaponArmorPen / 100.0f : 0.0f;
+    Entity_ApplyDamagePen(target, p->damage, shooter, pen);
     Fx_Burst(target->pos, p->color);
     if (shooter && shooter->alive) {
+        if (shooter->weaponLifesteal > 0) {
+            shooter->hp += shooter->weaponLifesteal;
+            if (shooter->hp > shooter->maxHp) shooter->hp = shooter->maxHp;
+        }
         Entity_GainAdrenalineStrike(shooter); // a landed shot is a strike too
         if (target->kind == ENT_MONSTER && !target->aggroed) {
             // A landed ranged hit wakes a sleeping monster - the wand

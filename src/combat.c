@@ -400,7 +400,13 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         Entity_WakeMonsterGroup(target, Entity_RefOf((int)(e - g_entities)));
                     }
                     if (outcome == ATTACK_LANDS) {
-                        Entity_ApplyDamage(target, dmg, e);
+                        // Weapon mods ride on the basic swing: Sundering
+                        // penetrates armour, Vampiric steals health.
+                        Entity_ApplyDamagePen(target, dmg, e, e->weaponArmorPen / 100.0f);
+                        if (e->weaponLifesteal > 0) {
+                            e->hp += e->weaponLifesteal;
+                            if (e->hp > e->maxHp) e->hp = e->maxHp;
+                        }
                         Entity_GainAdrenalineStrike(e); // one strike, GW1's unit
                     }
                 }

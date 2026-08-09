@@ -21,7 +21,10 @@ typedef enum {
     ITEM_BAG,          // equipping one adds `count` inventory slots
     ITEM_MATERIAL,     // crafting stock (stacks): armor is crafted, not looted
     ITEM_KIT_SALVAGE,  // breaks gear into materials; count = uses left
-    ITEM_KIT_ID        // reveals unidentified weapons; count = uses left
+    ITEM_KIT_ID,       // reveals unidentified weapons; count = uses left
+    ITEM_RUNE,         // an armour upgrade: applied to an equipped piece
+    ITEM_INSIGNIA,     // an armour upgrade: adds armour to a piece
+    ITEM_DYE           // recolours the character's armour
 } ItemKind;
 
 // GW1 dresses a character in five armour pieces, not one "armor" item,
@@ -70,6 +73,28 @@ typedef struct {
     // masked name, hidden stats, can't be equipped, nearly worthless -
     // until an Identification Kit reveals them.
     bool unidentified;
+
+    // --- Weapon upgrades (mods) --------------------------------------
+    // GW1 weapons carry a prefix and a suffix upgrade, and the loot game
+    // is really about the mods, not the base type. A dropped weapon rolls
+    // these; identifying it reveals them (and the fuller name). While the
+    // weapon is held, Items_RecomputeEquipped folds them into the wielder.
+    int modHealth;    // "of Fortitude": +health while wielded
+    int modArmorPen;  // "Sundering": % armor penetration on basic attacks
+    int modLifesteal; // "Vampiric": health stolen per basic hit
+
+    // --- Armor upgrades (runes + insignia) ---------------------------
+    // Each armour piece can hold one rune and one insignia. A rune boosts
+    // an attribute (at a health cost) or health (Vigor); an insignia adds
+    // armour. Applied to an equipped piece with a rune/insignia item, the
+    // way GW1 slots them in.
+    int runeAttr;      // AttributeKind the rune boosts, or -1 for none/Vigor
+    int runeAttrBonus; // +ranks from the rune
+    int runeHealth;    // health delta: Vigor is +, an attribute rune is -
+    int insigniaArmor; // flat armour the insignia adds
+
+    // ITEM_DYE: the colour it paints the armour.
+    Color dyeColor;
 } Item;
 
 typedef struct {

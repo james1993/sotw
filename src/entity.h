@@ -207,6 +207,19 @@ typedef struct Entity {
     // caster baseline. 60 = neutral.
     int armor;
 
+    // Bonuses folded in from item upgrades (Items_RecomputeEquipped):
+    // runes add to attributes and health, insignias to armour, weapon
+    // mods to health, armour penetration and life-steal. Kept separate
+    // from the base stats so re-equipping recomputes cleanly.
+    int gearAttrBonus[ATTR_COUNT];
+    int gearHealthBonus;   // runes (Vigor +, attribute runes -) + weapon Fortitude
+    int gearArmorBonus;    // insignias
+    int weaponArmorPen;    // Sundering: % pen on basic attacks
+    int weaponLifesteal;   // Vampiric: health per basic hit
+    // Armour dye, applied to the sprite. dyed=false keeps the default.
+    Color dyeColor;
+    bool dyed;
+
     int level;
     int xp;              // toward the next level
     int attributePoints; // earned but unspent

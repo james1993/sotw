@@ -4,7 +4,7 @@
 #include "entity.h"
 #include "raylib.h"
 #include <math.h>
-#include <string.h>
+#include <stdio.h>
 #include <string.h>
 
 #define PICKUP_RADIUS 30.0f
@@ -34,6 +34,31 @@ static const Item g_weaponTable[] = {
 static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Carving", .count = 1 };
 static const Item g_skaleFin  = { .kind = ITEM_MATERIAL, .name = "Skale Fin",  .count = 1 };
 static const Item g_grawlNecklace = { .kind = ITEM_MATERIAL, .name = "Grawl Necklace", .count = 1 };
+
+// Rolls a prefix and/or suffix upgrade onto a dropped weapon and rebuilds
+// its name to match - GW1's loot is really the mod hunt, so most weapons
+// come with something. The effects sit dormant until the weapon is
+// identified and wielded (Items_RecomputeEquipped folds them in).
+static void RollWeaponMods(Item *w) {
+    char prefix[16] = "";
+    char suffix[20] = "";
+    switch (GetRandomValue(0, 3)) { // ~half the time, a prefix
+        case 1: w->modArmorPen = GetRandomValue(10, 20);
+                snprintf(prefix, sizeof(prefix), "Sundering "); break;
+        case 2: w->modLifesteal = GetRandomValue(3, 5);
+                snprintf(prefix, sizeof(prefix), "Vampiric "); break;
+        default: break;
+    }
+    if (GetRandomValue(0, 1) == 0) { // ~half the time, a suffix
+        w->modHealth = 30;
+        snprintf(suffix, sizeof(suffix), " of Fortitude");
+    }
+    if (prefix[0] || suffix[0]) {
+        char base[40];
+        snprintf(base, sizeof(base), "%s", w->name);
+        snprintf(w->name, sizeof(w->name), "%s%s%s", prefix, base, suffix);
+    }
+}
 
 const char *Items_SlotName(EquipSlot slot) {
     switch (slot) {
@@ -189,18 +214,33 @@ int Items_UseKitOn(int kitIndex, int targetIndex) {
 void Items_RecomputeEquipped(Entity *player) {
     if (!player) return;
 
+    // Every upgrade bonus is rebuilt from scratch each call, so removing a
+    // rune or a modded weapon cleanly takes its bonus away.
+    for (int a = 0; a < ATTR_COUNT; a++) player->gearAttrBonus[a] = 0;
+    player->gearHealthBonus = 0;
+    player->gearArmorBonus = 0;
+    player->weaponArmorPen = 0;
+    player->weaponLifesteal = 0;
+
     // Armour: each of the five pieces protects its share of you, so a
     // full matching "AL 60" set reads as AL 60 and a missing piece
     // leaves a real hole. This is GW1's per-piece armour condensed into
-    // one number the damage formula can use.
+    // one number the damage formula can use. Runes and insignias on the
+    // pieces fold their bonuses in as we go.
     int total = 0;
     for (int slot = 0; slot < EQUIP_ARMOR_PIECES; slot++) {
         int idx = g_equipped[slot];
         if (idx < 0 || idx >= g_inventoryCount) continue;
-        if (g_inventory[idx].kind != ITEM_ARMOR) continue;
-        total += g_inventory[idx].armor;
+        const Item *pc = &g_inventory[idx];
+        if (pc->kind != ITEM_ARMOR) continue;
+        total += pc->armor;
+        player->gearArmorBonus += pc->insigniaArmor;
+        player->gearHealthBonus += pc->runeHealth;
+        if (pc->runeAttr >= 0 && pc->runeAttr < ATTR_COUNT) {
+            player->gearAttrBonus[pc->runeAttr] += pc->runeAttrBonus;
+        }
     }
-    player->armor = total / EQUIP_ARMOR_PIECES;
+    player->armor = total / EQUIP_ARMOR_PIECES + player->gearArmorBonus;
 
     // A shield adds flat AL on top, the reason a one-handed set is not
     // simply worse than a two-hander.
@@ -216,6 +256,10 @@ void Items_RecomputeEquipped(Entity *player) {
         player->attackDamageMax = it->dmgMax;
         player->attackRange = it->range;
         player->attackInterval = it->attackInterval;
+        // Weapon mods ride on the held weapon.
+        player->gearHealthBonus += it->modHealth;
+        player->weaponArmorPen = it->modArmorPen;
+        player->weaponLifesteal = it->modLifesteal;
     } else {
         // Bare hands: GW1 lets you fight unarmed, badly.
         player->attackDamageMin = 3;
@@ -223,6 +267,10 @@ void Items_RecomputeEquipped(Entity *player) {
         player->attackRange = 28.0f;
         player->attackInterval = 1.33f;
     }
+
+    // Fold the gear health bonus into the derived max-health (and clamp
+    // current hp/energy) via the attribute-stat recompute.
+    Entity_RecomputeAttributeStats(player);
 }
 
 static bool WeaponIsTwoHanded(void) {
@@ -335,7 +383,8 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
             d->pos = (Vector2){ pos.x + 12, pos.y - 4 };
             d->item = g_weaponTable[GetRandomValue(0, WEAPON_TABLE_COUNT - 1)];
             d->item.count = 1;
-            d->item.unidentified = true; // looted weapons need an ID kit
+            RollWeaponMods(&d->item);       // the mod hunt: most drops carry one
+            d->item.unidentified = true;    // hidden until an ID kit reveals it
         }
     } else {
         // Crafting materials come off the body they'd come off in the
