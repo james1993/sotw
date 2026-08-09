@@ -45,6 +45,18 @@ typedef enum {
 
 #define EQUIP_ARMOR_PIECES 5   // HEAD..FEET - the ones that make up AL
 
+// GW1 item rarity, shown by the colour of an item's name. White items
+// carry no mods; from blue up they always have at least one, and the
+// tier sets how good the values roll - blue low, purple mid, gold max.
+// Green is off the spectrum: unique boss drops with fixed perfect mods.
+typedef enum {
+    RARITY_WHITE = 0,  // Common - no modifiers
+    RARITY_BLUE,       // Magical - one low-range mod
+    RARITY_PURPLE,     // Rare - mid-range mods
+    RARITY_GOLD,       // Rare - max/near-max mods, the premium prefixes
+    RARITY_GREEN       // Unique - fixed perfect mods, from bosses
+} ItemRarity;
+
 const char *Items_SlotName(EquipSlot slot);
 
 typedef struct {
@@ -79,9 +91,13 @@ typedef struct {
     // is really about the mods, not the base type. A dropped weapon rolls
     // these; identifying it reveals them (and the fuller name). While the
     // weapon is held, Items_RecomputeEquipped folds them into the wielder.
-    int modHealth;    // "of Fortitude": +health while wielded
-    int modArmorPen;  // "Sundering": % armor penetration on basic attacks
-    int modLifesteal; // "Vampiric": health stolen per basic hit
+    int rarity;         // ItemRarity - drives name colour, mods and value
+    int modHealth;      // "of Fortitude": +health while wielded (10-30)
+    int modArmorPen;    // "Sundering": % armor penetration on basic attacks
+    int modLifesteal;   // "Vampiric": health stolen per basic hit (1-5); -1 hp regen
+    int modEnergyGain;  // "Zealous": energy gained per basic hit (1); -1 energy regen
+    int modArmor;       // "of Shelter": +armor while wielded (4-7)
+    int modEnchantPct;  // "of Enchanting": % longer enchantments (10-20)
 
     // --- Armor upgrades (runes + insignia) ---------------------------
     // Each armour piece can hold one rune and one insignia. A rune boosts
@@ -132,6 +148,9 @@ bool Items_ConsumeMaterial(const char *name, int n);
 // weapon is unidentified. Use everywhere an item is displayed.
 const char *Items_DisplayName(const Item *item);
 
+// The colour an item's name is drawn in, from its rarity.
+Color Items_RarityColor(const Item *item);
+
 // Applies a kit to an inventory item, GW1's click-kit-then-item flow.
 // Identification reveals an unidentified weapon; salvage destroys a
 // non-equipped weapon/armor and yields 1-3 Charr Hides. One use per
@@ -174,6 +193,11 @@ int Items_Capacity(void);
 // GW1, armor is only crafted (see the Armorer NPC). Hides only come off
 // creatures that have them - Charr, not Devourers.
 void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species);
+
+// Drops a GREEN unique weapon - fixed perfect mods, named for the boss
+// that dropped it. Called from the boss death path, GW1's "greens come
+// off bosses" rule.
+void Items_SpawnUnique(Vector2 pos, const char *bossName);
 
 // Walk-over pickup: anything within reach of the player is collected.
 void Items_UpdatePickup(struct Entity *player);

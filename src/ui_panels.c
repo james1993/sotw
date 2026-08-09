@@ -345,9 +345,13 @@ static void DrawInventory(Entity *player, int screenHeight) {
             snprintf(label, sizeof(label), "%s", blocked ? "- both hands used -" : "-");
         }
         int lw = UITextWidth(label, small);
+        Color labelCol = UI_TEXT_MUTED;
+        if (filled) {
+            const Item *it = &g_inventory[idx];
+            labelCol = (it->kind == ITEM_WEAPON) ? Items_RarityColor(it) : UI_TEXT_PRIMARY;
+        }
         UIText(label, (int)(row.x + row.width) - lw - (int)(6 * scale),
-               (int)row.y + (slotH - 3 - small) / 2, small,
-               filled ? UI_TEXT_PRIMARY : UI_TEXT_MUTED);
+               (int)row.y + (slotH - 3 - small) / 2, small, labelCol);
 
         if (hovered && click && filled) {
             Items_Unequip(player, (EquipSlot)slot);
@@ -419,8 +423,9 @@ static void DrawInventory(Entity *player, int screenHeight) {
             } else {
                 snprintf(info, sizeof(info), "%s", Items_DisplayName(it));
             }
-            UIText(info, x, (int)(g_invRect.y + g_invRect.height) - pad - font, font,
-                   UI_TEXT_PRIMARY);
+            Color nameCol = (it->kind == ITEM_WEAPON && !it->unidentified)
+                            ? Items_RarityColor(it) : UI_TEXT_PRIMARY;
+            UIText(info, x, (int)(g_invRect.y + g_invRect.height) - pad - font, font, nameCol);
         }
 
         if (hovered && click) {

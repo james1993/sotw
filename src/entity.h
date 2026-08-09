@@ -216,6 +216,10 @@ typedef struct Entity {
     int gearArmorBonus;    // insignias
     int weaponArmorPen;    // Sundering: % pen on basic attacks
     int weaponLifesteal;   // Vampiric: health per basic hit
+    int weaponEnergyGain;  // Zealous: energy per basic hit
+    int weaponEnchantPct;  // of Enchanting: % longer enchantments the wielder casts
+    int weaponHealthDegen; // Vampiric's drawback: -pips of health regen while held
+    int weaponEnergyDrain; // Zealous's drawback: -pips of energy regen while held
     // Armour dye, applied to the sprite. dyed=false keeps the default.
     Color dyeColor;
     bool dyed;

@@ -248,14 +248,15 @@ bool Save_Write(void) {
         // Name goes last so it can contain spaces (never '|'). The upgrade
         // fields (mods, rune, insignia, dye) trail the older columns so an
         // old loader parses the first eight and ignores the rest.
-        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s\n", i,
+        fprintf(f, "item%d=%d|%d|%d|%.3f|%.3f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s\n", i,
                 (int)it->kind, it->dmgMin, it->dmgMax,
                 it->range, it->attackInterval, it->armor,
                 (it->count > 0 ? it->count : 1),
                 it->unidentified ? 1 : 0,
                 it->modHealth, it->modArmorPen, it->modLifesteal,
                 it->runeAttr, it->runeAttrBonus, it->runeHealth, it->insigniaArmor,
-                dyePacked, it->name);
+                dyePacked, it->rarity, it->modEnergyGain, it->modArmor, it->modEnchantPct,
+                it->name);
     }
 
     fclose(f);
@@ -428,10 +429,24 @@ bool Save_LoadAndApply(void) {
             memset(&it, 0, sizeof(it));
             int kind = 0, unid = 0, consumed = 0;
             int mh = 0, map = 0, mls = 0, ra = 0, rab = 0, rh = 0, ia = 0, dye = 0;
-            // Formats, newest first: the full upgrade columns; then
-            // count+unidentified before the name; count only; neither.
-            // Older saves parse fine on the shorter branches.
-            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%n",
+            int rar = 0, meg = 0, marm = 0, mench = 0;
+            // Formats, newest first: full upgrade columns WITH rarity; the
+            // earlier upgrade columns; count+unidentified; count only;
+            // neither. Older saves parse fine on the shorter branches.
+            if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%n",
+                       &kind, &it.dmgMin, &it.dmgMax, &it.range, &it.attackInterval,
+                       &it.armor, &it.count, &unid, &mh, &map, &mls, &ra, &rab, &rh, &ia,
+                       &dye, &rar, &meg, &marm, &mench, &consumed) >= 20 && consumed > 0) {
+                it.unidentified = (unid != 0);
+                it.modHealth = mh; it.modArmorPen = map; it.modLifesteal = mls;
+                it.runeAttr = ra; it.runeAttrBonus = rab; it.runeHealth = rh;
+                it.insigniaArmor = ia;
+                it.rarity = rar; it.modEnergyGain = meg; it.modArmor = marm;
+                it.modEnchantPct = mench;
+                it.dyeColor = (Color){ (unsigned char)((dye >> 16) & 0xFF),
+                                       (unsigned char)((dye >> 8) & 0xFF),
+                                       (unsigned char)(dye & 0xFF), 255 };
+            } else if (sscanf(val, "%d|%d|%d|%f|%f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%n",
                        &kind, &it.dmgMin, &it.dmgMax, &it.range, &it.attackInterval,
                        &it.armor, &it.count, &unid, &mh, &map, &mls, &ra, &rab, &rh, &ia,
                        &dye, &consumed) >= 16 && consumed > 0) {

@@ -147,9 +147,11 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // Lands on an ally or the caster (enchantments never target a
             // foe). The magnitude is rank-scaled, so a higher Healing
             // Prayers gives more regeneration; upkeep comes from the step.
+            // An "of Enchanting" weapon on the CASTER lengthens it.
             float mag = RankScaledValue(step, caster, skill->attribute);
+            float dur = step->duration * (1.0f + (float)caster->weaponEnchantPct / 100.0f);
             ApplyAffliction(target, EFFECT_ENCHANTMENT, step->conditionKind,
-                            step->duration, mag, step->upkeep);
+                            dur, mag, step->upkeep);
             Fx_Heal(target->pos);
             break;
         }

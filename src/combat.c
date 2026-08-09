@@ -184,7 +184,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
     if (energyCap < 0) energyCap = 0;
     if (e->energy > energyCap) e->energy = energyCap; // exhaustion bites immediately
 
-    int effPips = e->energyRegenPips - Entity_UpkeepPips(e);
+    int effPips = e->energyRegenPips - Entity_UpkeepPips(e) - e->weaponEnergyDrain;
     if (effPips > 0) {
         float regenInterval = GW_EnergyRegenInterval(effPips);
         e->energyRegenAccum += dt;
@@ -276,6 +276,7 @@ void Combat_UpdateEntity(Entity *e, float dt) {
             pips += fx->degenPips;
             if (fx->remaining <= 0.0f) fx->active = false;
         }
+        pips += (float)e->weaponHealthDegen; // Vampiric's -1 health regen drawback
         // Degeneration (conditions/hexes, positive pips) and regeneration
         // (enchantments, negative pips) net against each other in this one
         // sum, and the result is capped at +/-10 pips - GW1's health-drift
@@ -406,6 +407,10 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                         if (e->weaponLifesteal > 0) {
                             e->hp += e->weaponLifesteal;
                             if (e->hp > e->maxHp) e->hp = e->maxHp;
+                        }
+                        if (e->weaponEnergyGain > 0) { // Zealous
+                            e->energy += e->weaponEnergyGain;
+                            if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
                         }
                         Entity_GainAdrenalineStrike(e); // one strike, GW1's unit
                     }

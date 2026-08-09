@@ -64,6 +64,10 @@ static void Impact(Projectile *p) {
             shooter->hp += shooter->weaponLifesteal;
             if (shooter->hp > shooter->maxHp) shooter->hp = shooter->maxHp;
         }
+        if (shooter->weaponEnergyGain > 0) { // Zealous
+            shooter->energy += shooter->weaponEnergyGain;
+            if (shooter->energy > shooter->maxEnergy) shooter->energy = shooter->maxEnergy;
+        }
         Entity_GainAdrenalineStrike(shooter); // a landed shot is a strike too
         if (target->kind == ENT_MONSTER && !target->aggroed) {
             // A landed ranged hit wakes a sleeping monster - the wand

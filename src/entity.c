@@ -309,6 +309,9 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
                 UI_Notify(msg);
                 Save_Write();
             }
+
+            // Greens come off bosses: a unique weapon named for the kill.
+            if (e->isBoss) Items_SpawnUnique(e->pos, e->name);
         }
     }
 }

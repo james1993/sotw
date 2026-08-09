@@ -58,28 +58,76 @@ static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Carving"
 static const Item g_skaleFin  = { .kind = ITEM_MATERIAL, .name = "Skale Fin",  .count = 1 };
 static const Item g_grawlNecklace = { .kind = ITEM_MATERIAL, .name = "Grawl Necklace", .count = 1 };
 
-// Rolls a prefix and/or suffix upgrade onto a dropped weapon and rebuilds
-// its name to match - GW1's loot is really the mod hunt, so most weapons
-// come with something. The effects sit dormant until the weapon is
-// identified and wielded (Items_RecomputeEquipped folds them in).
+// A mod's rolled value by rarity tier: blue takes the low end, purple the
+// middle, gold the max - GW1's rule that the tier sets how good the
+// variable bonuses come out.
+static int ModValue(int lo, int hi, int rarity) {
+    if (rarity <= RARITY_BLUE)   return lo;
+    if (rarity == RARITY_PURPLE) return lo + (hi - lo) * 2 / 3;
+    return hi; // gold / green
+}
+
+// Rolls rarity and, from it, a prefix and/or suffix upgrade, then rebuilds
+// the name to match ("Vampiric Long Sword of Fortitude"). White weapons
+// carry nothing; blue gets one mod, purple one or two, gold a full pair -
+// and the premium prefixes (Vampiric, Zealous) are gold-only, exactly as
+// GW1 restricts them. Effects sit dormant until the weapon is identified
+// and wielded (Items_RecomputeEquipped folds them in).
 static void RollWeaponMods(Item *w) {
-    char prefix[16] = "";
-    char suffix[20] = "";
-    switch (GetRandomValue(0, 3)) { // ~half the time, a prefix
-        case 1: w->modArmorPen = GetRandomValue(10, 20);
-                snprintf(prefix, sizeof(prefix), "Sundering "); break;
-        case 2: w->modLifesteal = GetRandomValue(3, 5);
-                snprintf(prefix, sizeof(prefix), "Vampiric "); break;
-        default: break;
+    int roll = GetRandomValue(1, 100);
+    w->rarity = (roll <= 35) ? RARITY_WHITE
+              : (roll <= 75) ? RARITY_BLUE
+              : (roll <= 93) ? RARITY_PURPLE
+                             : RARITY_GOLD;
+    w->runeAttr = -1;
+    if (w->rarity == RARITY_WHITE) return;
+
+    char prefix[16] = "", suffix[20] = "";
+    bool wantPrefix = true, wantSuffix = true;
+    if (w->rarity == RARITY_BLUE) {         // exactly one mod
+        if (GetRandomValue(0, 1)) wantSuffix = false; else wantPrefix = false;
+    } else if (w->rarity == RARITY_PURPLE) { // one, sometimes two
+        if (GetRandomValue(0, 1)) { if (GetRandomValue(0, 1)) wantSuffix = false; else wantPrefix = false; }
     }
-    if (GetRandomValue(0, 1) == 0) { // ~half the time, a suffix
-        w->modHealth = 30;
-        snprintf(suffix, sizeof(suffix), " of Fortitude");
+
+    if (wantPrefix) {
+        // Premium prefixes only appear on gold.
+        int n = (w->rarity == RARITY_GOLD) ? GetRandomValue(0, 3) : GetRandomValue(0, 1);
+        switch (n) {
+            case 0: w->modArmorPen = ModValue(10, 20, w->rarity);
+                    snprintf(prefix, sizeof(prefix), "Sundering "); break;
+            case 1: w->modArmor = ModValue(2, 5, w->rarity); // "Insightful"-style flat armour
+                    snprintf(prefix, sizeof(prefix), "Defensive "); break;
+            case 2: w->modLifesteal = ModValue(1, 5, w->rarity);
+                    snprintf(prefix, sizeof(prefix), "Vampiric "); break;
+            case 3: w->modEnergyGain = 1;
+                    snprintf(prefix, sizeof(prefix), "Zealous "); break;
+        }
+    }
+    if (wantSuffix) {
+        switch (GetRandomValue(0, 2)) {
+            case 0: w->modHealth = ModValue(10, 30, w->rarity);
+                    snprintf(suffix, sizeof(suffix), " of Fortitude"); break;
+            case 1: w->modEnchantPct = ModValue(10, 20, w->rarity);
+                    snprintf(suffix, sizeof(suffix), " of Enchanting"); break;
+            case 2: w->modArmor += ModValue(4, 7, w->rarity);
+                    snprintf(suffix, sizeof(suffix), " of Shelter"); break;
+        }
     }
     if (prefix[0] || suffix[0]) {
         char base[40];
         snprintf(base, sizeof(base), "%s", w->name);
         snprintf(w->name, sizeof(w->name), "%s%s%s", prefix, base, suffix);
+    }
+}
+
+Color Items_RarityColor(const Item *item) {
+    switch (item ? item->rarity : RARITY_WHITE) {
+        case RARITY_BLUE:   return (Color){ 110, 160, 240, 255 };
+        case RARITY_PURPLE: return (Color){ 190, 130, 235, 255 };
+        case RARITY_GOLD:   return (Color){ 235, 200, 90, 255 };
+        case RARITY_GREEN:  return (Color){ 110, 220, 120, 255 };
+        default:            return (Color){ 235, 235, 235, 255 }; // white
     }
 }
 
@@ -181,7 +229,14 @@ int Items_SellValue(const Item *item) {
     if (item->kind == ITEM_ARMOR) return 10 + item->armor / 2;
     if (item->kind == ITEM_OFFHAND) return 20 + item->armor * 4;
     if (item->kind == ITEM_BAG) return 15 + item->count * 2;
-    if (item->kind == ITEM_WEAPON) return 15 + item->dmgMax / 2;
+    if (item->kind == ITEM_WEAPON) {
+        // Rarer weapons are worth more, GW1-style - the mods are the value.
+        static const int mult[] = { 1, 2, 4, 8, 10 }; // white,blue,purple,gold,green
+        int r = (item->rarity >= 0 && item->rarity <= RARITY_GREEN) ? item->rarity : 0;
+        return (15 + item->dmgMax / 2) * mult[r];
+    }
+    if (item->kind == ITEM_RUNE || item->kind == ITEM_INSIGNIA) return 20;
+    if (item->kind == ITEM_DYE) return 15;
     if (item->kind == ITEM_MATERIAL) return 5; // per hide
     if (item->kind == ITEM_KIT_SALVAGE || item->kind == ITEM_KIT_ID) {
         return 2 * (item->count > 0 ? item->count : 1); // half-ish value per use
@@ -257,6 +312,10 @@ void Items_RecomputeEquipped(Entity *player) {
     player->gearArmorBonus = 0;
     player->weaponArmorPen = 0;
     player->weaponLifesteal = 0;
+    player->weaponEnergyGain = 0;
+    player->weaponEnchantPct = 0;
+    player->weaponHealthDegen = 0;
+    player->weaponEnergyDrain = 0;
 
     // Armour: each of the five pieces protects its share of you, so a
     // full matching "AL 60" set reads as AL 60 and a missing piece
@@ -292,10 +351,16 @@ void Items_RecomputeEquipped(Entity *player) {
         player->attackDamageMax = it->dmgMax;
         player->attackRange = it->range;
         player->attackInterval = it->attackInterval;
-        // Weapon mods ride on the held weapon.
+        // Weapon mods ride on the held weapon - and the premium prefixes
+        // carry GW1's -1 regen drawback with them.
         player->gearHealthBonus += it->modHealth;
+        player->armor += it->modArmor; // of Shelter / Defensive: flat AL, added after the piece total
         player->weaponArmorPen = it->modArmorPen;
         player->weaponLifesteal = it->modLifesteal;
+        player->weaponEnergyGain = it->modEnergyGain;
+        player->weaponEnchantPct = it->modEnchantPct;
+        if (it->modLifesteal > 0)  player->weaponHealthDegen = 1; // Vampiric
+        if (it->modEnergyGain > 0) player->weaponEnergyDrain = 1; // Zealous
     } else {
         // Bare hands: GW1 lets you fight unarmed, badly.
         player->attackDamageMin = 3;
@@ -464,6 +529,27 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
             d->item = g_dyeTable[GetRandomValue(0, DYE_TABLE_COUNT - 1)];
         }
     }
+}
+
+void Items_SpawnUnique(Vector2 pos, const char *bossName) {
+    GroundDrop *d = FindFreeDrop();
+    if (!d) return;
+    memset(d, 0, sizeof(GroundDrop));
+    d->active = true;
+    d->pos = (Vector2){ pos.x, pos.y + 12 };
+    d->item = g_weaponTable[GetRandomValue(0, WEAPON_TABLE_COUNT - 1)];
+    d->item.count = 1;
+    d->item.rarity = RARITY_GREEN;
+    d->item.runeAttr = -1;
+    // A green's fixed, perfect stat line: max Fortitude and max Vampiric.
+    d->item.modHealth = 30;
+    d->item.modLifesteal = 5;
+    d->item.unidentified = false; // greens read ready
+    // Named for the boss that dropped it.
+    char base[40];
+    snprintf(base, sizeof(base), "%s", d->item.name);
+    snprintf(d->item.name, sizeof(d->item.name), "%.18s's %.16s",
+             bossName ? bossName : "Champion", base);
 }
 
 void Items_UpdatePickup(Entity *player) {
