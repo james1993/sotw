@@ -223,6 +223,23 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
         if (finalDamage > cap) finalDamage = cap;
     }
 
+    // Reversal of Fortune: convert this hit (up to its cap) into healing,
+    // then spend the enchantment. Only a real blow triggers it, not a
+    // degeneration tick (attacker == NULL), matching how GW1 treats a
+    // "damage packet".
+    if (attacker && finalDamage > 0) {
+        for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+            ActiveEffect *fx = &e->effects[i];
+            if (!fx->active || fx->category != EFFECT_ENCHANTMENT || fx->kind != ENCH_REVERSAL) continue;
+            int prevented = finalDamage < (int)fx->magnitude ? finalDamage : (int)fx->magnitude;
+            finalDamage -= prevented;
+            e->hp += prevented;
+            if (e->hp > e->maxHp) e->hp = e->maxHp;
+            fx->active = false;
+            break;
+        }
+    }
+
     // Only struck blows are audible. Condition ticks pass attacker=NULL
     // and would otherwise fire an impact every second, per affliction,
     // per character.
@@ -257,6 +274,20 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
             Entity_RecomputePenalizedStats(e);
         }
 
+        // Disease is contagious: a creature that dies diseased passes it
+        // to others of its own kind standing nearby - the reason a
+        // Necromancer's Rotting Flesh snowballs through a tight group.
+        if (Entity_HasCondition(e, COND_DISEASE)) {
+            for (int i = 0; i < g_entityCount; i++) {
+                Entity *o = &g_entities[i];
+                if (o == e || !o->alive || o->species != e->species) continue;
+                float dx = o->pos.x - e->pos.x, dy = o->pos.y - e->pos.y;
+                if (dx * dx + dy * dy <= GW_DISEASE_SPREAD_RADIUS * GW_DISEASE_SPREAD_RADIUS) {
+                    Entity_InflictCondition(o, COND_DISEASE, 10.0f);
+                }
+            }
+        }
+
         if (e->kind == ENT_MONSTER) {
             // GW1 XP is party-wide: the player levels no matter whether
             // they or the hero landed the killing blow.
@@ -289,6 +320,36 @@ bool Entity_HasCondition(const Entity *e, ConditionKind kind) {
         if (fx->active && fx->category == EFFECT_CONDITION && fx->kind == (int)kind) return true;
     }
     return false;
+}
+
+// A condition's degeneration in pips - the one place shared by the effect
+// VM (via a thin wrapper there) and the contagion path here, so the two
+// can't disagree about how hard Disease bites.
+static float ConditionDegenPips(ConditionKind kind) {
+    switch (kind) {
+        case COND_BLEEDING: return GW_PIPS_BLEEDING;
+        case COND_BURNING:  return GW_PIPS_BURNING;
+        case COND_POISON:   return GW_PIPS_POISON;
+        case COND_DISEASE:  return GW_PIPS_DISEASE;
+        default:            return 0.0f;
+    }
+}
+
+void Entity_InflictCondition(Entity *e, ConditionKind kind, float duration) {
+    if (!e || !e->alive) return;
+    ActiveEffect *slot = NULL;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        ActiveEffect *fx = &e->effects[i];
+        if (fx->active && fx->category == EFFECT_CONDITION && fx->kind == (int)kind) {
+            if (duration > fx->remaining) fx->remaining = duration;
+            return;
+        }
+        if (!slot && !fx->active) slot = fx;
+    }
+    if (!slot) return;
+    *slot = (ActiveEffect){ .active = true, .category = EFFECT_CONDITION, .kind = (int)kind,
+                            .remaining = duration, .degenPips = ConditionDegenPips(kind) };
+    if (kind == COND_DEEP_WOUND) Entity_RecomputePenalizedStats(e);
 }
 
 bool Entity_HasHex(const Entity *e, HexKind kind) {
@@ -331,6 +392,15 @@ int Entity_BonusArmor(const Entity *e) {
         }
     }
     return bonus;
+}
+
+int Entity_UpkeepPips(const Entity *e) {
+    if (!e) return 0;
+    int pips = 0;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        if (e->effects[i].active) pips += e->effects[i].upkeepPips;
+    }
+    return pips;
 }
 
 float Entity_DamageCapFraction(const Entity *e) {
@@ -381,7 +451,10 @@ float Entity_MoveSpeed(const Entity *e) {
     if (!e) return 0.0f;
     // GW1's Crippled is a flat halving, and it's brutal precisely
     // because it takes kiting away rather than shaving a few percent.
-    return Entity_HasCondition(e, COND_CRIPPLED) ? e->moveSpeed * 0.5f : e->moveSpeed;
+    // A movement hex (Imagined Burden) does the same, and the two don't
+    // stack past 50% - GW1 caps a single move penalty there.
+    bool slowed = Entity_HasCondition(e, COND_CRIPPLED) || Entity_HasHex(e, HEX_SLOWED);
+    return slowed ? e->moveSpeed * 0.5f : e->moveSpeed;
 }
 
 float Entity_AttackInterval(const Entity *e) {
@@ -490,6 +563,7 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
             case ENCH_BLOCK:      return "Guardian";
             case ENCH_DAMAGE_CAP: return "Protective Spirit";
             case ENCH_ARMOR:      return "Armor";
+            case ENCH_REVERSAL:   return "Reversal of Fortune";
             default: return "Enchantment";
         }
     }
@@ -498,6 +572,8 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
             case HEX_FALTERING: return "Faltering";
             case HEX_BACKLASH:  return "Backlash";
             case HEX_PHANTASM:  return "Phantasm";
+            case HEX_SLOWED:    return "Slowed";
+            case HEX_DIVERSION: return "Diversion";
             default: return "Hex";
         }
     }
@@ -509,6 +585,8 @@ const char *Entity_EffectName(const ActiveEffect *fx) {
         case COND_WEAKNESS:   return "Weakness";
         case COND_BLIND:      return "Blind";
         case COND_DEEP_WOUND: return "Deep Wound";
+        case COND_DAZED:      return "Dazed";
+        case COND_DISEASE:    return "Disease";
         default: return "Condition";
     }
 }
@@ -528,6 +606,8 @@ Color Entity_EffectColor(const ActiveEffect *fx) {
         case COND_WEAKNESS:   return (Color){ 150, 150, 160, 255 };
         case COND_BLIND:      return (Color){ 90, 90, 100, 255 };
         case COND_DEEP_WOUND: return (Color){ 150, 40, 40, 255 };
+        case COND_DAZED:      return (Color){ 200, 200, 120, 255 };
+        case COND_DISEASE:    return (Color){ 120, 150, 70, 255 };
         default: return (Color){ 190, 150, 90, 255 };
     }
 }

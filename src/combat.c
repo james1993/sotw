@@ -33,6 +33,7 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
 
     Entity *caster = Entity_Get(casterIndex);
     if (!caster || !caster->alive) return false;
+    if (caster->knockdownTimer > 0.0f) return false; // knocked down: no actions
     if (slot < 0 || slot >= SKILL_BAR_SIZE) return false;
 
     int skillIdx = caster->skillBar[slot];
@@ -84,6 +85,24 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         // the trade GW1 makes you weigh between defending and swinging.
         Entity_BreakStance(caster);
     }
+    // Exhaustion: an overcast skill eats into the energy ceiling until it
+    // recovers (see Combat_UpdateEntity).
+    if (skill->exhausting) {
+        caster->exhaustion += GW_EXHAUSTION_PER_CAST;
+        if (caster->exhaustion > (float)caster->maxEnergy) caster->exhaustion = (float)caster->maxEnergy;
+    }
+    // Diversion has been waiting for the target's next skill - this is it.
+    // The penalty is carried on the caster and folded into this skill's
+    // recharge when it is set (below, or in ResolveCast for a timed cast).
+    caster->divPenalty = 0.0f;
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
+        ActiveEffect *fx = &caster->effects[i];
+        if (fx->active && fx->category == EFFECT_HEX && fx->kind == HEX_DIVERSION) {
+            caster->divPenalty = fx->magnitude;
+            fx->active = false;
+            break;
+        }
+    }
 
     // Which skill the target panel shows as "current/recent" - set here so
     // it covers both branches below, not just cast-time skills.
@@ -96,6 +115,11 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
     float castTime = GW_SkillCastTime(skill->castTime,
                                       Entity_EffectiveRank(caster, ATTR_FAST_CASTING),
                                       skill->type == SKILLTYPE_SPELL);
+    // Dazed doubles spell activation (its interrupt-vulnerability half is
+    // not modelled). Attack skills and signets are untouched.
+    if (skill->type == SKILLTYPE_SPELL && Entity_HasCondition(caster, COND_DAZED)) {
+        castTime *= 2.0f;
+    }
 
     if (castTime > 0.0f) {
         caster->castingSlot = slot;
@@ -110,7 +134,8 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         caster->hasMoveTarget = false; // casting roots the caster, matches GW1 spellcasting
     } else {
         Effect_Execute(caster, skill, target);
-        caster->skillRecharge[slot] = skill->recharge;
+        caster->skillRecharge[slot] = skill->recharge + caster->divPenalty;
+        caster->divPenalty = 0.0f;
         caster->lastCastInterrupted = false;
         caster->postCastDisplayTimer = 3.0f;
     }
@@ -134,7 +159,8 @@ static void ResolveCast(Entity *caster) {
         Effect_Execute(caster, skill, target);
     }
 
-    caster->skillRecharge[slot] = skill->recharge;
+    caster->skillRecharge[slot] = skill->recharge + caster->divPenalty;
+    caster->divPenalty = 0.0f;
     caster->castingSlot = -1;
     caster->lastCastInterrupted = false;
     caster->postCastDisplayTimer = 3.0f;
@@ -147,12 +173,28 @@ void Combat_UpdateEntity(Entity *e, float dt) {
     // seconds, everyone has 3 pips, so this is 1 energy per second. The
     // accumulator doubles as the fractional part the resource bars use
     // to fill smoothly between whole-point ticks.
-    float regenInterval = Entity_EnergyRegenInterval(e);
-    e->energyRegenAccum += dt;
-    while (e->energyRegenAccum >= regenInterval) {
-        e->energyRegenAccum -= regenInterval;
-        e->energy++;
-        if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+    // Exhaustion recovers slowly and lowers the energy ceiling while it
+    // lasts; maintained enchantments (upkeep) slow the regen itself. Both
+    // are GW1 energy mechanics that the flat "1 per second" hid.
+    if (e->exhaustion > 0.0f) {
+        e->exhaustion -= GW_EXHAUSTION_RECOVER_PER_SEC * dt;
+        if (e->exhaustion < 0.0f) e->exhaustion = 0.0f;
+    }
+    int energyCap = e->maxEnergy - (int)e->exhaustion;
+    if (energyCap < 0) energyCap = 0;
+    if (e->energy > energyCap) e->energy = energyCap; // exhaustion bites immediately
+
+    int effPips = e->energyRegenPips - Entity_UpkeepPips(e);
+    if (effPips > 0) {
+        float regenInterval = GW_EnergyRegenInterval(effPips);
+        e->energyRegenAccum += dt;
+        while (e->energyRegenAccum >= regenInterval) {
+            e->energyRegenAccum -= regenInterval;
+            e->energy++;
+            if (e->energy > energyCap) e->energy = energyCap;
+        }
+    } else {
+        e->energyRegenAccum = 0.0f; // no net regen while upkeep cancels it
     }
 
     // Soul Reaping's rolling 15-second trigger window (entity.c).
@@ -256,6 +298,15 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         } else {
             e->degenAccum = 0.0f;
         }
+    }
+
+    // Knockdown is a real timed lockout: recharge and degeneration above
+    // keep running (GW1 doesn't pause them), but nothing below - no
+    // casting, moving or attacking - happens until you get up.
+    if (e->knockdownTimer > 0.0f) {
+        e->knockdownTimer -= dt;
+        if (e->knockdownTimer < 0.0f) e->knockdownTimer = 0.0f;
+        return;
     }
 
     if (Entity_IsCasting(e)) {

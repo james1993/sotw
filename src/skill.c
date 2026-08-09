@@ -118,6 +118,8 @@ void SkillDB_Init(void) {
     s = MakeSkill("Meteor", SKILLTYPE_SPELL, ATTR_FIRE_MAGIC,
                   25, 0, 3.0f, 15.0f, 200.0f, true, TARGET_AOE_FOES);
     AddStep(&s, FX_DAMAGE, 25, 4.0f, 0, 0);
+    AddStep(&s, FX_KNOCKDOWN, 0, 0, 0, 0);   // Meteor knocks down, GW1-style
+    s.exhausting = true;                      // and it's an overcast skill
     RegisterAs(SK_METEOR, s);
 
     // --- Monster skills ---
@@ -450,9 +452,12 @@ void SkillDB_Init(void) {
     // Regeneration: the magnitude IS the pip count, scaled by Healing
     // Prayers. Long duration stands in for GW1's maintained upkeep, which
     // the demake has no energy-drain system for.
+    // Mending is MAINTAINED: it runs long and drains one energy-regen pip
+    // the whole time (upkeep), the trade GW1 makes for permanent regen.
     s = MakeSkill("Mending", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
                   10, 0, 2.0f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
-    AddStep(&s, FX_APPLY_ENCHANTMENT, 2.0f, 0.2f, ENCH_REGEN, 30.0f);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 2.0f, 0.2f, ENCH_REGEN, 120.0f);
+    s.steps[0].upkeep = 1;
     RegisterAs(SK_MENDING, s);
 
     s = MakeSkill("Healing Breeze", SKILLTYPE_SPELL, ATTR_HEALING_PRAYERS,
@@ -480,4 +485,44 @@ void SkillDB_Init(void) {
                   10, 0, 1.0f, 20.0f, 220.0f, false, TARGET_SINGLE_FOE);
     AddStep(&s, FX_REMOVE_ENCHANTMENT, 14.0f, 6.0f, 1, 0.0f);
     RegisterAs(SK_SHATTER_ENCHANTMENT, s);
+
+    // --- Effect-system extensions (B) --------------------------------
+
+    // Disease, and it spreads on death (entity.c). Death Magic's pressure
+    // tool against a tight group.
+    s = MakeSkill("Rotting Flesh", SKILLTYPE_SPELL, ATTR_DEATH_MAGIC,
+                  15, 0, 3.0f, 3.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DISEASE, 12.0f);
+    RegisterAs(SK_ROTTING_FLESH, s);
+
+    // A movement-slow hex - removable only by hex removal, unlike the
+    // Crippled condition, which is the whole point of having both.
+    s = MakeSkill("Imagined Burden", SKILLTYPE_SPELL, ATTR_ILLUSION_MAGIC,
+                  15, 0, 1.0f, 30.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 0, 0, HEX_SLOWED, 12.0f);
+    RegisterAs(SK_IMAGINED_BURDEN, s);
+
+    // Diversion: the next skill the foe uses gets a big recharge penalty.
+    // baseValue/perRank ARE that penalty (in seconds), read into the
+    // hex's magnitude and spent on the target's next activation.
+    s = MakeSkill("Diversion", SKILLTYPE_SPELL, ATTR_DOMINATION_MAGIC,
+                  10, 0, 0.25f, 12.0f, 220.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_APPLY_HEX, 10.0f, 3.0f, HEX_DIVERSION, 6.0f);
+    RegisterAs(SK_DIVERSION, s);
+
+    // Reversal of Fortune: an ally enchantment that turns the next hit
+    // (up to a cap) into healing. magnitude is the cap, rank-scaled.
+    s = MakeSkill("Reversal of Fortune", SKILLTYPE_SPELL, ATTR_PROTECTION_PRAYERS,
+                  5, 0, 0.25f, 2.0f, 220.0f, false, TARGET_SINGLE_ALLY);
+    AddStep(&s, FX_APPLY_ENCHANTMENT, 15.0f, 4.0f, ENCH_REVERSAL, 8.0f);
+    RegisterAs(SK_REVERSAL_OF_FORTUNE, s);
+
+    // Concussion Shot: a bow attack that interrupts and leaves the foe
+    // Dazed. Low damage on purpose - it's shutdown, not a spike.
+    s = MakeSkill("Concussion Shot", SKILLTYPE_ATTACK_SKILL, ATTR_MARKSMANSHIP,
+                  25, 0, 0.0f, 5.0f, 240.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_INTERRUPT, 0, 0, 0, 0);
+    AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DAZED, 8.0f);
+    AddStep(&s, FX_DAMAGE, 3, 0.5f, 0, 0);
+    RegisterAs(SK_CONCUSSION_SHOT, s);
 }

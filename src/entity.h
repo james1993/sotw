@@ -68,6 +68,13 @@ typedef enum {
     // which is why a Warrior applies it before a spike rather than as
     // damage in its own right.
     COND_DEEP_WOUND,
+    // Dazed: spells take twice as long to cast (and, in GW1, interrupt
+    // far more easily - the demake models the cast-time half). It does no
+    // degeneration; it just shuts a caster down.
+    COND_DAZED,
+    // Disease: -4 pips like Poison, and contagious - when a diseased
+    // creature dies, others of its kind nearby catch it.
+    COND_DISEASE,
     COND_COUNT
 } ConditionKind;
 
@@ -86,6 +93,9 @@ typedef enum {
     HEX_FALTERING,  // attacks come slower, and the hex bleeds you slowly
     HEX_BACKLASH,   // attacking costs the hexed target health
     HEX_PHANTASM,   // pure health degeneration (Illusion: Conjure Phantasm)
+    HEX_SLOWED,     // movement halved (Illusion: Imagined Burden)
+    HEX_DIVERSION,  // the target's NEXT skill gets a big recharge penalty,
+                    // stored in the effect's magnitude; consumed on use
     HEX_COUNT
 } HexKind;
 
@@ -106,6 +116,8 @@ typedef enum {
     ENCH_BLOCK,       // a chance to block attacks (Guardian)
     ENCH_DAMAGE_CAP,  // caps each hit at magnitude * max health (Protective Spirit)
     ENCH_ARMOR,       // flat bonus armor while it holds (Armor of Earth)
+    ENCH_REVERSAL,    // converts the next damage packet (up to magnitude)
+                      // into healing, then ends (Reversal of Fortune)
     ENCH_COUNT
 } EnchantKind;
 
@@ -123,10 +135,13 @@ typedef struct {
     // and regen net against each other in the same summation - exactly
     // how GW1's health-drift arrows work.
     float degenPips;
-    // Enchantments only: the mechanic's parameter - block chance, the
-    // damage-cap fraction, or the bonus armor. Conditions and hexes leave
-    // it 0.
+    // The mechanic's parameter - enchantment block chance, damage-cap
+    // fraction, bonus armor or reversal cap; and, for the Diversion hex,
+    // the recharge penalty it will inflict. Unused effects leave it 0.
     float magnitude;
+    // Maintained enchantments (Mending) drain this many energy-regen pips
+    // while active - GW1's upkeep. 0 for everything else.
+    int upkeepPips;
 } ActiveEffect;
 
 
@@ -239,6 +254,16 @@ typedef struct Entity {
     float stanceTimer;
     float blockChance;      // 0..1 chance to block an incoming attack
     int   stanceArmorBonus; // added to armor while the stance holds
+
+    // Knockdown: while this is > 0 the entity can't move, attack or cast -
+    // GW1's knockdown is a real timed lockout, not just a cancelled action.
+    float knockdownTimer;
+    // Exhaustion (Elementalist): each overcast skill adds to this and it
+    // lowers the energy ceiling until it slowly recovers. In energy points.
+    float exhaustion;
+    // The recharge penalty a Diversion hex has armed for this entity's
+    // next skill use; added to that skill's recharge, then cleared.
+    float divPenalty;
 
     // Target-panel display: which skill to show as "currently/recently
     // used" (see ui_target.c). Set whenever a skill is activated; the
@@ -355,6 +380,11 @@ bool Entity_HasCondition(const Entity *e, ConditionKind kind);
 bool Entity_HasHex(const Entity *e, HexKind kind);
 bool Entity_IsEnchanted(const Entity *e);
 
+// Applies a condition directly (refreshing if already present). The
+// effect VM has its own richer path; this is for code outside it - the
+// disease-contagion spread on death.
+void Entity_InflictCondition(Entity *e, ConditionKind kind, float duration);
+
 // The best block chance from any source right now: a defensive stance
 // (Disciplined Stance) or a block enchantment (Guardian), whichever is
 // higher. Attacks roll against this in Entity_ResolveAttack.
@@ -363,6 +393,9 @@ float Entity_BlockChance(const Entity *e);
 // Sum of ENCH_ARMOR bonuses currently on the entity - added to worn AL
 // in the damage formula.
 int Entity_BonusArmor(const Entity *e);
+
+// Total energy-regen pips drained by maintained enchantments right now.
+int Entity_UpkeepPips(const Entity *e);
 
 // The tightest per-hit damage cap as a fraction of max health (Protective
 // Spirit is 0.10), or 1.0 when nothing caps damage.

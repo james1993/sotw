@@ -49,7 +49,8 @@ static float AfflictionDegenPips(EffectCategory category, int kind) {
         case COND_BLEEDING: return GW_PIPS_BLEEDING;
         case COND_BURNING:  return GW_PIPS_BURNING;
         case COND_POISON:   return GW_PIPS_POISON;
-        default:            return 0.0f; // Crippled/Weakness impair, not degenerate
+        case COND_DISEASE:  return GW_PIPS_DISEASE;
+        default:            return 0.0f; // Crippled/Weakness/Blind/Dazed impair, not degenerate
     }
 }
 
@@ -57,7 +58,7 @@ static float AfflictionDegenPips(EffectCategory category, int kind) {
 // same affliction is already present - GW1's rule, and the reason
 // spamming one skill doesn't multiply its degeneration.
 static void ApplyAffliction(Entity *target, EffectCategory category, int kind,
-                            float duration, float magnitude) {
+                            float duration, float magnitude, int upkeep) {
     ActiveEffect *free = NULL;
     for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) {
         ActiveEffect *fx = &target->effects[i];
@@ -66,6 +67,7 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind,
             // A recast refreshes the magnitude too (a stronger Mending
             // replaces a weaker one rather than being ignored).
             fx->magnitude = magnitude;
+            fx->upkeepPips = upkeep;
             if (category == EFFECT_ENCHANTMENT && kind == ENCH_REGEN) {
                 fx->degenPips = -magnitude;
             }
@@ -79,6 +81,7 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind,
     free->kind = kind;
     free->remaining = duration;
     free->magnitude = magnitude;
+    free->upkeepPips = upkeep;
     // Regenerating enchantments feed the same health-drift sum as
     // degeneration, but with the opposite sign.
     if (category == EFFECT_ENCHANTMENT) {
@@ -133,16 +136,20 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // share a numeric kind are still distinct effects.
             EffectCategory category =
                 (step->kind == FX_APPLY_HEX) ? EFFECT_HEX : EFFECT_CONDITION;
-            ApplyAffliction(target, category, step->conditionKind, step->duration, 0.0f);
+            // A hex may carry a magnitude (Diversion's recharge penalty);
+            // conditions ignore it. Neither is maintained, so upkeep is 0.
+            float hexMag = (category == EFFECT_HEX)
+                           ? RankScaledValue(step, caster, skill->attribute) : 0.0f;
+            ApplyAffliction(target, category, step->conditionKind, step->duration, hexMag, 0);
             break;
         }
         case FX_APPLY_ENCHANTMENT: {
             // Lands on an ally or the caster (enchantments never target a
             // foe). The magnitude is rank-scaled, so a higher Healing
-            // Prayers gives more regeneration.
+            // Prayers gives more regeneration; upkeep comes from the step.
             float mag = RankScaledValue(step, caster, skill->attribute);
             ApplyAffliction(target, EFFECT_ENCHANTMENT, step->conditionKind,
-                            step->duration, mag);
+                            step->duration, mag, step->upkeep);
             Fx_Heal(target->pos);
             break;
         }
@@ -201,11 +208,15 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             break;
         }
         case FX_KNOCKDOWN: {
-            // Simplified: cancels the target's current action. A full
-            // implementation would add a movement/cast lockout timer
-            // driven by step->duration.
+            // A real timed lockout now: cancel the current action AND put
+            // the target on the ground for the duration (combat.c enforces
+            // it). GW1 knockdown is a fixed ~2s regardless of source, so a
+            // step needn't carry a duration, but we honour one if given.
             target->castingSlot = -1;
+            target->castTimeRemaining = 0.0f;
             target->hasMoveTarget = false;
+            target->knockdownTimer = (step->duration > 0.0f) ? step->duration
+                                                             : GW_KNOCKDOWN_SECONDS;
             Fx_Stars(target->pos);
             break;
         }

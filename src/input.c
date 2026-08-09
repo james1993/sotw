@@ -153,8 +153,9 @@ static void UpdateGamepad(Entity *player, float dt, const Camera2D *camera) {
     float mag = sqrtf(lx * lx + ly * ly);
     if (mag > STICK_DEADZONE && !UICursor_Active()) {
         if (mag > 1.0f) { lx /= mag; ly /= mag; }
-        // Casting roots the caster, same as the click-to-move path.
-        if (!Entity_IsCasting(player)) {
+        // Casting roots the caster, and knockdown pins them - the stick
+        // has to respect both, just like the click-to-move path does.
+        if (!Entity_IsCasting(player) && player->knockdownTimer <= 0.0f) {
             // Crippled halves stick movement too, so the condition
             // costs you kiting whichever way you're steering.
             float speed = Entity_MoveSpeed(player);

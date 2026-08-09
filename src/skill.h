@@ -75,6 +75,12 @@ typedef enum {
     SK_PROTECTIVE_SPIRIT,   // Protection: caps each hit at 10% max health
     SK_ARMOR_OF_EARTH,      // Earth Magic: big armor bonus
     SK_SHATTER_ENCHANTMENT, // Domination: strips an enchantment + damage
+    // Effect-system extensions (B)
+    SK_ROTTING_FLESH,       // Death Magic: Disease
+    SK_IMAGINED_BURDEN,     // Illusion: movement-slow hex
+    SK_DIVERSION,           // Domination: next-skill recharge hex
+    SK_REVERSAL_OF_FORTUNE, // Protection: next damage -> healing enchantment
+    SK_CONCUSSION_SHOT,     // Marksmanship: interrupt + Dazed
     SK_COUNT
 } SkillId;
 
@@ -136,9 +142,12 @@ typedef struct {
     float baseValue;
     float perAttributeRank; // linear scaling term against skill->attribute
     // FX_APPLY_CONDITION: a ConditionKind. FX_APPLY_HEX: a HexKind.
-    // FX_REMOVE_*: how many effects to strip.
+    // FX_APPLY_ENCHANTMENT: an EnchantKind. FX_REMOVE_*: how many to strip.
     int conditionKind;
     float duration;
+    // FX_APPLY_ENCHANTMENT only: energy-regen pips this enchantment
+    // maintains (drains) while active - GW1 upkeep. 0 = not maintained.
+    int upkeep;
     // Applies to the CASTER rather than the skill's target. This is what
     // life-stealing and energy-stealing skills are made of: one step
     // takes from the foe, the next gives to you, in a single skill.
@@ -156,6 +165,9 @@ typedef struct {
     float range;
     float aoeRadius; // TARGET_AOE_FOES: blast radius around the target
     bool isElite;
+    // Overcast Elementalist skills (Meteor) add Exhaustion when used,
+    // temporarily lowering the caster's energy ceiling.
+    bool exhausting;
     // Inherent armor penetration (0..1) this skill carries regardless of
     // Strength - Penetrating Blow and the like. Strength's penetration is
     // added on top of this in the effect VM.

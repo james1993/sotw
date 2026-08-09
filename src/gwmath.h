@@ -47,6 +47,17 @@
 #define GW_PIPS_BLEEDING 3.0f
 #define GW_PIPS_BURNING  7.0f
 #define GW_PIPS_POISON   4.0f
+#define GW_PIPS_DISEASE  4.0f
+// How near a dying diseased creature spreads it to its own kind.
+#define GW_DISEASE_SPREAD_RADIUS 90.0f
+
+// Knockdown is a fixed ~2-second lockout in GW1 regardless of source.
+#define GW_KNOCKDOWN_SECONDS 2.0f
+
+// Exhaustion: each overcast skill costs 10 points of the energy ceiling,
+// recovered at roughly one point every three seconds (one regen pip).
+#define GW_EXHAUSTION_PER_CAST 10.0f
+#define GW_EXHAUSTION_RECOVER_PER_SEC (1.0f / 3.0f)
 // Conjure Phantasm's health degeneration (Illusion Magic), scaling to
 // GW1's roughly -3..-5 pips; the demake fixes it at a representative -3.
 #define GW_PIPS_PHANTASM 3.0f
