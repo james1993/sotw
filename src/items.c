@@ -41,6 +41,17 @@ static const Item g_runeTable[] = {
 };
 #define RUNE_TABLE_COUNT (int)(sizeof(g_runeTable) / sizeof(g_runeTable[0]))
 
+// Dyes recolour the whole outfit from one choice (GW1 dyes armour; the
+// demake keeps it to a single character colour).
+static const Item g_dyeTable[] = {
+    { .kind = ITEM_DYE, .name = "Red Dye",    .count = 1, .dyeColor = { 170, 50, 50, 255 } },
+    { .kind = ITEM_DYE, .name = "Blue Dye",   .count = 1, .dyeColor = { 60, 90, 180, 255 } },
+    { .kind = ITEM_DYE, .name = "Green Dye",  .count = 1, .dyeColor = { 60, 150, 70, 255 } },
+    { .kind = ITEM_DYE, .name = "Purple Dye", .count = 1, .dyeColor = { 130, 70, 170, 255 } },
+    { .kind = ITEM_DYE, .name = "Black Dye",  .count = 1, .dyeColor = { 50, 50, 55, 255 } },
+};
+#define DYE_TABLE_COUNT (int)(sizeof(g_dyeTable) / sizeof(g_dyeTable[0]))
+
 // The crafting material Charr leave behind - the Armorer turns these
 // (plus gold) into armor, GW1's craft-only armor economy in miniature.
 static const Item g_charrHide = { .kind = ITEM_MATERIAL, .name = "Charr Carving", .count = 1 };
@@ -440,6 +451,17 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
             d->active = true;
             d->pos = (Vector2){ pos.x - 14, pos.y - 8 };
             d->item = g_runeTable[GetRandomValue(0, RUNE_TABLE_COUNT - 1)];
+        }
+    }
+
+    // And, rarely, a dye - the only purely cosmetic drop.
+    if (GetRandomValue(1, 100) <= 5 && DropIsMine(party)) {
+        d = FindFreeDrop();
+        if (d) {
+            memset(d, 0, sizeof(GroundDrop));
+            d->active = true;
+            d->pos = (Vector2){ pos.x + 14, pos.y - 10 };
+            d->item = g_dyeTable[GetRandomValue(0, DYE_TABLE_COUNT - 1)];
         }
     }
 }

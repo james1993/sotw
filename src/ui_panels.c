@@ -435,6 +435,13 @@ static void DrawInventory(Entity *player, int screenHeight) {
                        it->kind == ITEM_RUNE || it->kind == ITEM_INSIGNIA) {
                 g_armedKit = armed ? -1 : i;
                 Audio_Play(SFX_UI_CLICK);
+            } else if (it->kind == ITEM_DYE) {
+                // Dye paints the whole outfit and is spent doing so.
+                player->dyeColor = it->dyeColor;
+                player->dyed = true;
+                Items_RemoveFromInventory(i);
+                Audio_Play(SFX_UI_CONFIRM);
+                Save_Write();
             } else if (worn) {
                 for (int s2 = 0; s2 < EQUIP_SLOT_COUNT; s2++) {
                     if (g_equipped[s2] == i) Items_Unequip(player, (EquipSlot)s2);

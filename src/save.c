@@ -204,6 +204,10 @@ bool Save_Write(void) {
     fprintf(f, "level=%d\n", p->level);
     fprintf(f, "xp=%d\n", p->xp);
     fprintf(f, "attrPoints=%d\n", p->attributePoints);
+    // Armour dye: packed RGB, and a flag so "no dye" survives distinctly
+    // from "dyed black".
+    fprintf(f, "dye=%d,%d\n", p->dyed ? 1 : 0,
+            ((int)p->dyeColor.r << 16) | ((int)p->dyeColor.g << 8) | (int)p->dyeColor.b);
     for (int i = 0; i < ATTR_COUNT; i++) {
         fprintf(f, "attr%d=%d\n", i, p->attributeRank[i]);
     }
@@ -347,6 +351,14 @@ bool Save_LoadAndApply(void) {
             p->level = ClampInt(atoi(val), 1, MAX_LEVEL);
         } else if (strcmp(key, "xp") == 0) {
             p->xp = ClampInt(atoi(val), 0, 1000000);
+        } else if (strcmp(key, "dye") == 0) {
+            int dd = 0, dc = 0;
+            if (sscanf(val, "%d,%d", &dd, &dc) == 2) {
+                p->dyed = (dd != 0);
+                p->dyeColor = (Color){ (unsigned char)((dc >> 16) & 0xFF),
+                                       (unsigned char)((dc >> 8) & 0xFF),
+                                       (unsigned char)(dc & 0xFF), 255 };
+            }
         } else if (strcmp(key, "attrPoints") == 0) {
             p->attributePoints = ClampInt(atoi(val), 0, 300);
         } else if (sscanf(key, "attr%d", &idx) == 1 && idx >= 0 && idx < ATTR_COUNT) {

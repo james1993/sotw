@@ -188,6 +188,9 @@ static void DrawHumanoid(const Entity *e, double now) {
         robe = (al >= 60) ? (Color){ 205, 175, 95, 255 }   // gilded raiment
              : (al >= 45) ? (Color){ 120, 140, 190, 255 }  // woad blue
                           : (Color){ 190, 165, 120, 255 }; // plain cloth
+        // Dye overrides the tier colour; the legs and trim derive from it,
+        // so the whole outfit recolours from one choice.
+        if (e->dyed) robe = e->dyeColor;
     }
 
     float walk = sinf(e->animTime * 6.0f) * e->moveBlend;
