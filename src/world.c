@@ -689,6 +689,10 @@ static bool g_petCharmed = false;
 // state and be saved alongside it.
 static int g_petLevel = 0;
 static int g_petXp = 0;
+// Which outposts the player has set foot in, as a bitmask over ZoneId.
+// GW1 lets you map-travel only to places you've already been; this is
+// that memory. Saved with the character.
+static unsigned g_visitedOutposts = 0;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
 static float g_autoResTimer = 0.0f;
@@ -942,7 +946,7 @@ static void ResetPlayerTransientState(Entity *p, Vector2 entryPos) {
     Entity_BreakStance(p);
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->adrenaline[i] = 0;
     p->alive = true;
-    p->deathPenalty = 0;
+    p->morale = 0;
     Entity_RecomputePenalizedStats(p);
     for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) p->effects[i].active = false;
     for (int i = 0; i < SKILL_BAR_SIZE; i++) p->skillRecharge[i] = 0.0f;
@@ -1076,7 +1080,7 @@ void World_SetupPetStats(Entity *pet, int level, int beastRank) {
     pet->hp = pet->maxHp;
     pet->baseMaxEnergy = pet->maxEnergy = 20; // pets never spend it; the base pool
     pet->energy = pet->maxEnergy;
-    pet->deathPenalty = 0;
+    pet->morale = 0;
 
     pet->armor = 60;
     pet->attackDamageMin = dmgMin;
@@ -1327,7 +1331,10 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     g_zone = &g_zones[zoneId];
     g_zoneId = zoneId;
     BuildZoneBarriers(g_zone, zoneId); // the ridge that shapes this zone's edge
-    if (g_zone->mode == MODE_OUTPOST) g_lastOutpostId = zoneId;
+    if (g_zone->mode == MODE_OUTPOST) {
+        g_lastOutpostId = zoneId;
+        g_visitedOutposts |= (1u << zoneId); // now a map-travel destination
+    }
     g_portalCooldown = PORTAL_COOLDOWN;
     g_wipeTimer = 0.0f;
     g_autoResTimer = 0.0f;
@@ -1384,6 +1391,32 @@ bool World_ZoneUnlocked(ZoneId zone) {
     return true;
 }
 
+bool World_IsOutpost(ZoneId zone) {
+    return zone >= 0 && zone < ZONE_COUNT && g_zones[zone].mode == MODE_OUTPOST;
+}
+
+const char *World_ZoneName(ZoneId zone) {
+    return (zone >= 0 && zone < ZONE_COUNT) ? g_zones[zone].name : "";
+}
+
+bool World_OutpostVisited(ZoneId zone) {
+    return zone >= 0 && zone < ZONE_COUNT && (g_visitedOutposts & (1u << zone)) != 0;
+}
+
+unsigned World_VisitedMask(void) { return g_visitedOutposts; }
+void World_SetVisitedMask(unsigned mask) { g_visitedOutposts = mask; }
+
+bool World_TravelToOutpost(ZoneId zone) {
+    // GW1's map travel: only to an unlocked outpost you have already
+    // visited, and only from the safety of an outpost (never mid-fight).
+    if (!World_IsOutpost(zone) || !World_ZoneUnlocked(zone) ||
+        !World_OutpostVisited(zone)) return false;
+    if (g_zone->mode != MODE_OUTPOST) return false;
+    if (zone == g_zoneId) return false; // already here
+    LoadZone(zone, (Vector2){ 0, 0 });
+    return true;
+}
+
 void World_RestoreToOutpost(ZoneId zone) {
     if (zone < 0 || zone >= ZONE_COUNT || g_zones[zone].mode != MODE_OUTPOST ||
         !World_ZoneUnlocked(zone)) {
@@ -1399,6 +1432,7 @@ void World_Init(void) {
     g_petCharmed = false;
     g_petLevel = 0;
     g_petXp = 0;
+    g_visitedOutposts = 0;
     g_lastOutpostId = ZONE_ASCALON_CITY;
 
     // The persistent player, built from whatever the creator produced

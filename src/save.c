@@ -231,6 +231,7 @@ bool Save_Write(void) {
     fprintf(f, "thomHired=%d\n", World_IsThomHired() ? 1 : 0);
     fprintf(f, "petCharmed=%d\n", World_IsPetCharmed() ? 1 : 0);
     fprintf(f, "petProgress=%d,%d\n", World_GetPetLevel(), World_GetPetXp());
+    fprintf(f, "visitedOutposts=%u\n", World_VisitedMask());
     for (int i = 0; i < QUEST_COUNT; i++) {
         fprintf(f, "quest%d=%d,%d\n", i, (int)g_quests[i].state, g_quests[i].kills);
     }
@@ -310,6 +311,7 @@ bool Save_LoadAndApply(void) {
     bool thomHired = false;
     bool petCharmed = false;
     int petLevel = 0, petXp = 0;
+    unsigned visitedOutposts = 0;
     int titleWorn = -1;
     bool searingHappened = false;
     int equipWeapon = -1, equipArmor = -1; // legacy single-slot keys
@@ -416,6 +418,8 @@ bool Save_LoadAndApply(void) {
             petCharmed = atoi(val) != 0;
         } else if (strcmp(key, "petProgress") == 0) {
             sscanf(val, "%d,%d", &petLevel, &petXp);
+        } else if (strcmp(key, "visitedOutposts") == 0) {
+            visitedOutposts = (unsigned)strtoul(val, NULL, 10);
         } else if (sscanf(key, "quest%d", &idx) == 1 && idx >= 0 && idx < QUEST_COUNT) {
             int state = 0, kills = 0;
             sscanf(val, "%d,%d", &state, &kills);
@@ -537,6 +541,7 @@ bool Save_LoadAndApply(void) {
 
     World_SetThomHired(thomHired);
     World_SetPetProgress(petLevel, petXp);
+    World_SetVisitedMask(visitedOutposts);
     World_SetPetCharmed(petCharmed);
     World_SetSearingHappened(searingHappened);
     // Only now, with the level restored, can the setter judge whether

@@ -120,6 +120,22 @@ ZoneId World_GetLastOutpostId(void);
 // starting camp if the id isn't an outpost.
 void World_RestoreToOutpost(ZoneId zone);
 
+// --- Map travel (GW1) ------------------------------------------------
+// True if the zone is an outpost / has been visited. A character can
+// map-travel only to outposts they have already set foot in.
+bool World_IsOutpost(ZoneId zone);
+bool World_OutpostVisited(ZoneId zone);
+const char *World_ZoneName(ZoneId zone);
+
+// Instantly travels to a visited outpost. Only works from within an
+// outpost (not mid-explorable) and to a different, unlocked, visited
+// outpost. Returns true if the travel happened.
+bool World_TravelToOutpost(ZoneId zone);
+
+// The visited-outposts bitmask, for the save system to persist/restore.
+unsigned World_VisitedMask(void);
+void World_SetVisitedMask(unsigned mask);
+
 // True when this zone is reachable by the current character. Piken
 // Square exists only for Reforged characters, so its portal is hidden
 // and its label explains itself rather than silently failing.

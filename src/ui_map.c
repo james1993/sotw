@@ -154,6 +154,52 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
         DrawCircleLines((int)p.x, (int)p.y, 5.0f, BLACK);
     }
 
+    // Map travel: a column of visited outposts you can jump to, GW1-style.
+    // Only works from within an outpost - never mid-explorable - so the
+    // buttons grey out and explain themselves elsewhere.
+    {
+        bool inOutpost = World_IsOutpost(World_GetZoneId());
+        int font = (int)(12 * scale);
+        int btnH = (int)(26 * scale);
+        int btnW = (int)(150 * scale);
+        int bx = (int)(margin / 2);
+        int by = (int)(margin);
+        Vector2 mp = GetMousePosition();
+        bool click = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
+        UIText("Map Travel", bx, by, font, (Color){ 220, 210, 180, 255 });
+        by += font + (int)(8 * scale);
+
+        for (int z = 0; z < ZONE_COUNT; z++) {
+            if (!World_IsOutpost((ZoneId)z) || !World_ZoneUnlocked((ZoneId)z)) continue;
+            if (!World_OutpostVisited((ZoneId)z)) continue;
+            bool here = (z == (int)World_GetZoneId());
+            Rectangle r = { (float)bx, (float)by, (float)btnW, (float)btnH };
+            bool hover = inOutpost && !here && CheckCollisionPointRec(mp, r);
+            Color bg = here ? (Color){ 60, 70, 60, 230 }
+                            : hover ? (Color){ 70, 90, 120, 240 }
+                                    : (Color){ 40, 46, 54, 230 };
+            DrawRectangleRec(r, bg);
+            DrawRectangleLinesEx(r, 1, here ? UI_GOLD_DIM : (Color){ 90, 92, 84, 200 });
+            Color tc = (inOutpost || here) ? RAYWHITE : (Color){ 130, 130, 130, 255 };
+            UIText(World_ZoneName((ZoneId)z), bx + (int)(8 * scale),
+                   by + (btnH - font) / 2, font, tc);
+            if (here) {
+                int sw = UITextWidth("(here)", (int)(10 * scale));
+                UIText("(here)", bx + btnW - sw - (int)(8 * scale),
+                       by + (btnH - (int)(10 * scale)) / 2, (int)(10 * scale), UI_GOLD_DIM);
+            }
+            if (hover && click) {
+                if (World_TravelToOutpost((ZoneId)z)) { g_open = false; return; }
+            }
+            by += btnH + (int)(6 * scale);
+        }
+        if (!inOutpost) {
+            UIText("Travel from an outpost.", bx, by + (int)(4 * scale),
+                   (int)(10 * scale), (Color){ 180, 150, 120, 255 });
+        }
+    }
+
     // Title + close hint.
     {
         int font = (int)(16 * scale);
