@@ -677,6 +677,13 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
 static const ZoneDef *g_zone = &g_zones[ZONE_ASCALON_CITY];
 static ZoneId g_zoneId = ZONE_ASCALON_CITY;
 static ZoneId g_lastOutpostId = ZONE_ASCALON_CITY;
+// GW1 has NO henchmen in pre-Searing: your party is you alone (or other
+// human players), plus a Ranger's pet or a Necromancer's minions. Cynn,
+// Little Thom, and the whole hero/henchman system are kept intact for the
+// eventual post-Searing content - they just aren't spawned or hireable
+// here. Flip this to 1 when post-Searing outposts arrive.
+#define HENCHMEN_AVAILABLE 0
+
 static bool g_thomHired = false;
 // Whether the player currently has a charmed animal companion. Like
 // g_thomHired it's party composition that outlives a single zone: set by
@@ -1349,10 +1356,13 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
         player->energy = player->maxEnergy;
     }
 
-    // The party spawns around the player's entry point.
-    SpawnCynn((Vector2){ playerEntry.x - 50, playerEntry.y + 50 });
-    if (g_thomHired) {
-        SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
+    // The party spawns around the player's entry point - but only where
+    // GW1 actually offers henchmen (post-Searing). Pre-Searing is solo.
+    if (HENCHMEN_AVAILABLE) {
+        SpawnCynn((Vector2){ playerEntry.x - 50, playerEntry.y + 50 });
+        if (g_thomHired) {
+            SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
+        }
     }
     // A charmed pet comes with you into every instance, GW1-style.
     if (g_petCharmed) {
@@ -1372,10 +1382,10 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
                 SpawnMonsterPatrol(def);
                 break;
             case SPAWN_NPC:
-                // A henchman standing in the outpost is the same person
-                // as the one in your party - don't spawn his NPC while
-                // he's hired.
-                if (def->npcRole == NPC_HENCHMAN && g_thomHired) break;
+                // The henchman-for-hire NPC only stands in the outpost
+                // where henchmen exist at all (post-Searing), and not while
+                // he's already in your party.
+                if (def->npcRole == NPC_HENCHMAN && (!HENCHMEN_AVAILABLE || g_thomHired)) break;
                 SpawnNpc(def);
                 break;
         }
