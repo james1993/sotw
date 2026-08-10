@@ -34,13 +34,16 @@ typedef enum {
     ZONE_NORTHLANDS,          // the Charr frontier
     ZONE_PIKEN_SQUARE,        // outpost, Reforged Mode only
     // Appended so existing ids (and every save that stores one) stay put.
-    ZONE_FOIBLES_FAIR,        // outpost: the fairground off Ashford
+    ZONE_FOIBLES_FAIR,        // outpost: the bazaar in Wizard's Folly
     ZONE_BARRADIN_ESTATE,     // explorable: Duke Barradin's devourer-plagued lands
     ZONE_FORT_RANIK,          // outpost, Reforged Mode only: the frontier fort
     ZONE_COUNT
 } ZoneId;
 
-#define MAX_ZONE_PORTALS 4
+// Lakeside County is pre-Searing's true hub and touches five neighbours -
+// Ascalon City, Ashford Abbey, Green Hills, Regent Valley and the gate to
+// the Northlands - so the cap is five, not four.
+#define MAX_ZONE_PORTALS 5
 
 // A gate to another zone. Zones can have several (hub outposts with
 // multiple exits), each with its own destination and arrival point.

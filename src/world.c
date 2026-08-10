@@ -428,12 +428,19 @@ static const SpawnDef g_follySpawns[] = {
       .level = 4, .hp = 150, .armor = 35, .aggro = 130.0f, .strengthRank = 6,
       .caster = true, .species = SPECIES_GRAWL, .group = 3 },
 
-    // The Fire Imp - Wizard's Folly's fiery mini-boss and, in GW1, the
-    // classic big-XP kill a new caster hunts. Boss (tougher, marked, drops
-    // a green) but teaches nothing, matching retail.
+    // Fire Imps - not a boss but ordinary enemies: fire elementalists that
+    // travel in a pack of three, the classic big-XP kill a new caster hunts
+    // in Wizard's Folly. Tougher than the local skale and grawl, and they
+    // hit hard together, so the danger is the group, not a single champion.
     { .kind = SPAWN_MONSTER, .name = "Fire Imp", .pos = { 120, -180 },
-      .level = 6, .hp = 260, .armor = 40, .aggro = 150.0f, .strengthRank = 8,
-      .caster = true, .boss = true, .capSkill = -1, .species = SPECIES_IMP },
+      .level = 5, .hp = 140, .armor = 40, .aggro = 150.0f, .strengthRank = 7,
+      .caster = true, .capSkill = -1, .species = SPECIES_IMP, .group = 4 },
+    { .kind = SPAWN_MONSTER, .name = "Fire Imp", .pos = { 190, -210 },
+      .level = 5, .hp = 140, .armor = 40, .aggro = 150.0f, .strengthRank = 7,
+      .caster = true, .capSkill = -1, .species = SPECIES_IMP, .group = 4 },
+    { .kind = SPAWN_MONSTER, .name = "Fire Imp", .pos = { 60, -230 },
+      .level = 5, .hp = 140, .armor = 40, .aggro = 150.0f, .strengthRank = 7,
+      .caster = true, .capSkill = -1, .species = SPECIES_IMP, .group = 4 },
 };
 
 // --- The Catacombs: Necromancer country, under the abbey. The only
@@ -569,7 +576,7 @@ static const SpawnDef g_pikenSpawns[] = {
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
 };
 
-// --- Foible's Fair: the fairground off Ashford, a festival outpost ---
+// --- Foible's Fair: the bazaar up in Wizard's Folly's snowy heights ---
 
 static const EnvProp g_foibleProps[] = {
     { {    0, -140 }, PROP_FIRE,  1.2f },
@@ -666,9 +673,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .portals = {
             { {  380, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { -420, 0 } },
             { { -380, 0 }, "To The Catacombs",   ZONE_CATACOMBS,       {  320, 0 } },
-            { {    0, 260 }, "To Foible's Fair",  ZONE_FOIBLES_FAIR,    { -280, 0 } },
         },
-        .portalCount = 3,
+        .portalCount = 2,
         .bounds = { -450, -300, 900, 600 },
         .hasShrine = false,
         .props = g_abbeyProps, .propCount = COUNT(g_abbeyProps),
@@ -684,8 +690,11 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
             { { 1020, 0 },   "To Ascalon City",      ZONE_ASCALON_CITY,   { -360, 0 } },
             { { 280, -420 }, "To Green Hills County", ZONE_GREEN_HILLS,   {    0, 300 } },
             { { 280,  420 }, "To Regent Valley",     ZONE_REGENT_VALLEY,  {    0, -280 } },
+            // The gate in the wall - the only way north into the Charr
+            // frontier. GW1 puts this passage in Lakeside, not the city.
+            { { 720, -440 }, "To The Northlands",    ZONE_NORTHLANDS,     { -420, 0 } },
         },
-        .portalCount = 4,
+        .portalCount = 5,
         .bounds = { -520, -480, 1600, 960 },
         .hasShrine = true,
         .shrinePos = { -360, 160 },
@@ -699,9 +708,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .gridColor = { 92, 80, 58, 255 },
         .portals = {
             { { -420, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, {  960, 0 } },
-            { {  420, 0 }, "To The Northlands",  ZONE_NORTHLANDS,      { -420, 0 } },
         },
-        .portalCount = 2,
+        .portalCount = 1,
         .bounds = { -480, -300, 960, 600 },
         .hasShrine = false,
         .props = g_cityProps, .propCount = COUNT(g_cityProps),
@@ -748,8 +756,11 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .gridColor = { 54, 74, 88, 255 },
         .portals = {
             { { 420, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -440, 0 } },
+            // Foible's Fair sits up in the snowy heights of the Folly - the
+            // fair is reached through here, not off Ashford Abbey.
+            { { 300, -260 }, "To Foible's Fair", ZONE_FOIBLES_FAIR, { 0, 180 } },
         },
-        .portalCount = 1,
+        .portalCount = 2,
         .bounds = { -460, -300, 920, 600 },
         .hasShrine = true,
         .shrinePos = { 300, 200 },
@@ -777,7 +788,7 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 20, 21, 24, 255 },  // cold, grey, no green left
         .gridColor = { 78, 82, 90, 255 },
         .portals = {
-            { { -460,  0 }, "To Ascalon City", ZONE_ASCALON_CITY, {  380, 0 } },
+            { { -460,  0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, {  720, -380 } },
             // Reforged only. World_ZoneUnlocked hides it otherwise, so a
             // character who can't go there is never shown a door.
             { { 1120, 60 }, "To Piken Square", ZONE_PIKEN_SQUARE, { -300, 0 } },
@@ -809,7 +820,7 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 24, 22, 16, 255 },  // festival torchlight
         .gridColor = { 92, 82, 58, 255 },
         .portals = {
-            { { -360, 0 }, "To Ashford Abbey", ZONE_ASHFORD_ABBEY, { 0, 180 } },
+            { { -360, 0 }, "To Wizard's Folly", ZONE_WIZARDS_FOLLY, { 300, -200 } },
         },
         .portalCount = 1,
         .bounds = { -420, -280, 840, 560 },
