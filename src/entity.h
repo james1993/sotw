@@ -36,7 +36,11 @@ typedef enum {
     SPECIES_GRAWL,       // hunched ape-men off the hills
     SPECIES_MOA,         // flightless bird; harmless unless provoked
     SPECIES_UNDEAD,      // the Catacombs
-    SPECIES_ALOE         // rooted plant; never moves
+    SPECIES_ALOE,        // rooted plant; never moves
+    // Appended so existing species ids (saved on the pet) stay put.
+    SPECIES_IMP,         // Fire Imp: Wizard's Folly's fiery mini-boss
+    SPECIES_WORM,        // burrowing worms of the fields
+    SPECIES_STALKER      // Melandru's Stalker: a charmable big cat
 } Species;
 
 typedef enum {

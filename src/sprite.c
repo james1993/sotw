@@ -683,6 +683,113 @@ static void DrawAloe(const Entity *e, double now) {
     DrawCircleV((Vector2){ p.x, p.y + r * 0.26f }, r * 0.12f, dark);
 }
 
+// ----- Fire Imp: a small fiend wreathed in flame (Wizard's Folly) -----
+static void DrawImp(const Entity *e, double now) {
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    float hop = sinf(e->animTime * 8.0f) * e->moveBlend * r * 0.08f;
+    float flick = sinf((float)now * 9.0f + p.x * 0.05f);
+    Color body = e->color;                  // ember red
+    Color glow = Lighten(body, 0.4f);
+    Color flame = (Color){ 255, 170, 60, 255 };
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.7f), r * 0.6f, r * 0.2f, (Color){ 0, 0, 0, 70 });
+    float by = p.y - hop;
+
+    // A halo of flame licking upward behind the body.
+    for (int i = -1; i <= 1; i++) {
+        float fx = p.x + i * r * 0.28f;
+        float h = r * (0.6f + 0.2f * flick * (i == 0 ? 1.0f : -1.0f));
+        DrawTriangle((Vector2){ fx - r * 0.16f, by - r * 0.1f },
+                     (Vector2){ fx + r * 0.16f, by - r * 0.1f },
+                     (Vector2){ fx, by - h }, (i % 2 == 0) ? flame : (Color){ 255, 210, 90, 220 });
+    }
+
+    // Squat body + head.
+    DrawCircleV((Vector2){ p.x, by }, r * 0.42f, body);
+    DrawCircleV((Vector2){ p.x, by - r * 0.5f }, r * 0.3f, glow);
+    // Horns.
+    DrawTriangle((Vector2){ p.x - r * 0.28f, by - r * 0.62f },
+                 (Vector2){ p.x - r * 0.1f,  by - r * 0.6f },
+                 (Vector2){ p.x - r * 0.3f,  by - r * 0.95f }, body);
+    DrawTriangle((Vector2){ p.x + r * 0.1f,  by - r * 0.6f },
+                 (Vector2){ p.x + r * 0.28f, by - r * 0.62f },
+                 (Vector2){ p.x + r * 0.3f,  by - r * 0.95f }, body);
+    // Molten eyes.
+    DrawCircleV((Vector2){ p.x + sx * r * 0.1f, by - r * 0.5f }, r * 0.07f, (Color){ 255, 240, 180, 255 });
+}
+
+// ----- Worm: a segmented burrower rising out of the ground -----
+static void DrawWorm(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+    Color skin = e->color;
+    Color dark = Darken(skin, 0.65f);
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.5f), r * 0.7f, r * 0.22f, (Color){ 0, 0, 0, 70 });
+
+    // A stack of segments curving up out of the earth; the head rears back
+    // then strikes on the swing.
+    int segs = 5;
+    for (int i = 0; i < segs; i++) {
+        float t = (float)i / (float)(segs - 1);
+        float wob = sinf(e->animTime * 4.0f + i * 0.9f) * e->moveBlend * r * 0.12f;
+        float rear = (1.0f - snap) * t * r * 0.2f;
+        float x = p.x + sx * (wob + t * r * 0.15f) - sx * rear;
+        float y = p.y + r * 0.4f - t * r * 0.95f;
+        float rad = r * (0.34f - t * 0.12f);
+        DrawCircleV((Vector2){ x, y }, rad, (i % 2 == 0) ? skin : dark);
+    }
+    // Head at the top, a round maw.
+    float hx = p.x + sx * (snap * r * 0.5f);
+    float hy = p.y - r * 0.55f - snap * r * 0.15f;
+    DrawCircleV((Vector2){ hx, hy }, r * 0.26f, skin);
+    DrawCircleV((Vector2){ hx + sx * r * 0.06f, hy }, r * 0.12f, (Color){ 60, 20, 24, 255 }); // maw
+}
+
+// ----- Melandru's Stalker: a lean charmable big cat -----
+static void DrawStalker(const Entity *e, double now) {
+    (void)now;
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f;
+    float step = sinf(e->animTime * 9.0f) * e->moveBlend;
+    float phase = SwingPhase(e);
+    float snap = (phase >= 0.0f) ? AttackSwing(phase) : 0.0f;
+    Color coat = e->color;
+    Color dark = Darken(coat, 0.6f);
+
+    DrawEllipse((int)p.x, (int)(p.y + r * 0.65f), r * 0.85f, r * 0.24f, (Color){ 0, 0, 0, 75 });
+    float by = p.y;
+
+    // Four legs, front pair reaching on a pounce.
+    for (int i = -1; i <= 1; i += 2) {
+        float k = (i > 0 ? step : -step) * r * 0.25f;
+        DrawLineEx((Vector2){ p.x - sx * r * 0.35f, by + r * 0.15f },
+                   (Vector2){ p.x - sx * r * 0.35f + k, by + r * 0.6f }, r * 0.1f, dark); // hind
+        DrawLineEx((Vector2){ p.x + sx * (r * 0.35f + snap * r * 0.2f), by + r * 0.1f },
+                   (Vector2){ p.x + sx * (r * 0.4f) - k, by + r * 0.6f }, r * 0.1f, dark); // fore
+    }
+    // Long low body.
+    DrawEllipse((int)p.x, (int)(by + r * 0.05f), r * 0.62f, r * 0.32f, coat);
+    // Tail flicking behind.
+    DrawLineEx((Vector2){ p.x - sx * r * 0.55f, by },
+               (Vector2){ p.x - sx * (r * 0.95f), by - r * 0.3f - step * r * 0.15f }, r * 0.08f, coat);
+    // Head forward, low.
+    Vector2 head = { p.x + sx * (r * 0.6f + snap * r * 0.2f), by - r * 0.12f };
+    DrawCircleV(head, r * 0.28f, coat);
+    DrawTriangle((Vector2){ head.x - sx * r * 0.02f, head.y - r * 0.24f },
+                 (Vector2){ head.x - sx * r * 0.18f, head.y - r * 0.24f },
+                 (Vector2){ head.x - sx * r * 0.1f,  head.y - r * 0.42f }, coat); // ear
+    DrawCircleV((Vector2){ head.x + sx * r * 0.12f, head.y - r * 0.04f }, r * 0.05f,
+                (Color){ 240, 220, 120, 255 }); // eye
+}
+
 void Sprite_DrawEntity(const Entity *e, double now) {
     switch (e->species) {
         case SPECIES_CHARR:    DrawCharr(e, now); break;
@@ -692,6 +799,9 @@ void Sprite_DrawEntity(const Entity *e, double now) {
         case SPECIES_MOA:      DrawMoa(e, now); break;
         case SPECIES_UNDEAD:   DrawUndead(e, now); break;
         case SPECIES_ALOE:     DrawAloe(e, now); break;
+        case SPECIES_IMP:      DrawImp(e, now); break;
+        case SPECIES_WORM:     DrawWorm(e, now); break;
+        case SPECIES_STALKER:  DrawStalker(e, now); break;
         default:               DrawHumanoid(e, now); break;
     }
 }

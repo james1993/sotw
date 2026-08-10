@@ -339,6 +339,25 @@ static const SpawnDef g_regentSpawns[] = {
     { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { -260, -60 },
       .level = 2, .hp = 100, .armor = 25, .aggro = 110.0f, .strengthRank = 4,
       .species = SPECIES_SKALE },
+
+    // Burrowing worms of the field - low aggro, they only stir when you
+    // step close (The Worm Problem's quarry).
+    { .kind = SPAWN_MONSTER, .name = "Plague Worm", .pos = { 420, 220 },
+      .level = 2, .hp = 90, .armor = 20, .aggro = 80.0f, .strengthRank = 3,
+      .species = SPECIES_WORM, .group = 4 },
+    { .kind = SPAWN_MONSTER, .name = "Plague Worm", .pos = { 500, 160 },
+      .level = 2, .hp = 90, .armor = 20, .aggro = 80.0f, .strengthRank = 3,
+      .species = SPECIES_WORM, .group = 4 },
+
+    // Charmable animals for a Ranger passing through: a lean Melandru's
+    // Stalker and a Black Moa, the pre-Searing pets Regent Valley is known
+    // for. Passive until provoked (low aggro), like the Lakeside Moa.
+    { .kind = SPAWN_MONSTER, .name = "Melandru's Stalker", .pos = { -420, 200 },
+      .level = 5, .hp = 140, .armor = 30, .aggro = 70.0f, .strengthRank = 5,
+      .species = SPECIES_STALKER },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Black Moa", .pos = { -500, -180 },
+      .posB = { -300, -240 }, .level = 5, .hp = 130, .armor = 30, .aggro = 70.0f,
+      .strengthRank = 5, .species = SPECIES_MOA },
 };
 
 // --- Wizard's Folly: Elementalist country. Sodden ground, skale, and
@@ -391,6 +410,13 @@ static const SpawnDef g_follySpawns[] = {
     { .kind = SPAWN_MONSTER, .name = "Grawl Longeye", .pos = { 380, -60 },
       .level = 4, .hp = 150, .armor = 35, .aggro = 130.0f, .strengthRank = 6,
       .caster = true, .species = SPECIES_GRAWL, .group = 3 },
+
+    // The Fire Imp - Wizard's Folly's fiery mini-boss and, in GW1, the
+    // classic big-XP kill a new caster hunts. Boss (tougher, marked, drops
+    // a green) but teaches nothing, matching retail.
+    { .kind = SPAWN_MONSTER, .name = "Fire Imp", .pos = { 120, -180 },
+      .level = 6, .hp = 260, .armor = 40, .aggro = 150.0f, .strengthRank = 8,
+      .caster = true, .boss = true, .capSkill = -1, .species = SPECIES_IMP },
 };
 
 // --- The Catacombs: Necromancer country, under the abbey. The only
@@ -830,6 +856,9 @@ static bool g_petCharmed = false;
 // state and be saved alongside it.
 static int g_petLevel = 0;
 static int g_petXp = 0;
+// Which animal the pet is - a Moa or a charmed Melandru's Stalker - so a
+// respawned pet keeps the look of what you tamed. Saved with the rest.
+static int g_petSpecies = SPECIES_MOA;
 // Which outposts the player has set foot in, as a bitmask over ZoneId.
 // GW1 lets you map-travel only to places you've already been; this is
 // that memory. Saved with the character.
@@ -869,11 +898,14 @@ void World_SetPetCharmed(bool charmed) {
 
 int World_GetPetLevel(void) { return g_petLevel; }
 int World_GetPetXp(void) { return g_petXp; }
+int World_GetPetSpecies(void) { return g_petSpecies; }
 
 void World_SetPetProgress(int level, int xp) {
     g_petLevel = level;
     g_petXp = xp;
 }
+
+void World_SetPetSpecies(int species) { g_petSpecies = species; }
 
 ZoneId World_GetLastOutpostId(void) { return g_lastOutpostId; }
 
@@ -1211,9 +1243,15 @@ void World_SetupPetStats(Entity *pet, int level, int beastRank) {
     pet->npcRole = NPC_NONE;
     pet->isBoss = false;
     pet->capturedSkill = -1;
-    pet->species = SPECIES_MOA;
-    pet->color = (Color){ 198, 158, 96, 255 }; // straw plumage
-    strncpy(pet->name, "Moa Bird", sizeof(pet->name) - 1);
+    // Keep the look of whatever was tamed.
+    pet->species = g_petSpecies;
+    if (g_petSpecies == SPECIES_STALKER) {
+        pet->color = (Color){ 92, 110, 84, 255 }; // mottled hide
+        strncpy(pet->name, "Melandru's Stalker", sizeof(pet->name) - 1);
+    } else {
+        pet->color = (Color){ 198, 158, 96, 255 }; // straw plumage
+        strncpy(pet->name, "Moa Bird", sizeof(pet->name) - 1);
+    }
     pet->name[sizeof(pet->name) - 1] = '\0';
 
     int maxHp, dmgMin, dmgMax;
@@ -1262,6 +1300,7 @@ void World_CharmPet(Entity *animal, int beastRank) {
     if (start > MAX_LEVEL) start = MAX_LEVEL;
     g_petLevel = start;
     g_petXp = 0;
+    g_petSpecies = animal->species; // remember what was tamed, for respawns
     World_SetupPetStats(animal, g_petLevel, beastRank);
     World_SetPetCharmed(true); // saves the whole party state, pet included
 }
@@ -1579,6 +1618,7 @@ void World_Init(void) {
     g_petCharmed = false;
     g_petLevel = 0;
     g_petXp = 0;
+    g_petSpecies = SPECIES_MOA;
     g_visitedOutposts = 0;
     g_lastOutpostId = ZONE_ASCALON_CITY;
 

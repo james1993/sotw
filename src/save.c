@@ -230,7 +230,7 @@ bool Save_Write(void) {
     fprintf(f, "skillsBought=%d\n", g_skillsPurchased);
     fprintf(f, "thomHired=%d\n", World_IsThomHired() ? 1 : 0);
     fprintf(f, "petCharmed=%d\n", World_IsPetCharmed() ? 1 : 0);
-    fprintf(f, "petProgress=%d,%d\n", World_GetPetLevel(), World_GetPetXp());
+    fprintf(f, "petProgress=%d,%d,%d\n", World_GetPetLevel(), World_GetPetXp(), World_GetPetSpecies());
     fprintf(f, "visitedOutposts=%u\n", World_VisitedMask());
     for (int i = 0; i < QUEST_COUNT; i++) {
         fprintf(f, "quest%d=%d,%d\n", i, (int)g_quests[i].state, g_quests[i].kills);
@@ -310,7 +310,7 @@ bool Save_LoadAndApply(void) {
     int outpost = (int)ZONE_ASCALON_CITY;
     bool thomHired = false;
     bool petCharmed = false;
-    int petLevel = 0, petXp = 0;
+    int petLevel = 0, petXp = 0, petSpecies = 0; // 0 = SPECIES_MOA
     unsigned visitedOutposts = 0;
     int titleWorn = -1;
     bool searingHappened = false;
@@ -417,7 +417,7 @@ bool Save_LoadAndApply(void) {
         } else if (strcmp(key, "petCharmed") == 0) {
             petCharmed = atoi(val) != 0;
         } else if (strcmp(key, "petProgress") == 0) {
-            sscanf(val, "%d,%d", &petLevel, &petXp);
+            sscanf(val, "%d,%d,%d", &petLevel, &petXp, &petSpecies); // species optional (old saves)
         } else if (strcmp(key, "visitedOutposts") == 0) {
             visitedOutposts = (unsigned)strtoul(val, NULL, 10);
         } else if (sscanf(key, "quest%d", &idx) == 1 && idx >= 0 && idx < QUEST_COUNT) {
@@ -556,6 +556,7 @@ bool Save_LoadAndApply(void) {
 
     World_SetThomHired(thomHired);
     World_SetPetProgress(petLevel, petXp);
+    World_SetPetSpecies(petSpecies);
     World_SetVisitedMask(visitedOutposts);
     World_SetPetCharmed(petCharmed);
     World_SetSearingHappened(searingHappened);

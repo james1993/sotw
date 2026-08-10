@@ -540,7 +540,7 @@ int Entity_FindPet(void) {
 
 bool Entity_IsCharmable(const Entity *e) {
     return e && e->alive && e->kind == ENT_MONSTER && !e->isBoss &&
-           e->species == SPECIES_MOA;
+           (e->species == SPECIES_MOA || e->species == SPECIES_STALKER);
 }
 
 bool Entity_IsExploitableCorpse(const Entity *e) {

@@ -167,7 +167,9 @@ void World_SetPetCharmed(bool charmed);
 // to 20). Persisted with the character and restored on load.
 int World_GetPetLevel(void);
 int World_GetPetXp(void);
+int World_GetPetSpecies(void);       // Species of the charmed pet
 void World_SetPetProgress(int level, int xp);
+void World_SetPetSpecies(int species);
 
 // Charms a wild animal into the player's pet: records its starting level,
 // scales its stats to that level and the given Beast Mastery rank, and
