@@ -18,11 +18,22 @@ struct Entity;
 // can't meaningfully move yet.
 typedef enum {
     TITLE_DEFENDER_OF_ASCALON = 0,
+    // Survivor: reach the level cap without your character ever dying.
+    // A single death loses it for good (until a new character), which is
+    // what makes it the other pre-Searing badge of honour.
+    TITLE_SURVIVOR,
     TITLE_COUNT
 } TitleId;
 
 #define TITLE_LDOA_LEVEL   20
 #define TITLE_LDOA_REVEAL  12
+#define TITLE_SURVIVOR_LEVEL 20
+
+// Records that the player character has died - the one thing that ends a
+// Survivor run. Called from the death path; saved with the character.
+void Titles_NotifyDeath(void);
+bool Titles_EverDied(void);
+void Titles_SetEverDied(bool died);
 
 const char *Titles_Name(TitleId id);
 

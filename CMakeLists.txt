@@ -120,7 +120,20 @@ target_link_libraries(test_ui_focus PRIVATE m)
 target_include_directories(test_ui_focus PRIVATE
     ${raylib_SOURCE_DIR}/src)
 
+# The title-track logic is pure arithmetic over the player's level plus a
+# sticky death flag, all checkable without a window - and the death-flag
+# rule is subtle enough (lost for good, restored from a save) to be worth
+# pinning.
+add_executable(test_titles EXCLUDE_FROM_ALL
+    tests/test_titles.c
+    src/titles.c)
+target_include_directories(test_titles PRIVATE src)
+target_link_libraries(test_titles PRIVATE m)
+target_include_directories(test_titles PRIVATE
+    ${raylib_SOURCE_DIR}/src)
+
 add_custom_target(run_tests
     COMMAND test_ui_focus
-    DEPENDS test_ui_focus
+    COMMAND test_titles
+    DEPENDS test_ui_focus test_titles
     COMMENT "Running unit tests")

@@ -9,6 +9,7 @@
 #include "skill.h"
 #include "skillbook.h"
 #include "save.h"
+#include "titles.h"
 #include "ui_hints.h"
 #include <math.h>
 #include <stdio.h>
@@ -291,6 +292,9 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
         // on - GW1 makes no distinction, and that's what makes a
         // Necromancer strongest in exactly the fights that go badly.
         AwardSoulReaping(e);
+
+        // A player death ends any Survivor run, for good.
+        if (e->kind == ENT_PLAYER) Titles_NotifyDeath();
 
         // GW1's death penalty: dying drops a party member's morale 15%,
         // stacking down to -60%, until they rezone. Pets take it too.

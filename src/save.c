@@ -187,6 +187,7 @@ bool Save_Write(void) {
     // has been through the Searing can say so on the selection screen.
     fprintf(f, "searing=%d\n", World_SearingHappened() ? 1 : 0);
     fprintf(f, "titleWorn=%d\n", Titles_Displayed());
+    fprintf(f, "everDied=%d\n", Titles_EverDied() ? 1 : 0);
 
     // Skill templates: name, bar, spread. Written one line per slot so a
     // save from before templates existed simply has none.
@@ -314,6 +315,7 @@ bool Save_LoadAndApply(void) {
     unsigned visitedOutposts = 0;
     int titleWorn = -1;
     bool searingHappened = false;
+    bool everDied = false;
     int equipWeapon = -1, equipArmor = -1; // legacy single-slot keys
     int equipped[EQUIP_SLOT_COUNT];
     bool sawEquipped = false;
@@ -412,6 +414,8 @@ bool Save_LoadAndApply(void) {
             // setter refuses a title that isn't earned yet, and at this
             // point in the parse the level may still be the default.
             titleWorn = atoi(val);
+        } else if (strcmp(key, "everDied") == 0) {
+            everDied = atoi(val) != 0;
         } else if (strcmp(key, "thomHired") == 0) {
             thomHired = atoi(val) != 0;
         } else if (strcmp(key, "petCharmed") == 0) {
@@ -563,6 +567,7 @@ bool Save_LoadAndApply(void) {
     // Only now, with the level restored, can the setter judge whether
     // the title was actually earned.
     Titles_Reset();
+    Titles_SetEverDied(everDied); // before SetDisplayed, which reads it for Survivor
     Titles_SetDisplayed(titleWorn);
     if (sawEquipped) {
         for (int i = 0; i < EQUIP_SLOT_COUNT; i++) {
