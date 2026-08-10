@@ -196,6 +196,158 @@ Quest g_quests[QUEST_COUNT] = {
         .state = QUEST_AVAILABLE,
         .prereq = 6,
     },
+
+    // ================= Side quests (any profession) =================
+
+    // [9] Charr at the Gate - the pre-Searing opener, here a call to blood
+    // the Northlands frontier.
+    {
+        .name = "Charr at the Gate",
+        .objective = "Slay 4 Charr in the Northlands",
+        .offerText = "The Charr test the Wall daily. Go north and show them Ascalon "
+                     "still has teeth - four of them, and come tell me it's done.",
+        .giverName = "Prince Rurik",
+        .type = QTYPE_KILL, .killsRequired = 4, .targetName = "Charr",
+        .rewardXP = 250, .rewardGold = 100, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+    // [10] The Prize Moa Bird - Pitney's runaways, gone feral in Lakeside.
+    {
+        .name = "The Prize Moa Bird",
+        .objective = "Cull 3 wild Moa in Lakeside County",
+        .offerText = "My prize moa broke its pen and the wild flock's gone bold - "
+                     "trampling the crop. Thin them for me, three should teach the rest.",
+        .giverName = "Pitney",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Moa",
+        .rewardXP = 120, .rewardGold = 50, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+    // [11] Gwen's Flute - clear the skale that scare the abbey's little girl.
+    {
+        .name = "Gwen's Flute",
+        .objective = "Drive off 3 River Skale for Gwen",
+        .offerText = "The nasty skale keep taking my spot by the water, and I can't "
+                     "play my flute there. Could you shoo them? Three should do it!",
+        .giverName = "Gwen",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Skale",
+        .rewardXP = 100, .rewardGold = 40, .rewardSkill = -1,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+    // [12] The Vineyard Problem - devourers in the Duke's grapes.
+    {
+        .name = "The Vineyard Problem",
+        .objective = "Clear 3 Carrion Devourers from the Barradin Estate",
+        .offerText = "Devourers have burrowed through the whole vineyard. The Duke "
+                     "wants them gone before harvest - start with three of the carrion sort.",
+        .giverName = "Sandre Elek",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Carrion Devourer",
+        .rewardXP = 300, .rewardGold = 140, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+    // [13] The Poison Devourer - the named beast at the vineyard's heart.
+    {
+        .name = "The Poison Devourer",
+        .objective = "Slay the Poison Devourer in the Barradin Estate",
+        .offerText = "One of them is bigger than the rest, and its bite festers. Put "
+                     "the Poison Devourer down and the vineyard's ours again.",
+        .giverName = "Sandre Elek",
+        .type = QTYPE_KILL, .killsRequired = 1, .targetName = "Poison Devourer",
+        .rewardXP = 400, .rewardGold = 200, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = 12,
+    },
+    // [14] The Worm Problem - burrowers fouling the Regent Valley fields.
+    {
+        .name = "The Worm Problem",
+        .objective = "Destroy 3 Plague Worms in Regent Valley",
+        .offerText = "Worms have got into the low fields and whatever they touch rots. "
+                     "Burn out three and the farmers can work again.",
+        .giverName = "Duke Barradin",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Worm",
+        .rewardXP = 220, .rewardGold = 90, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+    // [15] Grawl Invasion - the hill-men pressing on Green Hills.
+    {
+        .name = "Grawl Invasion",
+        .objective = "Turn back 4 Grawl in the Northlands",
+        .offerText = "The grawl come down off the hills bolder each night. Break a few "
+                     "heads - four - and the rest will think twice.",
+        .giverName = "Duke Barradin",
+        .type = QTYPE_KILL, .killsRequired = 4, .targetName = "Grawl",
+        .rewardXP = 300, .rewardGold = 130, .rewardSkill = QUEST_REWARD_ANY_SKILL,
+        .state = QUEST_AVAILABLE, .prereq = -1,
+    },
+
+    // ============ Profession skill quests (GW1's real spine) ============
+    // Each is offered only to characters of its profession and teaches a
+    // signature pre-Searing skill of that line.
+
+    // [16] Warrior
+    {
+        .name = "Warrior's Challenge",
+        .objective = "Prove your arm: fell 3 Grawl in the Northlands",
+        .offerText = "You carry a blade like you mean it. Bring me three grawl skulls "
+                     "and I'll teach you to swing an axe through a whole line of them.",
+        .giverName = "Van the Warrior",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Grawl",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_CYCLONE_AXE,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_WARRIOR + 1,
+    },
+    // [17] Ranger
+    {
+        .name = "The Ranger's Companion",
+        .objective = "Hunt 3 Devourers in the Barradin Estate",
+        .offerText = "A ranger lives by the land. Take three devourers with bow and "
+                     "wit and I'll show you the unguent that keeps a hunter on their feet.",
+        .giverName = "Aidan",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Devourer",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_TROLL_UNGUENT,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_RANGER + 1,
+    },
+    // [18] Monk
+    {
+        .name = "Protection Prayers",
+        .objective = "Show mercy under fire: slay 3 River Skale",
+        .offerText = "Healing is only half a Monk's art. Face the skale at the water "
+                     "and live, and I will teach you to turn a blow into a blessing.",
+        .giverName = "Grazden the Protector",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Skale",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_REVERSAL_OF_FORTUNE,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_MONK + 1,
+    },
+    // [19] Necromancer
+    {
+        .name = "The Power of Blood",
+        .objective = "Reap 3 of the Catacombs' undead",
+        .offerText = "Death is a wellspring to those who understand it. Fell three of "
+                     "the walking dead below and I will teach you to bleed a foe with a curse.",
+        .giverName = "Verata the Necromancer",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Skeleton",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_FAINTHEARTEDNESS,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_NECROMANCER + 1,
+    },
+    // [20] Mesmer
+    {
+        .name = "A Mesmer's Burden",
+        .objective = "Unmake 3 bandits on the Regent Valley road",
+        .offerText = "The mind is the sharpest weapon of all. Best three of the road "
+                     "bandits with yours, and I'll teach you to sow phantom pain.",
+        .giverName = "Sebedoh the Mesmer",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Bandit",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_CONJURE_PHANTASM,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_MESMER + 1,
+    },
+    // [21] Elementalist
+    {
+        .name = "The Elementalist Experiment",
+        .objective = "Scatter 3 Grawl with the elements",
+        .offerText = "Fire is a blunt instrument; the air is a scalpel. Burn three "
+                     "grawl for me and I'll teach you to blind a foe with a flash of light.",
+        .giverName = "Howland the Elementalist",
+        .type = QTYPE_KILL, .killsRequired = 3, .targetName = "Grawl",
+        .rewardXP = 200, .rewardGold = 60, .rewardSkill = SK_BLINDING_FLASH,
+        .state = QUEST_AVAILABLE, .prereq = -1, .profReq = PROF_ELEMENTALIST + 1,
+    },
 };
 
 static bool PrereqMet(int index) {
@@ -207,10 +359,21 @@ static bool GiverMatches(int index, const char *giverName) {
     return !giverName || strcmp(g_quests[index].giverName, giverName) == 0;
 }
 
+// GW1's profession skill quests are only offered to characters of that
+// profession (primary or secondary). profReq == 0 means anyone.
+static bool ProfessionAllows(int index) {
+    int req = g_quests[index].profReq;
+    if (req == 0) return true;
+    const Entity *player = Entity_Get(0);
+    if (!player) return false;
+    Profession p = (Profession)(req - 1);
+    return player->primaryProfession == p || player->secondaryProfession == p;
+}
+
 int Quests_OfferableIndexFor(const char *giverName) {
     for (int i = 0; i < QUEST_COUNT; i++) {
         if (g_quests[i].state == QUEST_AVAILABLE && PrereqMet(i) &&
-            GiverMatches(i, giverName)) return i;
+            ProfessionAllows(i) && GiverMatches(i, giverName)) return i;
     }
     return -1;
 }

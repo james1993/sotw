@@ -58,6 +58,11 @@ typedef struct {
                             // as the story does.
     QuestState state;
     int prereq; // index of a quest that must be DONE first, -1 = none
+    // Profession gate (GW1's profession skill quests). 0 = anyone; else
+    // (Profession)(profReq-1) must be the player's primary OR secondary for
+    // the quest to be offered. The +1 shift keeps 0 ("any") the default for
+    // every quest that doesn't set it.
+    int profReq;
     // Turning this one in ends the campaign. GW1's pre-Searing has
     // exactly one such quest - Sir Tydus' Academy trial - and the
     // Searing follows it immediately. Data rather than a name check, so
@@ -65,7 +70,7 @@ typedef struct {
     bool endsCampaign;
 } Quest;
 
-#define QUEST_COUNT 9
+#define QUEST_COUNT 22
 extern Quest g_quests[QUEST_COUNT];
 
 // The first offerable (available + prerequisite met) / turn-in-ready

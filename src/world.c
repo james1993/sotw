@@ -171,6 +171,15 @@ static const SpawnDef g_lakesideSpawns[] = {
     { .kind = SPAWN_NPC, .name = "Farmer Hamnet", .pos = { 140, 250 },
       .npcRole = NPC_COLLECTOR, .npcColor = { 176, 154, 96, 255 } },
 
+    // Pre-Searing's quest-givers out in the field: Gwen the flute-girl,
+    // Pitney with his runaway moa, and Grazden with the Monk's trial.
+    { .kind = SPAWN_NPC, .name = "Gwen", .pos = { -140, 200 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 210, 180, 200, 255 } },
+    { .kind = SPAWN_NPC, .name = "Pitney", .pos = { 60, -230 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 176, 154, 96, 255 } },
+    { .kind = SPAWN_NPC, .name = "Grazden the Protector", .pos = { -300, -60 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 205, 190, 150, 255 } },
+
     // Moa wander and won't start anything - the tutorial's way of
     // teaching that not everything on the field is a fight.
     { .kind = SPAWN_MONSTER_PATROL, .name = "Moa Bird", .pos = { -200, -150 },
@@ -258,6 +267,12 @@ static const SpawnDef g_greenHillsSpawns[] = {
     { .kind = SPAWN_NPC, .name = "Sentry Wallin", .pos = { -320, -120 },
       .npcRole = NPC_COLLECTOR, .npcColor = { 150, 160, 176, 255 } },
 
+    // Profession quest-givers who teach a signature skill of their line.
+    { .kind = SPAWN_NPC, .name = "Van the Warrior", .pos = { 460, 120 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 170, 96, 72, 255 } },
+    { .kind = SPAWN_NPC, .name = "Sebedoh the Mesmer", .pos = { -460, 180 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 168, 92, 148, 255 } },
+
     { .kind = SPAWN_MONSTER, .name = "Grawl", .pos = { 120, -60 },
       .level = 3, .hp = 150, .armor = 35, .aggro = 125.0f, .strengthRank = 5,
       .species = SPECIES_GRAWL, .group = 1 },
@@ -313,6 +328,8 @@ static const SpawnDef g_regentSpawns[] = {
       .npcColor = { 96, 134, 78, 255 } },
     { .kind = SPAWN_NPC, .name = "Duke Barradin", .pos = { 760, -30 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Aidan", .pos = { -380, -40 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 96, 134, 78, 255 } },
 
     // Bandits on the road: human, and the only pre-Searing enemy that
     // fights with a real skill bar rather than teeth.
@@ -441,6 +458,8 @@ static const SpawnDef g_catacombSpawns[] = {
     { .kind = SPAWN_NPC, .name = "Necromancer Munne", .pos = { -240, -60 },
       .npcRole = NPC_PROFESSION_CHANGER, .teaches = PROF_NECROMANCER,
       .npcColor = { 86, 74, 104, 255 } },
+    { .kind = SPAWN_NPC, .name = "Verata the Necromancer", .pos = { -120, 120 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 86, 74, 104, 255 } },
 
     { .kind = SPAWN_MONSTER, .name = "Bone Minion", .pos = { 80, -60 },
       .level = 3, .hp = 110, .armor = 30, .aggro = 125.0f, .strengthRank = 5,
@@ -572,7 +591,7 @@ static const SpawnDef g_foibleSpawns[] = {
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Howland the Elementalist", .pos = { 130, -60 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
-    { .kind = SPAWN_NPC, .name = "Sebedoh the Mesmer", .pos = { 210, 90 },
+    { .kind = SPAWN_NPC, .name = "Adept Mullenix", .pos = { 210, 90 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Merchant Kaya", .pos = { -210, 80 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
