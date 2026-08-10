@@ -90,6 +90,12 @@ typedef enum {
     // expense - the minion-master loop against decay.
     SK_ANIMATE_BONE_HORROR,
     SK_BLOOD_OF_THE_MASTER,
+    // Area auras: a ward (Earth), two corpse-raised wells (Blood/Curses),
+    // and a nature-ritual spirit (Wilderness Survival).
+    SK_WARD_AGAINST_HARM,
+    SK_WELL_OF_BLOOD,
+    SK_WELL_OF_SUFFERING,
+    SK_WINNOWING,
     SK_COUNT
 } SkillId;
 
@@ -157,7 +163,12 @@ typedef enum {
     // the heal, perAttributeRank scales it, and the caster sacrifices a
     // fraction of their health carried in duration).
     FX_ANIMATE_MINION,
-    FX_HEAL_MINIONS
+    FX_HEAL_MINIONS,
+    // A positional area aura (ward/well/spirit). conditionKind carries the
+    // AreaKind, baseValue/perAttributeRank the magnitude, duration the
+    // length, and the skill's aoeRadius the size. Well kinds consume the
+    // nearest corpse and spawn on it; the rest spawn at the caster.
+    FX_CREATE_AREA
 } EffectKind;
 
 typedef struct {

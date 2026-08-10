@@ -48,6 +48,7 @@ add_executable(sotw_demake
     src/attributes.c
     src/skill.c
     src/effect.c
+    src/area.c
     src/combat.c
     src/ai_hero.c
     src/input.c

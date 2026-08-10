@@ -6,6 +6,7 @@
 #include "world.h"
 #include "projectile.h"
 #include "fx.h"
+#include "area.h"
 #include "raylib.h"
 #include <math.h>
 #include <stddef.h>
@@ -82,6 +83,9 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         if (Entity_FindNearestCorpse(caster->pos, skill->range) < 0) return false;
         int cap = 1 + Entity_EffectiveRank(caster, ATTR_DEATH_MAGIC) / 3;
         if (Entity_MinionCount() >= cap) return false;
+    } else if (skillIdx == SK_WELL_OF_BLOOD || skillIdx == SK_WELL_OF_SUFFERING) {
+        // Wells are raised on a corpse, so one has to be in range.
+        if (Entity_FindNearestCorpse(caster->pos, skill->range) < 0) return false;
     }
 
     EntityRef targetRef = Entity_RefOf(targetIndex);
@@ -433,8 +437,11 @@ void Combat_UpdateEntity(Entity *e, float dt) {
                     }
                     if (outcome == ATTACK_LANDS) {
                         // Weapon mods ride on the basic swing: Sundering
-                        // penetrates armour, Vampiric steals health.
-                        Entity_ApplyDamagePen(target, dmg, e, e->weaponArmorPen / 100.0f);
+                        // penetrates armour, Vampiric steals health. A
+                        // Winnowing spirit adds to every attack that lands
+                        // in its range, whoever is struck.
+                        Entity_ApplyDamagePen(target, dmg + Area_BonusAttackDamage(target),
+                                              e, e->weaponArmorPen / 100.0f);
                         if (e->weaponLifesteal > 0) {
                             e->hp += e->weaponLifesteal;
                             if (e->hp > e->maxHp) e->hp = e->maxHp;

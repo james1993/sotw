@@ -10,6 +10,7 @@
 #include "sprite.h"
 #include "fx.h"
 #include "ground.h"
+#include "area.h"
 #include "gwmath.h"
 #include <math.h>
 #include <stddef.h>
@@ -404,6 +405,9 @@ void Render_World(Camera2D camera) {
     // they draw last and overlap the ones behind them. Without this,
     // characters standing on the same ground pop in front of each other
     // by array order, which reads as a bug the moment two sprites touch.
+    // Ground auras - wards, wells, spirits - laid under everything else.
+    Area_Draw();
+
     // Exploitable corpses, drawn under the living: a slain body a Death
     // Magic Necromancer can raise a minion from. Fades as its window runs
     // out, so what's available to animate reads at a glance.

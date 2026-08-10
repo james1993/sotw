@@ -1,5 +1,6 @@
 #include "skill.h"
 #include "entity.h"
+#include "area.h"
 #include "raylib.h"
 #include <string.h>
 
@@ -568,4 +569,41 @@ void SkillDB_Init(void) {
                   10, 0, 1.0f, 4.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_HEAL_MINIONS, 40.0f, 8.0f, 0, 0.15f);
     RegisterAs(SK_BLOOD_OF_THE_MASTER, s);
+
+    // --- Area auras: wards, wells, and nature-ritual spirits ----------
+    // Ward Against Harm (Earth): a stone ward on the ground that adds armor
+    // to allies standing in it. Self-cast; the ward is placed at the caster.
+    // Armor scales with Earth Magic. Long recharge, GW1's ward tax.
+    s = MakeSkill("Ward Against Harm", SKILLTYPE_SPELL, ATTR_EARTH_MAGIC,
+                  15, 0, 1.0f, 30.0f, 0.0f, false, TARGET_SELF);
+    s.aoeRadius = 110.0f;
+    AddStep(&s, FX_CREATE_AREA, 12.0f, 1.5f, AREA_WARD_HARM, 20.0f);
+    RegisterAs(SK_WARD_AGAINST_HARM, s);
+
+    // Well of Blood (Blood Magic): raised ON a corpse, it grants allies
+    // inside health regeneration. Gated on a corpse in range, like the
+    // animate skills. Regen (in pips) scales with Blood Magic.
+    s = MakeSkill("Well of Blood", SKILLTYPE_SPELL, ATTR_BLOOD_MAGIC,
+                  10, 0, 1.0f, 5.0f, 150.0f, false, TARGET_SELF);
+    s.aoeRadius = 100.0f;
+    AddStep(&s, FX_CREATE_AREA, 2.0f, 0.2f, AREA_WELL_BLOOD, 20.0f);
+    RegisterAs(SK_WELL_OF_BLOOD, s);
+
+    // Well of Suffering (Curses): raised on a corpse, foes inside suffer
+    // health degeneration. Degen (in pips) scales with Curses.
+    s = MakeSkill("Well of Suffering", SKILLTYPE_SPELL, ATTR_CURSES,
+                  10, 0, 1.0f, 5.0f, 150.0f, false, TARGET_SELF);
+    s.aoeRadius = 100.0f;
+    AddStep(&s, FX_CREATE_AREA, 2.0f, 0.2f, AREA_WELL_SUFFERING, 20.0f);
+    RegisterAs(SK_WELL_OF_SUFFERING, s);
+
+    // Winnowing (Wilderness Survival nature ritual): a spirit whose aura
+    // makes EVERY creature in range - ally and foe alike - take extra
+    // damage from attacks. The double edge is the whole point of a nature
+    // ritual. Bonus damage scales with Wilderness Survival; wide radius.
+    s = MakeSkill("Winnowing", SKILLTYPE_SPELL, ATTR_WILDERNESS_SURVIVAL,
+                  10, 0, 3.0f, 20.0f, 0.0f, false, TARGET_SELF);
+    s.aoeRadius = 160.0f;
+    AddStep(&s, FX_CREATE_AREA, 8.0f, 0.6f, AREA_SPIRIT_WINNOWING, 30.0f);
+    RegisterAs(SK_WINNOWING, s);
 }

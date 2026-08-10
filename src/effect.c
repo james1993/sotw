@@ -2,6 +2,7 @@
 #include "fx.h"
 #include "gwmath.h"
 #include "world.h"
+#include "area.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -104,6 +105,9 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
     switch (step->kind) {
         case FX_DAMAGE: {
             int dmg = (int)RankScaledValue(step, caster, skill->attribute);
+            // An attack skill is an attack, so a Winnowing spirit's aura
+            // adds to it (spells are untouched - it keys on attacks).
+            if (skill->type == SKILLTYPE_ATTACK_SKILL) dmg += Area_BonusAttackDamage(target);
             Entity_ApplyDamagePen(target, dmg, caster, AttackPenetration(caster, skill));
             Fx_Burst(target->pos, Fx_AttrColor(skill->attribute));
             Entity_MarkInCombat(caster);
@@ -323,6 +327,24 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 if (caster->hp < 1) caster->hp = 1; // sacrifice can't kill
                 Fx_Burst(caster->pos, (Color){ 200, 60, 60, 255 });
             }
+            break;
+        }
+        case FX_CREATE_AREA: {
+            // A ward/well/spirit. Wells raise ON a corpse (consuming it);
+            // everything else lays down at the caster's feet. magnitude
+            // scales with the skill's attribute; radius is the aoeRadius.
+            AreaKind ak = (AreaKind)step->conditionKind;
+            float mag = RankScaledValue(step, caster, skill->attribute);
+            Vector2 at = caster->pos;
+            if (ak == AREA_WELL_BLOOD || ak == AREA_WELL_SUFFERING) {
+                int corpse = Entity_FindNearestCorpse(caster->pos, skill->range);
+                if (corpse < 0) break; // gated in combat.c; stay safe here
+                at = g_entities[corpse].pos;
+                g_entities[corpse].corpseExploited = true;
+                g_entities[corpse].corpseTimer = 0.0f;
+            }
+            Area_Spawn(ak, at, skill->aoeRadius, step->duration, mag, caster->team);
+            Fx_Ring(at, skill->aoeRadius, Fx_AttrColor(skill->attribute));
             break;
         }
         default:

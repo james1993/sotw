@@ -7,6 +7,7 @@
 #include "skillbook.h"
 #include "projectile.h"
 #include "fx.h"
+#include "area.h"
 #include "save.h"
 #include "progression.h"
 #include "ui_hints.h"
@@ -1316,6 +1317,7 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     g_entityCount = 0;
     memset(g_drops, 0, sizeof(g_drops)); // ground loot doesn't survive rezoning, like GW1
     Projectile_ClearAll();               // and neither do shots in flight
+    Area_Reset();                        // wards/wells/spirits don't either
     Fx_Clear();
 
     g_entities[g_entityCount++] = saved;

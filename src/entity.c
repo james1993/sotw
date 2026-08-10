@@ -5,6 +5,7 @@
 #include "progression.h"
 #include "quests.h"
 #include "world.h"
+#include "area.h"
 #include "skill.h"
 #include "skillbook.h"
 #include "save.h"
@@ -214,7 +215,8 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
     // holds - Disciplined Stance's +10 is the reason it blunts a spike
     // and not just the attacks it happens to block - and so does an armor
     // enchantment (Armor of Earth).
-    int armor = e->armor + (e->stanceTimer > 0.0f ? e->stanceArmorBonus : 0) + Entity_BonusArmor(e);
+    int armor = e->armor + (e->stanceTimer > 0.0f ? e->stanceArmorBonus : 0) +
+                Entity_BonusArmor(e) + Area_BonusArmor(e); // ...and a Ward Against Harm
     int finalDamage = GW_ArmorScaledDamage(amount, armor, armorPenetration);
 
     // Protective Spirit and its kin cap a single hit at a fraction of max
