@@ -524,6 +524,92 @@ static const SpawnDef g_pikenSpawns[] = {
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
 };
 
+// --- Foible's Fair: the fairground off Ashford, a festival outpost ---
+
+static const EnvProp g_foibleProps[] = {
+    { {    0, -140 }, PROP_FIRE,  1.2f },
+    { { -180, -120 }, PROP_TENT,  1.1f },
+    { {  180, -130 }, PROP_TENT,  1.1f },
+    { { -240,   50 }, PROP_TENT,  1.0f },
+    { {  240,   60 }, PROP_TENT,  1.0f },
+    { {  -80,  120 }, PROP_TENT,  0.9f },
+    { {   90,  130 }, PROP_TENT,  0.9f },
+    { { -320, -170 }, PROP_TREE,  1.0f },
+    { {  330, -160 }, PROP_TREE,  1.0f },
+    { {  -60,   40 }, PROP_GRASS, 1.0f },
+    { {   70,  -20 }, PROP_GRASS, 0.9f },
+};
+
+static const SpawnDef g_foibleSpawns[] = {
+    // Vassar runs the Domination Magic quest out of the Fair in GW1.
+    { .kind = SPAWN_NPC, .name = "Vassar", .pos = { -120, -50 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Howland the Elementalist", .pos = { 130, -60 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Sebedoh the Mesmer", .pos = { 210, 90 },
+      .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Merchant Kaya", .pos = { -210, 80 },
+      .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+};
+
+// --- The Barradin Estate: the Duke's devourer-plagued vineyard ---
+
+static const EnvProp g_estateProps[] = {
+    { { -260, -160 }, PROP_TENT,  1.0f },
+    { {  260, -150 }, PROP_TENT,  1.0f },
+    { { -360, -220 }, PROP_TREE,  1.1f },
+    { {  360, -210 }, PROP_TREE,  1.0f },
+    { { -300,  180 }, PROP_TREE,  0.9f },
+    { {  320,  190 }, PROP_TREE,  1.0f },
+    { { -120,  120 }, PROP_ROCK,  0.9f },
+    { {  140,  130 }, PROP_ROCK,  1.0f },
+    { {  -40,  -40 }, PROP_GRASS, 1.0f },
+    { {   60,   40 }, PROP_GRASS, 0.9f },
+};
+
+static const SpawnDef g_estateSpawns[] = {
+    // Sandre Elek tends the vineyard and hands out its troubles.
+    { .kind = SPAWN_NPC, .name = "Sandre Elek", .pos = { -300, -60 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 176, 154, 96, 255 } },
+    { .kind = SPAWN_MONSTER, .name = "Carrion Devourer", .pos = { 120, -40 },
+      .level = 3, .hp = 130, .armor = 30, .aggro = 115.0f, .strengthRank = 4,
+      .species = SPECIES_DEVOURER, .group = 5 },
+    { .kind = SPAWN_MONSTER, .name = "Carrion Devourer", .pos = { 200, 30 },
+      .level = 3, .hp = 130, .armor = 30, .aggro = 115.0f, .strengthRank = 4,
+      .species = SPECIES_DEVOURER, .group = 5 },
+    { .kind = SPAWN_MONSTER, .name = "Carrion Devourer", .pos = { 160, 110 },
+      .level = 3, .hp = 130, .armor = 30, .aggro = 115.0f, .strengthRank = 4,
+      .species = SPECIES_DEVOURER, .group = 5 },
+    { .kind = SPAWN_MONSTER_PATROL, .name = "Ridgeback Devourer", .pos = { -200, 160 },
+      .posB = { 260, 200 }, .level = 4, .hp = 160, .armor = 35, .aggro = 120.0f,
+      .strengthRank = 5, .species = SPECIES_DEVOURER },
+    // The Poison Devourer of GW1's quest of the same name.
+    { .kind = SPAWN_MONSTER, .name = "The Poison Devourer", .pos = { 380, -120 },
+      .level = 6, .hp = 300, .armor = 45, .aggro = 150.0f, .strengthRank = 8,
+      .boss = true, .capSkill = SK_APPLY_POISON, .species = SPECIES_DEVOURER },
+};
+
+// --- Fort Ranik: Reforged Mode's frontier fort ---
+
+static const EnvProp g_ranikProps[] = {
+    { {    0, -140 }, PROP_FIRE, 1.1f },
+    { { -190, -120 }, PROP_TENT, 1.0f },
+    { {  190, -130 }, PROP_TENT, 1.0f },
+    { { -300, -180 }, PROP_ROCK, 1.1f },
+    { {  310, -170 }, PROP_ROCK, 1.0f },
+    { { -260,  170 }, PROP_ROCK, 1.0f },
+    { {  280,  180 }, PROP_ROCK, 0.9f },
+};
+
+static const SpawnDef g_ranikSpawns[] = {
+    { .kind = SPAWN_NPC, .name = "Captain Arne", .pos = { -110, -50 },
+      .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Quartermaster Vund", .pos = { 120, -60 },
+      .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
+    { .kind = SPAWN_NPC, .name = "Armorer Bael", .pos = { 200, 90 },
+      .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
+};
+
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
 static const ZoneDef g_zones[ZONE_COUNT] = {
@@ -535,8 +621,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .portals = {
             { {  380, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { -420, 0 } },
             { { -380, 0 }, "To The Catacombs",   ZONE_CATACOMBS,       {  320, 0 } },
+            { {    0, 260 }, "To Foible's Fair",  ZONE_FOIBLES_FAIR,    { -280, 0 } },
         },
-        .portalCount = 2,
+        .portalCount = 3,
         .bounds = { -450, -300, 900, 600 },
         .hasShrine = false,
         .props = g_abbeyProps, .propCount = COUNT(g_abbeyProps),
@@ -582,8 +669,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .gridColor = { 62, 94, 54, 255 },
         .portals = {
             { { 0, 340 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { 280, -360 } },
+            { { 520, 0 }, "To The Barradin Estate", ZONE_BARRADIN_ESTATE, { -380, 0 } },
         },
-        .portalCount = 1,
+        .portalCount = 2,
         .bounds = { -560, -340, 1120, 720 },
         .hasShrine = true,
         .shrinePos = { -160, 250 },
@@ -598,8 +686,10 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .portals = {
             { {    0, -320 }, "To Lakeside County",  ZONE_LAKESIDE_COUNTY, { 280,  360 } },
             { { -480,    0 }, "To Wizard's Folly",   ZONE_WIZARDS_FOLLY,   { 380,    0 } },
+            // Reforged only - World_ZoneUnlocked hides the door otherwise.
+            { {  980,    0 }, "To Fort Ranik",       ZONE_FORT_RANIK,      { -300,   0 } },
         },
-        .portalCount = 2,
+        .portalCount = 3,
         .bounds = { -540, -340, 1500, 700 },
         .hasShrine = true,
         .shrinePos = { -260, -180 },
@@ -667,6 +757,49 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .hasShrine = false,
         .props = g_pikenProps, .propCount = COUNT(g_pikenProps),
         .spawns = g_pikenSpawns, .spawnCount = COUNT(g_pikenSpawns),
+    },
+    [ZONE_FOIBLES_FAIR] = {
+        .name = "Foible's Fair",
+        .mode = MODE_OUTPOST,
+        .clearColor = { 24, 22, 16, 255 },  // festival torchlight
+        .gridColor = { 92, 82, 58, 255 },
+        .portals = {
+            { { -360, 0 }, "To Ashford Abbey", ZONE_ASHFORD_ABBEY, { 0, 180 } },
+        },
+        .portalCount = 1,
+        .bounds = { -420, -280, 840, 560 },
+        .hasShrine = false,
+        .props = g_foibleProps, .propCount = COUNT(g_foibleProps),
+        .spawns = g_foibleSpawns, .spawnCount = COUNT(g_foibleSpawns),
+    },
+    [ZONE_BARRADIN_ESTATE] = {
+        .name = "The Barradin Estate",
+        .mode = MODE_EXPLORABLE,
+        .clearColor = { 19, 24, 16, 255 },  // vineyard green, going to seed
+        .gridColor = { 68, 88, 54, 255 },
+        .portals = {
+            { { -460, 0 }, "To Green Hills County", ZONE_GREEN_HILLS, { 480, 0 } },
+        },
+        .portalCount = 1,
+        .bounds = { -520, -320, 1040, 640 },
+        .hasShrine = true,
+        .shrinePos = { -360, -200 },
+        .props = g_estateProps, .propCount = COUNT(g_estateProps),
+        .spawns = g_estateSpawns, .spawnCount = COUNT(g_estateSpawns),
+    },
+    [ZONE_FORT_RANIK] = {
+        .name = "Fort Ranik",
+        .mode = MODE_OUTPOST,
+        .clearColor = { 25, 22, 19, 255 },
+        .gridColor = { 88, 78, 66, 255 },
+        .portals = {
+            { { -340, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -440, 0 } },
+        },
+        .portalCount = 1,
+        .bounds = { -400, -280, 800, 560 },
+        .hasShrine = false,
+        .props = g_ranikProps, .propCount = COUNT(g_ranikProps),
+        .spawns = g_ranikSpawns, .spawnCount = COUNT(g_ranikSpawns),
     },
 };
 
@@ -1401,7 +1534,7 @@ bool World_ZoneUnlocked(ZoneId zone) {
     // Piken Square is Reforged Mode's addition to pre-Searing. Everyone
     // else never sees the portal at all - a locked door you can't ever
     // open is worse than no door.
-    if (zone == ZONE_PIKEN_SQUARE) return Character_IsReforged();
+    if (zone == ZONE_PIKEN_SQUARE || zone == ZONE_FORT_RANIK) return Character_IsReforged();
     return true;
 }
 
