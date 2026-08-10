@@ -199,6 +199,12 @@ typedef struct {
     float range;
     float aoeRadius; // TARGET_AOE_FOES: blast radius around the target
     bool isElite;
+    // Obtainable in pre-Searing (GW1's real list - see the pre-Searing
+    // trainer Halbrik and the pre-Searing skill quests). Only these are
+    // sold by the trainer or handed out as quest rewards; the rest are
+    // implemented but out of reach in the prototype, exactly as GW1 keeps
+    // most of its skills locked away until after the Searing.
+    bool preSearing;
     // Overcast Elementalist skills (Meteor) add Exhaustion when used,
     // temporarily lowering the caster's energy ceiling.
     bool exhausting;

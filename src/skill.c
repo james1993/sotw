@@ -67,6 +67,8 @@ static void AddSelfStep(Skill *s, EffectKind kind, float base, float perRank) {
     if (s->stepCount > 0) s->steps[s->stepCount - 1].selfTarget = true;
 }
 
+static void MarkPreSearingSkills(void);
+
 // Registration order below must match the SkillId enum in skill.h.
 void SkillDB_Init(void) {
     g_skillCount = 0;
@@ -606,4 +608,38 @@ void SkillDB_Init(void) {
     s.aoeRadius = 160.0f;
     AddStep(&s, FX_CREATE_AREA, 8.0f, 0.6f, AREA_SPIRIT_WINNOWING, 30.0f);
     RegisterAs(SK_WINNOWING, s);
+
+    MarkPreSearingSkills();
+}
+
+// GW1's real pre-Searing skill list (wiki: "List of Ascalon (pre-Searing)
+// skills") - the only skills obtainable before the Searing, whether from
+// the trainer Halbrik or a skill quest. Everything else in the DB is
+// implemented but deliberately out of reach in this prototype, matching how
+// GW1 gates the bulk of its skills behind the Searing. Flagged here in one
+// place so the trainer and the quest-reward picker share a single source of
+// truth for what a character can actually learn.
+//
+// Fire Bolt stands in for GW1's Flare (the demake's basic fire attack and
+// the Elementalist's starting skill); the rest map to their namesakes.
+static void MarkPreSearingSkills(void) {
+    static const SkillId kPreSearing[] = {
+        // Warrior
+        SK_GASH, SK_EXECUTIONERS_STRIKE, SK_CYCLONE_AXE, SK_HAMMER_BASH,
+        // Ranger (incl. the pet line - Charm/Comfort ARE pre-Searing)
+        SK_POWER_SHOT, SK_TROLL_UNGUENT, SK_CHARM_ANIMAL, SK_COMFORT_ANIMAL,
+        // Monk
+        SK_ORISON_OF_HEALING, SK_BANISH, SK_BANE_SIGNET, SK_HEALING_BREEZE,
+        SK_REVERSAL_OF_FORTUNE,
+        // Necromancer (Animate Bone Horror IS pre-Searing)
+        SK_VAMPIRIC_GAZE, SK_FAINTHEARTEDNESS, SK_DEATHLY_SWARM, SK_ANIMATE_BONE_HORROR,
+        // Mesmer
+        SK_ETHER_FEAST, SK_EMPATHY, SK_SHATTER_DELUSIONS, SK_CONJURE_PHANTASM,
+        SK_IMAGINED_BURDEN,
+        // Elementalist (Fire Bolt = Flare)
+        SK_BLINDING_FLASH, SK_FIRE_BOLT,
+    };
+    for (size_t i = 0; i < sizeof(kPreSearing) / sizeof(kPreSearing[0]); i++) {
+        if ((int)kPreSearing[i] < g_skillCount) g_skillDB[kPreSearing[i]].preSearing = true;
+    }
 }

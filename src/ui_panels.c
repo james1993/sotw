@@ -838,7 +838,7 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     int forSale = 0;
     if (!tooEarly) {
         for (int i = 0; i < g_skillCount; i++) {
-            if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
+            if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite || !g_skillDB[i].preSearing) continue;
             if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
         }
     }
@@ -889,7 +889,7 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     }
 
     for (int i = 0; i < g_skillCount; i++) {
-        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite) continue;
+        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite || !g_skillDB[i].preSearing) continue;
         if (!Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) continue;
 
         const Skill *s = &g_skillDB[i];
