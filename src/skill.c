@@ -547,4 +547,25 @@ void SkillDB_Init(void) {
                   5, 0, 1.0f, 2.0f, 0.0f, false, TARGET_SELF);
     AddStep(&s, FX_COMFORT_ANIMAL, 30.0f, 6.0f, 0, 0);
     RegisterAs(SK_COMFORT_ANIMAL, s);
+
+    // --- Necromancer: Death Magic (minions) --------------------------
+    // Animate Bone Horror raises an undead servant from the nearest
+    // corpse. Self-cast: it reaches for a body in the area rather than a
+    // targeted foe. Gated in Combat_ActivateSkill on there being a corpse
+    // and room under the Death-Magic minion cap, so it spends nothing when
+    // it can't fire. The raised minion's level, health, damage and decay
+    // rate all come from Death Magic (the effect handler reads the rank).
+    s = MakeSkill("Animate Bone Horror", SKILLTYPE_SPELL, ATTR_DEATH_MAGIC,
+                  15, 0, 3.0f, 3.0f, 150.0f, false, TARGET_SELF);
+    AddStep(&s, FX_ANIMATE_MINION, 0, 0, 0, 0);
+    RegisterAs(SK_ANIMATE_BONE_HORROR, s);
+
+    // Blood of the Master heals every minion you command, paid for with a
+    // slice of your OWN health - GW1's sacrifice. baseValue/perRank are the
+    // heal per minion; duration carries the self-sacrifice as a fraction of
+    // the caster's max health.
+    s = MakeSkill("Blood of the Master", SKILLTYPE_SPELL, ATTR_DEATH_MAGIC,
+                  10, 0, 1.0f, 4.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_HEAL_MINIONS, 40.0f, 8.0f, 0, 0.15f);
+    RegisterAs(SK_BLOOD_OF_THE_MASTER, s);
 }

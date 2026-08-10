@@ -377,7 +377,8 @@ int main(void) {
             bool anyAlive = false;
             for (int i = 0; i < g_entityCount; i++) {
                 Entity *e = &g_entities[i];
-                if (e->team == 0 && e->alive && (e->kind == ENT_PLAYER || e->kind == ENT_HERO)) anyAlive = true;
+                if (e->team == 0 && e->alive && !e->isMinion &&
+                    (e->kind == ENT_PLAYER || e->kind == ENT_HERO)) anyAlive = true;
             }
             int smallFont = UI_ScaledFontSize(screenHeight, 15);
             const char *sub = anyAlive ? "Your party fights on..."

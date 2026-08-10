@@ -292,6 +292,39 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             Fx_Heal(pet->pos);
             break;
         }
+        case FX_ANIMATE_MINION: {
+            // Self-cast: reach for the nearest corpse in range, spend it,
+            // and raise an undead servant scaled by Death Magic. Gated in
+            // Combat_ActivateSkill, but re-checked here so a corpse that
+            // expired during the cast simply yields nothing.
+            int corpse = Entity_FindNearestCorpse(caster->pos, skill->range);
+            if (corpse < 0) break;
+            Vector2 pos = g_entities[corpse].pos;
+            g_entities[corpse].corpseExploited = true;
+            g_entities[corpse].corpseTimer = 0.0f;
+            World_RaiseMinion(pos, Entity_EffectiveRank(caster, ATTR_DEATH_MAGIC));
+            Fx_Burst(pos, (Color){ 130, 200, 130, 255 });
+            break;
+        }
+        case FX_HEAL_MINIONS: {
+            // Heals every minion you command; then you pay for it in your
+            // own blood - a fraction of max health (duration), never fatal.
+            int heal = (int)RankScaledValue(step, caster, skill->attribute);
+            for (int j = 0; j < g_entityCount; j++) {
+                Entity *m = &g_entities[j];
+                if (!m->isMinion || !m->alive) continue;
+                m->hp += heal;
+                if (m->hp > m->maxHp) m->hp = m->maxHp;
+                Fx_Heal(m->pos);
+            }
+            int sac = (int)((float)caster->maxHp * step->duration);
+            if (sac > 0) {
+                caster->hp -= sac;
+                if (caster->hp < 1) caster->hp = 1; // sacrifice can't kill
+                Fx_Burst(caster->pos, (Color){ 200, 60, 60, 255 });
+            }
+            break;
+        }
         default:
             break;
     }

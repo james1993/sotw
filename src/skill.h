@@ -85,6 +85,11 @@ typedef enum {
     // companion; Comfort heals it and raises it when it falls.
     SK_CHARM_ANIMAL,
     SK_COMFORT_ANIMAL,
+    // Death Magic: minions. Animate Bone Horror raises an undead servant
+    // from a corpse; Blood of the Master sustains the horde at your own
+    // expense - the minion-master loop against decay.
+    SK_ANIMATE_BONE_HORROR,
+    SK_BLOOD_OF_THE_MASTER,
     SK_COUNT
 } SkillId;
 
@@ -145,7 +150,14 @@ typedef enum {
     // genuinely new mechanics (they spawn/convert/heal a whole entity), so
     // they earn their own primitives rather than bending an existing one.
     FX_CHARM_ANIMAL,
-    FX_COMFORT_ANIMAL
+    FX_COMFORT_ANIMAL,
+    // Death Magic minions. Animate consumes the nearest corpse to raise an
+    // undead servant scaled by Death Magic; heal-minions sustains the horde
+    // against decay, paid for with the caster's own health (baseValue is
+    // the heal, perAttributeRank scales it, and the caster sacrifices a
+    // fraction of their health carried in duration).
+    FX_ANIMATE_MINION,
+    FX_HEAL_MINIONS
 } EffectKind;
 
 typedef struct {

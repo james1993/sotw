@@ -164,6 +164,12 @@ void World_AwardPetXp(int monsterLevel);
 // Moa) and the zone loader (respawning the companion).
 void World_SetupPetStats(struct Entity *pet, int level, int beastRank);
 
+// Raises an undead minion (team 0) at a position, scaled to the given
+// Death Magic rank - health, damage and decay rate all ride on it.
+// Returns the new entity index, or -1 if the array is full. Minions are
+// transient: they decay and die, and don't survive a zone change.
+int World_RaiseMinion(Vector2 pos, int deathRank);
+
 // Dismiss a hired henchman entity: outposts only, GW1's rule for party
 // editing. Converts the party member back into the standing NPC.
 void World_DismissHenchman(struct Entity *henchman);

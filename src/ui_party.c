@@ -57,7 +57,9 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
     int rowY = y + pad;
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
-        if (e->team != 0 || e->kind == ENT_NPC) continue;
+        // Minions are allied creatures, not party members - GW1 keeps them
+        // out of the party window even though they fight on your side.
+        if (e->team != 0 || e->kind == ENT_NPC || e->isMinion) continue;
 
         // Clicking a member's row selects them - how GW1 targets allies
         // for heals from the party window. (The dismiss button, drawn

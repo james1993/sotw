@@ -292,6 +292,15 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
             }
         }
 
+        // A slain creature leaves an exploitable corpse for a while - what
+        // a Death Magic animate skill raises a minion from. Only real
+        // creatures do; a crumbling minion leaves nothing, which is what
+        // stops minions raising each other in an endless chain.
+        if (e->kind == ENT_MONSTER && !e->isMinion) {
+            e->corpseTimer = GW_CORPSE_DURATION;
+            e->corpseExploited = false;
+        }
+
         if (e->kind == ENT_MONSTER) {
             // GW1 XP is party-wide: the player levels no matter whether
             // they or the hero landed the killing blow.
@@ -505,6 +514,30 @@ int Entity_FindPet(void) {
 bool Entity_IsCharmable(const Entity *e) {
     return e && e->alive && e->kind == ENT_MONSTER && !e->isBoss &&
            e->species == SPECIES_MOA;
+}
+
+bool Entity_IsExploitableCorpse(const Entity *e) {
+    return e && !e->alive && e->corpseTimer > 0.0f && !e->corpseExploited;
+}
+
+int Entity_FindNearestCorpse(Vector2 pos, float range) {
+    int best = -1;
+    float bestD = range;
+    for (int i = 0; i < g_entityCount; i++) {
+        if (!Entity_IsExploitableCorpse(&g_entities[i])) continue;
+        float dx = g_entities[i].pos.x - pos.x, dy = g_entities[i].pos.y - pos.y;
+        float d = sqrtf(dx * dx + dy * dy);
+        if (d <= bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+int Entity_MinionCount(void) {
+    int n = 0;
+    for (int i = 0; i < g_entityCount; i++) {
+        if (g_entities[i].isMinion && g_entities[i].alive) n++;
+    }
+    return n;
 }
 
 AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender) {

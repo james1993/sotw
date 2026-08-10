@@ -54,6 +54,10 @@
 // Knockdown is a fixed ~2-second lockout in GW1 regardless of source.
 #define GW_KNOCKDOWN_SECONDS 2.0f
 
+// How long a slain creature's corpse stays exploitable for a Death Magic
+// animate skill. GW1 corpses linger a good while; 20s is a workable window.
+#define GW_CORPSE_DURATION 20.0f
+
 // Exhaustion: each overcast skill costs 10 points of the energy ceiling,
 // recovered at roughly one point every three seconds (one regen pip).
 #define GW_EXHAUSTION_PER_CAST 10.0f

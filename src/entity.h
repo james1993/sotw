@@ -207,6 +207,22 @@ typedef struct Entity {
     // and it can be told apart from a hired henchman.
     bool isPet;
 
+    // An animated undead servant (Necromancer's Death Magic). Also an
+    // ENT_HERO so the party AI carries it, but a minion is not a party
+    // member: it decays and dies on its own, never appears in the party
+    // window, and doesn't count toward a party wipe. minionDecayPerSec is
+    // set at raise time from Death Magic (higher rank = slower decay).
+    bool isMinion;
+    float minionDecayPerSec;
+    float minionDecayAccum;
+
+    // Exploitable corpse (GW1). A slain creature leaves a corpse a Death
+    // Magic skill can consume to raise a minion. corpseTimer counts down
+    // the window on a DEAD entity; corpseExploited marks one already spent
+    // so two casts can't raise from the same body.
+    float corpseTimer;
+    bool corpseExploited;
+
     // GW1-style armor level (AL): incoming damage is scaled by
     // 2^((60 - AL) / 40), GW1's actual armor formula against the AL 60
     // caster baseline. 60 = neutral.
@@ -451,6 +467,18 @@ int Entity_FindPet(void);
 // True if this entity is an animal a Ranger could charm with Charm Animal.
 // In pre-Searing that's the Moa; a boss version is off-limits.
 bool Entity_IsCharmable(const Entity *e);
+
+// True if this entity is a dead body still within its exploitable window -
+// what a Death Magic animate skill needs to raise a minion.
+bool Entity_IsExploitableCorpse(const Entity *e);
+
+// Nearest exploitable corpse within `range` of `pos`, or -1. Marks nothing;
+// the caller consumes it. Used to gate and resolve an animate skill.
+int Entity_FindNearestCorpse(Vector2 pos, float range);
+
+// How many living undead minions the player currently commands - checked
+// against the Death-Magic-derived cap before another can be raised.
+int Entity_MinionCount(void);
 
 // How many conditions / hexes are currently on this character - drives
 // both the nameplate pips and what a removal skill has to work with.

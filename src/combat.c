@@ -76,6 +76,12 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         if (!Entity_IsCharmable(target)) return false;           // must be a wild animal
     } else if (skillIdx == SK_COMFORT_ANIMAL) {
         if (Entity_FindPet() < 0) return false;                  // nothing to comfort
+    } else if (skillIdx == SK_ANIMATE_BONE_HORROR) {
+        // A corpse in range to raise from, and room under the Death-Magic
+        // minion cap. Both are GW1 requirements the effect VM can't state.
+        if (Entity_FindNearestCorpse(caster->pos, skill->range) < 0) return false;
+        int cap = 1 + Entity_EffectiveRank(caster, ATTR_DEATH_MAGIC) / 3;
+        if (Entity_MinionCount() >= cap) return false;
     }
 
     EntityRef targetRef = Entity_RefOf(targetIndex);
@@ -312,6 +318,20 @@ void Combat_UpdateEntity(Entity *e, float dt) {
         }
     }
 
+    // Minion decay: an animated undead steadily loses health and, left
+    // untended, crumbles. Death Magic fixed the rate at raise time and
+    // Blood of the Master buys it back - which is what makes a minion army
+    // a resource to sustain, not a free standing buff. Like degeneration,
+    // it never pauses (not even under knockdown), so it runs here.
+    if (e->isMinion && e->minionDecayPerSec > 0.0f) {
+        e->minionDecayAccum += e->minionDecayPerSec * dt;
+        while (e->minionDecayAccum >= 1.0f && e->alive) {
+            e->minionDecayAccum -= 1.0f;
+            Entity_ApplyDamage(e, 1, NULL);
+        }
+        if (!e->alive) return;
+    }
+
     // Knockdown is a real timed lockout: recharge and degeneration above
     // keep running (GW1 doesn't pause them), but nothing below - no
     // casting, moving or attacking - happens until you get up.
@@ -438,6 +458,12 @@ void Combat_UpdateEntity(Entity *e, float dt) {
 void Combat_TickTimers(float dt) {
     for (int i = 0; i < g_entityCount; i++) {
         Entity *e = &g_entities[i];
+        // A corpse's exploitable window counts down even though the entity
+        // is dead (Combat_UpdateEntity bails immediately on the dead).
+        if (!e->alive && e->corpseTimer > 0.0f) {
+            e->corpseTimer -= dt;
+            if (e->corpseTimer < 0.0f) e->corpseTimer = 0.0f;
+        }
         Combat_UpdateEntity(e, dt);
 
         // Sprite animation bookkeeping, from actual movement this frame

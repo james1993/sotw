@@ -10,6 +10,7 @@
 #include "sprite.h"
 #include "fx.h"
 #include "ground.h"
+#include "gwmath.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -403,6 +404,22 @@ void Render_World(Camera2D camera) {
     // they draw last and overlap the ones behind them. Without this,
     // characters standing on the same ground pop in front of each other
     // by array order, which reads as a bug the moment two sprites touch.
+    // Exploitable corpses, drawn under the living: a slain body a Death
+    // Magic Necromancer can raise a minion from. Fades as its window runs
+    // out, so what's available to animate reads at a glance.
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (e->alive || e->corpseTimer <= 0.0f || e->corpseExploited) continue;
+        float f = e->corpseTimer / GW_CORPSE_DURATION;
+        if (f > 1.0f) f = 1.0f;
+        unsigned char a = (unsigned char)(90.0f * f + 50.0f);
+        DrawEllipse((int)e->pos.x, (int)(e->pos.y + 6), 16.0f, 7.0f, (Color){ 15, 20, 15, a });
+        DrawCircleV(e->pos, 5.0f, (Color){ 70, 78, 66, a });
+        DrawLineEx((Vector2){ e->pos.x - 6.0f, e->pos.y - 2.0f },
+                   (Vector2){ e->pos.x + 6.0f, e->pos.y - 2.0f },
+                   2.0f, (Color){ 200, 205, 185, a }); // a pale bone hint
+    }
+
     int order[MAX_ENTITIES];
     int drawCount = 0;
     for (int i = 0; i < g_entityCount; i++) {

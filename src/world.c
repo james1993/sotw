@@ -1156,6 +1156,37 @@ void World_AwardPetXp(int monsterLevel) {
     }
 }
 
+int World_RaiseMinion(Vector2 pos, int deathRank) {
+    if (deathRank < 0) deathRank = 0;
+    if (deathRank > ATTRIBUTE_RANK_CAP) deathRank = ATTRIBUTE_RANK_CAP;
+
+    // Bone grey, so a minion reads as yours-but-undead at a glance.
+    int idx = Entity_Spawn(ENT_HERO, "Bone Horror", 0, pos, (Color){ 200, 205, 190, 255 });
+    if (idx < 0) return -1;
+    Entity *m = Entity_Get(idx);
+
+    m->isMinion = true;
+    m->species = SPECIES_UNDEAD;
+    // Everything about it scales with Death Magic: a higher rank raises a
+    // higher-level minion that is tougher, hits harder, and decays slower.
+    m->level = 1 + deathRank;
+    m->baseMaxHp = m->maxHp = 40 + deathRank * 10;   // rank 12 -> 160
+    m->hp = m->maxHp;
+    m->armor = 60;
+    m->attackDamageMin = 4 + deathRank / 2;
+    m->attackDamageMax = 8 + deathRank;              // rank 12 -> 20
+    m->attackRange = 28.0f;
+    m->attackInterval = 1.5f;
+    m->moveSpeed = 95.0f;
+    // Decay: health lost per second, slowed by Death Magic. Untended, a
+    // rank-12 minion (160 hp, 1.6/s) lasts ~100s - long enough to fight
+    // with, short enough that Blood of the Master earns its slot.
+    m->minionDecayPerSec = 4.0f - (float)deathRank * 0.2f;
+    if (m->minionDecayPerSec < 1.5f) m->minionDecayPerSec = 1.5f;
+    m->minionDecayAccum = 0.0f;
+    return idx;
+}
+
 // Respawns the charmed companion on zone load: a fresh, full-health Moa
 // each instance, at its earned level and current Beast Mastery.
 static void SpawnPet(Vector2 pos) {
@@ -1513,7 +1544,10 @@ void World_Update(Entity *player, float dt) {
         int aliveCount = 0, deadCount = 0;
         for (int i = 0; i < g_entityCount; i++) {
             Entity *e = &g_entities[i];
-            if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
+            // Minions are allied creatures, not party members: they neither
+            // stave off a wipe nor get resurrected at the shrine.
+            if (e->team != 0 || e->isMinion ||
+                (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
             if (e->alive) aliveCount++; else deadCount++;
         }
 
@@ -1527,7 +1561,8 @@ void World_Update(Entity *player, float dt) {
                 int slot = 0;
                 for (int i = 0; i < g_entityCount; i++) {
                     Entity *e = &g_entities[i];
-                    if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
+                    if (e->team != 0 || e->isMinion ||
+                        (e->kind != ENT_PLAYER && e->kind != ENT_HERO)) continue;
                     e->alive = true;
                     e->hp = e->maxHp; // already penalized by DP
                     e->energy = e->maxEnergy;
@@ -1554,7 +1589,7 @@ void World_Update(Entity *player, float dt) {
             for (int i = 0; i < g_entityCount; i++) {
                 Entity *e = &g_entities[i];
                 if (e->kind == ENT_MONSTER && e->alive && e->aggroed) anyAggro = true;
-                if (e->team == 0 && e->alive && !anchor &&
+                if (e->team == 0 && e->alive && !anchor && !e->isMinion &&
                     (e->kind == ENT_PLAYER || e->kind == ENT_HERO)) anchor = e;
             }
             if (anyAggro || !anchor) {
@@ -1565,7 +1600,8 @@ void World_Update(Entity *player, float dt) {
                     g_autoResTimer = 0.0f;
                     for (int i = 0; i < g_entityCount; i++) {
                         Entity *e = &g_entities[i];
-                        if (e->team != 0 || (e->kind != ENT_PLAYER && e->kind != ENT_HERO) || e->alive) continue;
+                        if (e->team != 0 || e->isMinion ||
+                            (e->kind != ENT_PLAYER && e->kind != ENT_HERO) || e->alive) continue;
                         e->alive = true;
                         e->hp = e->maxHp / 2; // revived weakened, like a res signet
                         e->energy = e->maxEnergy / 2;
