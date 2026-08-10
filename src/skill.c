@@ -525,4 +525,26 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_APPLY_CONDITION, 0, 0, COND_DAZED, 8.0f);
     AddStep(&s, FX_DAMAGE, 3, 0.5f, 0, 0);
     RegisterAs(SK_CONCUSSION_SHOT, s);
+
+    // --- Ranger: Beast Mastery (pets) --------------------------------
+    // Charm Animal turns the targeted wild animal into your companion.
+    // GW1's real cast is a punishing 10s; the demake shortens it to a
+    // still-committal 3s so you feel the vulnerability without standing
+    // still for a third of a fight. The animal must be charmable and you
+    // must not already have a pet - both gated in Combat_ActivateSkill so
+    // no energy is wasted when it can't fire. TARGET_SINGLE_FOE because
+    // the animal is a (passive) foe right up until it's yours.
+    s = MakeSkill("Charm Animal", SKILLTYPE_SPELL, ATTR_BEAST_MASTERY,
+                  10, 0, 3.0f, 5.0f, 150.0f, false, TARGET_SINGLE_FOE);
+    AddStep(&s, FX_CHARM_ANIMAL, 0, 0, 0, 0);
+    RegisterAs(SK_CHARM_ANIMAL, s);
+
+    // Comfort Animal heals the pet, and resurrects it (at part health)
+    // when it has fallen - the Ranger's answer to a dead companion.
+    // Self-targeted: it always finds YOUR pet, never a selected ally.
+    // Heal scales with Beast Mastery.
+    s = MakeSkill("Comfort Animal", SKILLTYPE_SPELL, ATTR_BEAST_MASTERY,
+                  5, 0, 1.0f, 2.0f, 0.0f, false, TARGET_SELF);
+    AddStep(&s, FX_COMFORT_ANIMAL, 30.0f, 6.0f, 0, 0);
+    RegisterAs(SK_COMFORT_ANIMAL, s);
 }

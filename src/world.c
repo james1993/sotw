@@ -675,6 +675,11 @@ static const ZoneDef *g_zone = &g_zones[ZONE_ASCALON_CITY];
 static ZoneId g_zoneId = ZONE_ASCALON_CITY;
 static ZoneId g_lastOutpostId = ZONE_ASCALON_CITY;
 static bool g_thomHired = false;
+// Whether the player currently has a charmed animal companion. Like
+// g_thomHired it's party composition that outlives a single zone: set by
+// Charm Animal, saved with the character, and read by LoadZone to respawn
+// the pet in each new instance.
+static bool g_petCharmed = false;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
 static float g_autoResTimer = 0.0f;
@@ -699,6 +704,13 @@ bool World_IsThomHired(void) { return g_thomHired; }
 void World_SetThomHired(bool hired) {
     g_thomHired = hired;
     Save_Write(); // party composition is part of the saved character
+}
+
+bool World_IsPetCharmed(void) { return g_petCharmed; }
+
+void World_SetPetCharmed(bool charmed) {
+    g_petCharmed = charmed;
+    Save_Write(); // the pet is part of the saved party too
 }
 
 ZoneId World_GetLastOutpostId(void) { return g_lastOutpostId; }
@@ -994,6 +1006,81 @@ static void SpawnThomCompanion(Vector2 pos) {
     World_SetupThomStats(Entity_Get(idx));
 }
 
+// Turns an entity into the player's charmed companion - used both to
+// convert a wild Moa when Charm Animal resolves and to respawn the pet on
+// every zone load. Stats scale with Beast Mastery, GW1's rule that a pet
+// is only as strong as the attribute behind it. Kept an ENT_HERO so the
+// existing party AI (follow the player, engage aggroed foes, auto-attack)
+// carries it with no special case - a pet has no skill bar, so it simply
+// bites.
+void World_SetupPetStats(Entity *pet, int beastRank) {
+    if (!pet) return;
+    if (beastRank < 0) beastRank = 0;
+    if (beastRank > ATTRIBUTE_RANK_CAP) beastRank = ATTRIBUTE_RANK_CAP;
+
+    pet->kind = ENT_HERO;
+    pet->team = 0;
+    pet->isPet = true;
+    pet->isHenchman = false;
+    pet->npcRole = NPC_NONE;
+    pet->isBoss = false;
+    pet->capturedSkill = -1;
+    pet->species = SPECIES_MOA;
+    pet->color = (Color){ 198, 158, 96, 255 }; // straw plumage
+    strncpy(pet->name, "Moa Bird", sizeof(pet->name) - 1);
+    pet->name[sizeof(pet->name) - 1] = '\0';
+
+    pet->level = 5 + beastRank;
+    pet->baseMaxHp = pet->maxHp = 100 + beastRank * 8;
+    pet->hp = pet->maxHp;
+    pet->baseMaxEnergy = pet->maxEnergy = 20; // pets never spend it; the base pool
+
+    pet->energy = pet->maxEnergy;
+    pet->deathPenalty = 0;
+
+    pet->armor = 60;
+    pet->attackDamageMin = 8 + beastRank / 2;
+    pet->attackDamageMax = 14 + beastRank;
+    pet->attackRange = 28.0f;   // a beak, not a bow
+    pet->attackInterval = 1.4f;
+    pet->attackTimer = 0.0f;
+    pet->moveSpeed = 110.0f;    // moa are quick on their feet
+    pet->radius = 12.0f;
+
+    // Scrub anything it carried as a wild monster: no skill bar, no
+    // afflictions, no aggro/patrol state.
+    for (int i = 0; i < SKILL_BAR_SIZE; i++) {
+        pet->skillBar[i] = -1;
+        pet->skillRecharge[i] = 0.0f;
+        pet->adrenaline[i] = 0;
+    }
+    for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) pet->effects[i].active = false;
+    pet->aggroed = false;
+    pet->engaged = false;
+    pet->hasMoveTarget = false;
+    pet->hasPatrol = false;
+    pet->groupId = 0;
+    pet->knockdownTimer = 0.0f;
+    pet->castingSlot = -1;
+    pet->targetRef = Entity_NoRef();
+    pet->castTargetRef = Entity_NoRef();
+}
+
+// The Beast Mastery rank the pet scales to - the player's, since the pet
+// is theirs.
+static int PetBeastRank(void) {
+    const Entity *player = Entity_Get(PLAYER_INDEX);
+    return player ? Entity_EffectiveRank(player, ATTR_BEAST_MASTERY) : 0;
+}
+
+// Respawns the charmed companion on zone load: a fresh, full-health Moa
+// each instance, scaled to current Beast Mastery.
+static void SpawnPet(Vector2 pos) {
+    int idx = Entity_Spawn(ENT_HERO, "Moa Bird", 0, pos, (Color){ 198, 158, 96, 255 });
+    if (idx < 0) return;
+    World_SetupPetStats(Entity_Get(idx), PetBeastRank());
+}
+
 // Body colour per species. The sprite shapes carry most of the read,
 // but colour is what tells you at a glance whether the thing across the
 // field is a moa you can walk past or a Charr that will kill you.
@@ -1140,6 +1227,10 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     if (g_thomHired) {
         SpawnThomCompanion((Vector2){ playerEntry.x + 30, playerEntry.y + 60 });
     }
+    // A charmed pet comes with you into every instance, GW1-style.
+    if (g_petCharmed) {
+        SpawnPet((Vector2){ playerEntry.x + 55, playerEntry.y + 45 });
+    }
 
     for (int i = 0; i < g_zone->spawnCount; i++) {
         const SpawnDef *def = &g_zone->spawns[i];
@@ -1189,6 +1280,7 @@ void World_Init(void) {
     // Fresh-start state, so a New Game from the menu after a previous
     // run doesn't inherit the old party composition.
     g_thomHired = false;
+    g_petCharmed = false;
     g_lastOutpostId = ZONE_ASCALON_CITY;
 
     // The persistent player, built from whatever the creator produced

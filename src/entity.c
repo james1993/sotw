@@ -489,6 +489,20 @@ void Entity_BreakStance(Entity *e) {
     e->stanceArmorBonus = 0;
 }
 
+int Entity_FindPet(void) {
+    // Dead or alive: a downed pet still occupies the one pet "slot", so
+    // Charm Animal is blocked and Comfort Animal has something to raise.
+    for (int i = 0; i < g_entityCount; i++) {
+        if (g_entities[i].isPet && g_entities[i].team == 0) return i;
+    }
+    return -1;
+}
+
+bool Entity_IsCharmable(const Entity *e) {
+    return e && e->alive && e->kind == ENT_MONSTER && !e->isBoss &&
+           e->species == SPECIES_MOA;
+}
+
 AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender) {
     // Blind is checked first and on the ATTACKER: a blinded swing misses
     // before the defender's stance ever matters. GW1's number is a flat

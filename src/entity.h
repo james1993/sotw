@@ -201,6 +201,11 @@ typedef struct Entity {
     int adrenaline[SKILL_BAR_SIZE];
 
     bool isHenchman; // hired help - dismissible in outposts, unlike heroes
+    // A charmed animal companion (Ranger's Beast Mastery). Kept as an
+    // ENT_HERO so it follows and fights like any party member, but flagged
+    // so Charm/Comfort Animal can find it, the zone loader can respawn it,
+    // and it can be told apart from a hired henchman.
+    bool isPet;
 
     // GW1-style armor level (AL): incoming damage is scaled by
     // 2^((60 - AL) / 40), GW1's actual armor formula against the AL 60
@@ -436,6 +441,16 @@ AttackOutcome Entity_ResolveAttack(const Entity *attacker, Entity *defender);
 // Ends any defensive stance immediately (Disciplined Stance's "ends if
 // you use an adrenal skill" rule, and zone/respawn cleanup).
 void Entity_BreakStance(Entity *e);
+
+// The player's charmed animal companion, or -1 when they have none. One
+// pet at a time, GW1's rule - Charm Animal checks this before charming,
+// Comfort Animal uses it to find who to heal or resurrect. Counts a dead
+// pet too: you can't charm a replacement while one is down.
+int Entity_FindPet(void);
+
+// True if this entity is an animal a Ranger could charm with Charm Animal.
+// In pre-Searing that's the Moa; a boss version is off-limits.
+bool Entity_IsCharmable(const Entity *e);
 
 // How many conditions / hexes are currently on this character - drives
 // both the nameplate pips and what a removal skill has to work with.

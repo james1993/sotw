@@ -81,6 +81,10 @@ typedef enum {
     SK_DIVERSION,           // Domination: next-skill recharge hex
     SK_REVERSAL_OF_FORTUNE, // Protection: next damage -> healing enchantment
     SK_CONCUSSION_SHOT,     // Marksmanship: interrupt + Dazed
+    // Beast Mastery: the pet line. Charm turns a wild animal into a
+    // companion; Comfort heals it and raises it when it falls.
+    SK_CHARM_ANIMAL,
+    SK_COMFORT_ANIMAL,
     SK_COUNT
 } SkillId;
 
@@ -134,7 +138,14 @@ typedef enum {
     // recharge penalty to the interrupted skill, same as GW1's interrupt
     // skills - the whole reason cast time exists as a distinct mechanic
     // from instant skills is so interrupts have something to punish.
-    FX_INTERRUPT
+    FX_INTERRUPT,
+    // Beast Mastery pets. Charm converts the targeted animal into a
+    // team-0 companion scaled by the caster's Beast Mastery; Comfort heals
+    // the caster's pet, raising it where it fell if it had died. Both are
+    // genuinely new mechanics (they spawn/convert/heal a whole entity), so
+    // they earn their own primitives rather than bending an existing one.
+    FX_CHARM_ANIMAL,
+    FX_COMFORT_ANIMAL
 } EffectKind;
 
 typedef struct {

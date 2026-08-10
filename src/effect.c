@@ -1,6 +1,7 @@
 #include "effect.h"
 #include "fx.h"
 #include "gwmath.h"
+#include "world.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -248,6 +249,48 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
                 target->lastCastInterrupted = true;
                 target->postCastDisplayTimer = 3.0f;
             }
+            break;
+        }
+        case FX_CHARM_ANIMAL: {
+            // `target` is the wild animal, already validated as charmable
+            // (and the caster confirmed pet-less) in Combat_ActivateSkill.
+            // Convert it into the caster's companion, scaled by Beast
+            // Mastery, and drop the caster's aim so its brand-new ally
+            // isn't treated as the foe it was a moment ago.
+            int beastRank = Entity_EffectiveRank(caster, ATTR_BEAST_MASTERY);
+            World_SetupPetStats(target, beastRank);
+            World_SetPetCharmed(true);
+            caster->engaged = false;
+            caster->targetRef = Entity_NoRef();
+            Fx_Ring(target->pos, target->radius + 12.0f, (Color){ 150, 220, 150, 255 });
+            Fx_Heal(target->pos);
+            break;
+        }
+        case FX_COMFORT_ANIMAL: {
+            // Self-targeted, so `target` is the caster; the pet is found
+            // rather than aimed at. Heals a live companion and raises a
+            // fallen one at the master's side. Amount scales with Beast
+            // Mastery (baseValue/perAttributeRank).
+            int petIdx = Entity_FindPet();
+            if (petIdx < 0) break;
+            Entity *pet = &g_entities[petIdx];
+            int amount = (int)RankScaledValue(step, caster, skill->attribute);
+            if (!pet->alive) {
+                pet->alive = true;
+                pet->hp = amount;
+                if (pet->hp > pet->maxHp) pet->hp = pet->maxHp;
+                pet->pos = (Vector2){ caster->pos.x + 24.0f, caster->pos.y + 24.0f };
+                pet->prevPos = pet->pos;
+                pet->moveTarget = pet->pos;
+                pet->hasMoveTarget = false;
+                pet->targetRef = Entity_NoRef();
+                pet->engaged = false;
+                pet->castingSlot = -1;
+            } else {
+                pet->hp += amount;
+                if (pet->hp > pet->maxHp) pet->hp = pet->maxHp;
+            }
+            Fx_Heal(pet->pos);
             break;
         }
         default:

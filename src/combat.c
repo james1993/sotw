@@ -67,6 +67,17 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         }
         if (Dist(caster->pos, target->pos) > skill->range) return false;
     }
+
+    // Pet skills carry preconditions the effect VM can't express, and GW1
+    // simply refuses to fire them (spending nothing) when they aren't met.
+    // Gate here, before any energy leaves the pool.
+    if (skillIdx == SK_CHARM_ANIMAL) {
+        if (Entity_FindPet() >= 0) return false;                 // one pet at a time
+        if (!Entity_IsCharmable(target)) return false;           // must be a wild animal
+    } else if (skillIdx == SK_COMFORT_ANIMAL) {
+        if (Entity_FindPet() < 0) return false;                  // nothing to comfort
+    }
+
     EntityRef targetRef = Entity_RefOf(targetIndex);
 
     // Casting AT a foe is an attack order: it commits the caster (and,

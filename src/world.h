@@ -137,6 +137,17 @@ void World_SetSearingHappened(bool happened);
 bool World_IsThomHired(void);
 void World_SetThomHired(bool hired);
 
+// Whether the player has a charmed animal companion (Beast Mastery). Set
+// by Charm Animal, saved with the character, and read on zone load to
+// respawn the pet in each new instance.
+bool World_IsPetCharmed(void);
+void World_SetPetCharmed(bool charmed);
+
+// Turns an entity into the player's pet, scaled to the given Beast Mastery
+// rank - shared by Charm Animal (converting a wild Moa) and the zone
+// loader (respawning the companion).
+void World_SetupPetStats(struct Entity *pet, int beastRank);
+
 // Dismiss a hired henchman entity: outposts only, GW1's rule for party
 // editing. Converts the party member back into the standing NPC.
 void World_DismissHenchman(struct Entity *henchman);
