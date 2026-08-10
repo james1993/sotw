@@ -54,6 +54,16 @@
 // Knockdown is a fixed ~2-second lockout in GW1 regardless of source.
 #define GW_KNOCKDOWN_SECONDS 2.0f
 
+// Morale (GW1): a party member's health and energy maximums scale with a
+// meter running from -60% (death penalty) to +10% (morale boost). Each
+// death drops it 15%; each boss kill raises it 2% and, as a morale boost,
+// restores health/energy to full and recharges all skills. Pets and
+// minions get no boost (though pets still take the death penalty).
+#define GW_DEATH_PENALTY_STEP 15
+#define GW_MORALE_BOOST_STEP 2
+#define GW_MORALE_MIN (-60)
+#define GW_MORALE_MAX 10
+
 // How long a slain creature's corpse stays exploitable for a Death Magic
 // animate skill. GW1 corpses linger a good while; 20s is a workable window.
 #define GW_CORPSE_DURATION 20.0f

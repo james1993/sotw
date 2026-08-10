@@ -82,12 +82,15 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         Color nameColor = e->alive ? RAYWHITE : (Color){ 130, 130, 130, 255 };
         UIText(e->name, x + pad, rowY, font, nameColor);
 
-        // GW1 shows each member's stacked death penalty in the party list.
-        if (e->deathPenalty > 0) {
-            char dp[16];
-            snprintf(dp, sizeof(dp), "-%d%%", e->deathPenalty);
+        // GW1 shows each member's morale beside their name: a red death
+        // penalty, or a green morale boost from a cleared boss.
+        if (e->morale != 0) {
+            char m[16];
+            snprintf(m, sizeof(m), "%+d%%", e->morale);
             int nameW = UITextWidth(e->name, font);
-            UIText(dp, x + pad + nameW + 8, rowY, font, (Color){ 220, 120, 120, 255 });
+            Color mc = e->morale < 0 ? (Color){ 220, 120, 120, 255 }
+                                     : (Color){ 120, 210, 130, 255 };
+            UIText(m, x + pad + nameW + 8, rowY, font, mc);
         }
 
         // Level, right-aligned on the name row. Henchmen scale to the

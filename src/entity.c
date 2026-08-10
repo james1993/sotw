@@ -53,7 +53,7 @@ int Entity_Spawn(EntityKind kind, const char *name, int team, Vector2 pos, Color
     // Energy Storage, not from being a caster.
     e->energy = e->maxEnergy = e->baseMaxEnergy = GW_BASE_ENERGY;
     e->energyRegenPips = GW_BASE_ENERGY_PIPS;
-    e->deathPenalty = 0;
+    e->morale = 0;
     for (int i = 0; i < SKILL_BAR_SIZE; i++) e->adrenaline[i] = 0;
     e->armor = 60; // neutral AL - no bonus, no penalty
     e->level = 1;
@@ -139,8 +139,8 @@ void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe) {
 }
 
 void Entity_RecomputePenalizedStats(Entity *e) {
-    e->maxHp = e->baseMaxHp * (100 - e->deathPenalty) / 100;
-    e->maxEnergy = e->baseMaxEnergy * (100 - e->deathPenalty) / 100;
+    e->maxHp = e->baseMaxHp * (100 + e->morale) / 100;
+    e->maxEnergy = e->baseMaxEnergy * (100 + e->morale) / 100;
 
     // Deep Wound takes another 20% off the ceiling, on top of death
     // penalty. Applied here rather than at the call sites so nothing can
@@ -152,6 +152,26 @@ void Entity_RecomputePenalizedStats(Entity *e) {
 
     if (e->hp > e->maxHp) e->hp = e->maxHp;
     if (e->energy > e->maxEnergy) e->energy = e->maxEnergy;
+}
+
+void Entity_GrantPartyMoraleBoost(void) {
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *e = &g_entities[i];
+        if (e->team != 0 || !e->alive) continue;
+        if (e->kind != ENT_PLAYER && e->kind != ENT_HERO) continue;
+        // GW1: morale boosts don't touch pets or minions (a pet still
+        // carries its own death penalty, it just isn't lifted by this).
+        if (e->isPet || e->isMinion) continue;
+
+        e->morale += GW_MORALE_BOOST_STEP;
+        if (e->morale > GW_MORALE_MAX) e->morale = GW_MORALE_MAX;
+        Entity_RecomputePenalizedStats(e);
+        // A morale boost restores health and energy to full and recharges
+        // every skill - the reason clearing a boss turns a fight around.
+        e->hp = e->maxHp;
+        e->energy = e->maxEnergy;
+        for (int s = 0; s < SKILL_BAR_SIZE; s++) e->skillRecharge[s] = 0.0f;
+    }
 }
 
 int Entity_ScaleIncomingHeal(const Entity *e, int amount) {
@@ -272,11 +292,11 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
         // Necromancer strongest in exactly the fights that go badly.
         AwardSoulReaping(e);
 
-        // GW1's death penalty: dying costs party members 15% of max
-        // health and energy, stacking to -60%, until they rezone.
+        // GW1's death penalty: dying drops a party member's morale 15%,
+        // stacking down to -60%, until they rezone. Pets take it too.
         if (e->kind == ENT_PLAYER || e->kind == ENT_HERO) {
-            e->deathPenalty += 15;
-            if (e->deathPenalty > 60) e->deathPenalty = 60;
+            e->morale -= GW_DEATH_PENALTY_STEP;
+            if (e->morale < GW_MORALE_MIN) e->morale = GW_MORALE_MIN;
             Entity_RecomputePenalizedStats(e);
         }
 
@@ -326,7 +346,12 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
             }
 
             // Greens come off bosses: a unique weapon named for the kill.
-            if (e->isBoss) Items_SpawnUnique(e->pos, e->name);
+            // A boss also hands the party a morale boost, GW1's reward for
+            // clearing one - full health and energy and skills recharged.
+            if (e->isBoss) {
+                Items_SpawnUnique(e->pos, e->name);
+                Entity_GrantPartyMoraleBoost();
+            }
         }
     }
 }

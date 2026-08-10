@@ -178,11 +178,12 @@ typedef struct Entity {
 
     int hp, maxHp;
     int energy, maxEnergy;
-    // Death penalty (GW1's DP): each death costs 15% of max health and
-    // energy, stacking to -60%, cleared by rezoning. maxHp/maxEnergy are
-    // the *penalized* values; base* hold the real stats.
+    // Morale (GW1): a signed meter from -60% (stacked death penalty) to
+    // +10% (morale boost). Each death drops it 15%, each boss kill raises
+    // it. maxHp/maxEnergy are scaled by it; base* hold the real stats.
+    // Cleared to 0 by rezoning, like GW1's death penalty.
     int baseMaxHp, baseMaxEnergy;
-    int deathPenalty; // percent, 0-60
+    int morale; // -60..+10
     // Energy regeneration in GW1 pips. Everyone has 3 naturally; the
     // number exists as a field because pips are what skills, stances and
     // weapon mods actually move in GW1, not a flat "energy per second".
@@ -405,8 +406,14 @@ void Entity_MarkInCombat(Entity *e);
 void Entity_WakeMonsterGroup(Entity *monster, EntityRef foe);
 
 // Recomputes penalized maxHp/maxEnergy from base stats and the current
-// death penalty. Call after changing baseMax*, deathPenalty, or both.
+// morale. Call after changing baseMax*, morale, or both.
 void Entity_RecomputePenalizedStats(Entity *e);
+
+// Grants the party a GW1 morale boost (+2%, capped at +10%): restores
+// health and energy to full and recharges all skills for every living
+// party member. Pets and minions are excluded, as in GW1. Called when a
+// boss dies.
+void Entity_GrantPartyMoraleBoost(void);
 
 // --- Conditions and hexes -------------------------------------------
 //
