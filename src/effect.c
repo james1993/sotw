@@ -258,8 +258,7 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             // Mastery, and drop the caster's aim so its brand-new ally
             // isn't treated as the foe it was a moment ago.
             int beastRank = Entity_EffectiveRank(caster, ATTR_BEAST_MASTERY);
-            World_SetupPetStats(target, beastRank);
-            World_SetPetCharmed(true);
+            World_CharmPet(target, beastRank);
             caster->engaged = false;
             caster->targetRef = Entity_NoRef();
             Fx_Ring(target->pos, target->radius + 12.0f, (Color){ 150, 220, 150, 255 });

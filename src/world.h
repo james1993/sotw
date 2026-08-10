@@ -143,10 +143,26 @@ void World_SetThomHired(bool hired);
 bool World_IsPetCharmed(void);
 void World_SetPetCharmed(bool charmed);
 
-// Turns an entity into the player's pet, scaled to the given Beast Mastery
-// rank - shared by Charm Animal (converting a wild Moa) and the zone
-// loader (respawning the companion).
-void World_SetupPetStats(struct Entity *pet, int beastRank);
+// The pet's own level and experience (GW1: a pet levels independently, up
+// to 20). Persisted with the character and restored on load.
+int World_GetPetLevel(void);
+int World_GetPetXp(void);
+void World_SetPetProgress(int level, int xp);
+
+// Charms a wild animal into the player's pet: records its starting level,
+// scales its stats to that level and the given Beast Mastery rank, and
+// marks the party as owning a pet.
+void World_CharmPet(struct Entity *animal, int beastRank);
+
+// Grants the living pet experience for a kill of the given level, handling
+// level-ups (and rescaling the live pet). No-op without a charmed, living
+// pet. GW1's pet-XP-from-fighting, condensed.
+void World_AwardPetXp(int monsterLevel);
+
+// Turns an entity into the player's pet at a given level, scaled to the
+// given Beast Mastery rank - shared by Charm Animal (converting a wild
+// Moa) and the zone loader (respawning the companion).
+void World_SetupPetStats(struct Entity *pet, int level, int beastRank);
 
 // Dismiss a hired henchman entity: outposts only, GW1's rule for party
 // editing. Converts the party member back into the standing NPC.

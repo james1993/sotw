@@ -9,6 +9,7 @@
 #include "fx.h"
 #include "save.h"
 #include "progression.h"
+#include "ui_hints.h"
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -680,6 +681,13 @@ static bool g_thomHired = false;
 // Charm Animal, saved with the character, and read by LoadZone to respawn
 // the pet in each new instance.
 static bool g_petCharmed = false;
+// The pet's OWN level and experience, GW1-style: a charmed animal starts
+// low and levels up to 20 by fighting, independent of the player. Held
+// here (not on the entity) because the pet entity is rebuilt every zone,
+// so its progress has to live with the rest of the persistent party
+// state and be saved alongside it.
+static int g_petLevel = 0;
+static int g_petXp = 0;
 static float g_portalCooldown = 0.0f;
 static float g_wipeTimer = 0.0f;
 static float g_autoResTimer = 0.0f;
@@ -711,6 +719,14 @@ bool World_IsPetCharmed(void) { return g_petCharmed; }
 void World_SetPetCharmed(bool charmed) {
     g_petCharmed = charmed;
     Save_Write(); // the pet is part of the saved party too
+}
+
+int World_GetPetLevel(void) { return g_petLevel; }
+int World_GetPetXp(void) { return g_petXp; }
+
+void World_SetPetProgress(int level, int xp) {
+    g_petLevel = level;
+    g_petXp = xp;
 }
 
 ZoneId World_GetLastOutpostId(void) { return g_lastOutpostId; }
@@ -1006,15 +1022,37 @@ static void SpawnThomCompanion(Vector2 pos) {
     World_SetupThomStats(Entity_Get(idx));
 }
 
-// Turns an entity into the player's charmed companion - used both to
-// convert a wild Moa when Charm Animal resolves and to respawn the pet on
-// every zone load. Stats scale with Beast Mastery, GW1's rule that a pet
-// is only as strong as the attribute behind it. Kept an ENT_HERO so the
-// existing party AI (follow the player, engage aggroed foes, auto-attack)
-// carries it with no special case - a pet has no skill bar, so it simply
-// bites.
-void World_SetupPetStats(Entity *pet, int beastRank) {
+// GW1's pet starting level. A charmed animal begins at 5 and climbs to
+// 20 by fighting - the same range the retail game uses for a wild pet.
+#define PET_START_LEVEL 5
+
+// A pet's health and per-hit damage, from its own level and the owner's
+// Beast Mastery. Health rides on level (a higher-level pet is simply
+// tougher); damage takes from both, so the attribute still matters - GW1's
+// pet is only as dangerous as the Beast Mastery behind it.
+static void PetStatsForLevel(int level, int beastRank,
+                             int *maxHp, int *dmgMin, int *dmgMax) {
+    if (maxHp)  *maxHp  = 60 + level * 13;             // L5=125 .. L20=320
+    if (dmgMin) *dmgMin = 6 + level / 2 + beastRank / 2;
+    if (dmgMax) *dmgMax = 10 + level + beastRank;      // L20/BM12 = 42
+}
+
+// The Beast Mastery rank the pet scales to - the player's, since the pet
+// is theirs.
+static int PetBeastRank(void) {
+    const Entity *player = Entity_Get(PLAYER_INDEX);
+    return player ? Entity_EffectiveRank(player, ATTR_BEAST_MASTERY) : 0;
+}
+
+// Turns an entity into the player's charmed companion at a given level -
+// used both to convert a wild Moa when Charm Animal resolves and to
+// respawn the pet on every zone load. Kept an ENT_HERO so the existing
+// party AI (follow the player, engage aggroed foes, auto-attack) carries
+// it with no special case - a pet has no skill bar, so it simply bites.
+void World_SetupPetStats(Entity *pet, int level, int beastRank) {
     if (!pet) return;
+    if (level < PET_START_LEVEL) level = PET_START_LEVEL;
+    if (level > MAX_LEVEL) level = MAX_LEVEL;
     if (beastRank < 0) beastRank = 0;
     if (beastRank > ATTRIBUTE_RANK_CAP) beastRank = ATTRIBUTE_RANK_CAP;
 
@@ -1030,17 +1068,18 @@ void World_SetupPetStats(Entity *pet, int beastRank) {
     strncpy(pet->name, "Moa Bird", sizeof(pet->name) - 1);
     pet->name[sizeof(pet->name) - 1] = '\0';
 
-    pet->level = 5 + beastRank;
-    pet->baseMaxHp = pet->maxHp = 100 + beastRank * 8;
+    int maxHp, dmgMin, dmgMax;
+    PetStatsForLevel(level, beastRank, &maxHp, &dmgMin, &dmgMax);
+    pet->level = level;
+    pet->baseMaxHp = pet->maxHp = maxHp;
     pet->hp = pet->maxHp;
     pet->baseMaxEnergy = pet->maxEnergy = 20; // pets never spend it; the base pool
-
     pet->energy = pet->maxEnergy;
     pet->deathPenalty = 0;
 
     pet->armor = 60;
-    pet->attackDamageMin = 8 + beastRank / 2;
-    pet->attackDamageMax = 14 + beastRank;
+    pet->attackDamageMin = dmgMin;
+    pet->attackDamageMax = dmgMax;
     pet->attackRange = 28.0f;   // a beak, not a bow
     pet->attackInterval = 1.4f;
     pet->attackTimer = 0.0f;
@@ -1066,19 +1105,63 @@ void World_SetupPetStats(Entity *pet, int beastRank) {
     pet->castTargetRef = Entity_NoRef();
 }
 
-// The Beast Mastery rank the pet scales to - the player's, since the pet
-// is theirs.
-static int PetBeastRank(void) {
-    const Entity *player = Entity_Get(PLAYER_INDEX);
-    return player ? Entity_EffectiveRank(player, ATTR_BEAST_MASTERY) : 0;
+void World_CharmPet(Entity *animal, int beastRank) {
+    if (!animal) return;
+    // The pet inherits the wild animal's level as its starting point (at
+    // least PET_START_LEVEL), then earns its way up from there.
+    int start = animal->level;
+    if (start < PET_START_LEVEL) start = PET_START_LEVEL;
+    if (start > MAX_LEVEL) start = MAX_LEVEL;
+    g_petLevel = start;
+    g_petXp = 0;
+    World_SetupPetStats(animal, g_petLevel, beastRank);
+    World_SetPetCharmed(true); // saves the whole party state, pet included
+}
+
+void World_AwardPetXp(int monsterLevel) {
+    if (!g_petCharmed || g_petLevel >= MAX_LEVEL) return;
+    int petIdx = Entity_FindPet();
+    if (petIdx < 0) return;
+    Entity *pet = &g_entities[petIdx];
+    if (!pet->alive) return; // a dead pet earns nothing, GW1's rule
+
+    // Same shape as party kill XP, measured against the pet's own level.
+    int diff = monsterLevel - g_petLevel;
+    int xp = 100 + 24 * diff;
+    if (xp < 16) xp = 16;
+    if (xp > 400) xp = 400;
+    g_petXp += xp;
+
+    bool leveled = false;
+    while (g_petLevel < MAX_LEVEL && g_petXp >= Progression_XPToNext(g_petLevel)) {
+        g_petXp -= Progression_XPToNext(g_petLevel);
+        g_petLevel++;
+        leveled = true;
+    }
+    if (g_petLevel >= MAX_LEVEL) g_petXp = 0;
+
+    if (leveled) {
+        // Rescale the live pet to its new level and, GW1-style, heal it to
+        // full on the level-up. Position/target state is left untouched.
+        int maxHp, dmgMin, dmgMax;
+        PetStatsForLevel(g_petLevel, PetBeastRank(), &maxHp, &dmgMin, &dmgMax);
+        pet->level = g_petLevel;
+        pet->baseMaxHp = pet->maxHp = maxHp;
+        pet->hp = pet->maxHp;
+        pet->attackDamageMin = dmgMin;
+        pet->attackDamageMax = dmgMax;
+        char msg[64];
+        snprintf(msg, sizeof(msg), "%s reached level %d", pet->name, g_petLevel);
+        UI_Notify(msg);
+    }
 }
 
 // Respawns the charmed companion on zone load: a fresh, full-health Moa
-// each instance, scaled to current Beast Mastery.
+// each instance, at its earned level and current Beast Mastery.
 static void SpawnPet(Vector2 pos) {
     int idx = Entity_Spawn(ENT_HERO, "Moa Bird", 0, pos, (Color){ 198, 158, 96, 255 });
     if (idx < 0) return;
-    World_SetupPetStats(Entity_Get(idx), PetBeastRank());
+    World_SetupPetStats(Entity_Get(idx), g_petLevel, PetBeastRank());
 }
 
 // Body colour per species. The sprite shapes carry most of the read,
@@ -1281,6 +1364,8 @@ void World_Init(void) {
     // run doesn't inherit the old party composition.
     g_thomHired = false;
     g_petCharmed = false;
+    g_petLevel = 0;
+    g_petXp = 0;
     g_lastOutpostId = ZONE_ASCALON_CITY;
 
     // The persistent player, built from whatever the creator produced

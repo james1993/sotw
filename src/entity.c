@@ -4,6 +4,7 @@
 #include "items.h"
 #include "progression.h"
 #include "quests.h"
+#include "world.h"
 #include "skill.h"
 #include "skillbook.h"
 #include "save.h"
@@ -295,6 +296,9 @@ void Entity_ApplyDamagePen(Entity *e, int amount, Entity *attacker, float armorP
             // GW1 XP is party-wide: the player levels no matter whether
             // they or the hero landed the killing blow.
             Progression_AwardKillXP(Entity_Get(PLAYER_INDEX), e->level);
+            // A living pet earns its own XP from the same kill, GW1-style,
+            // and levels up independently of the player.
+            World_AwardPetXp(e->level);
             Items_SpawnMonsterDrops(e->pos, e->level, (int)e->species);
             Quests_NotifyMonsterKill(e);
 
