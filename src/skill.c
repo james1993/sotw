@@ -609,6 +609,20 @@ void SkillDB_Init(void) {
     AddStep(&s, FX_CREATE_AREA, 8.0f, 0.6f, AREA_SPIRIT_WINNOWING, 30.0f);
     RegisterAs(SK_WINNOWING, s);
 
+    // --- Resurrection Signet -----------------------------------------
+    // The common rez every character carries in pre-Searing. Brings a
+    // fallen ally back to full health and a quarter energy, and - its
+    // defining limit - recharges only when you earn a morale boost, so
+    // clearing a boss is what buys back a botched pull. Attribute is
+    // ATTR_MONSTROUS (the "belongs to no profession" bucket) so it never
+    // shows in an attribute line; Skillbook_IsUsableBy hands it to
+    // everyone regardless. The cast time is real, so it can be interrupted.
+    s = MakeSkill("Resurrection Signet", SKILLTYPE_SIGNET, ATTR_MONSTROUS,
+                  0, 0, 3.0f, 1.0f, 200.0f, false, TARGET_DEAD_ALLY);
+    s.moraleRecharge = true;
+    AddStep(&s, FX_RESURRECT, 0, 0, 0, 0);
+    RegisterAs(SK_RESURRECTION_SIGNET, s);
+
     MarkPreSearingSkills();
 }
 
@@ -638,6 +652,8 @@ static void MarkPreSearingSkills(void) {
         SK_IMAGINED_BURDEN,
         // Elementalist (Fire Bolt = Flare)
         SK_BLINDING_FLASH, SK_FIRE_BOLT,
+        // Common
+        SK_RESURRECTION_SIGNET,
     };
     for (size_t i = 0; i < sizeof(kPreSearing) / sizeof(kPreSearing[0]); i++) {
         if ((int)kPreSearing[i] < g_skillCount) g_skillDB[kPreSearing[i]].preSearing = true;

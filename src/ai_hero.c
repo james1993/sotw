@@ -9,6 +9,18 @@
 
 static float g_aiTimer = 0.0f;
 
+// Party flag (GW1): a ground point the party moves to and holds instead of
+// trailing the player. Set/cleared from the compass.
+static Vector2 g_partyFlag;
+static bool g_partyFlagged = false;
+
+void AI_SetPartyFlag(Vector2 pos) { g_partyFlag = pos; g_partyFlagged = true; }
+void AI_ClearPartyFlag(void) { g_partyFlagged = false; }
+bool AI_PartyFlagActive(Vector2 *out) {
+    if (g_partyFlagged && out) *out = g_partyFlag;
+    return g_partyFlagged;
+}
+
 static float Dist(Vector2 a, Vector2 b) {
     float dx = a.x - b.x, dy = a.y - b.y;
     return sqrtf(dx * dx + dy * dy);
@@ -60,6 +72,33 @@ static int FindHeroEngageTarget(const Entity *self, const Entity *player) {
     return best;
 }
 
+// The nearest FALLEN party member a Resurrection Signet could raise -
+// a real party member, so pets and minions (which have their own
+// resurrections, or none) don't count.
+static int FindFallenAlly(const Entity *self) {
+    int best = -1;
+    float bestDist = 1e9f;
+    for (int i = 0; i < g_entityCount; i++) {
+        Entity *o = &g_entities[i];
+        if (o == self || o->team != self->team || o->alive) continue;
+        if (o->kind != ENT_PLAYER && o->kind != ENT_HERO) continue;
+        if (o->isPet || o->isMinion) continue;
+        float d = Dist(self->pos, o->pos);
+        if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+}
+
+// This hero's Resurrection Signet slot, if it's ready to fire - otherwise
+// -1. (It only recharges on a morale boost, so "ready" means never used
+// since the last boss.)
+static int ReadyResSlot(const Entity *self) {
+    for (int s = 0; s < SKILL_BAR_SIZE; s++) {
+        if (self->skillBar[s] == SK_RESURRECTION_SIGNET && self->skillRecharge[s] <= 0.0f) return s;
+    }
+    return -1;
+}
+
 static void UpdateHero(int index) {
     Entity *self = &g_entities[index];
     if (!self->alive || Entity_IsCasting(self)) return;
@@ -70,6 +109,23 @@ static void UpdateHero(int index) {
     if (World_GetMode() == MODE_OUTPOST) return;
 
     Entity *player = Entity_Get(PLAYER_INDEX);
+
+    // Reviving a downed ally comes first, GW1's henchman priority: if this
+    // hero still has a Resurrection Signet charged and someone is down,
+    // cast it - closing the distance first if the body is out of reach.
+    int resSlot = ReadyResSlot(self);
+    if (resSlot >= 0) {
+        int fallen = FindFallenAlly(self);
+        if (fallen >= 0) {
+            if (Combat_ActivateSkill(index, resSlot, fallen)) return; // rezzing
+            self->engaged = false;
+            self->targetRef = Entity_NoRef();
+            self->moveTarget = g_entities[fallen].pos;   // run to the body
+            self->hasMoveTarget = true;
+            return;
+        }
+    }
+
     int foe = FindHeroEngageTarget(self, player);
     self->targetRef = Entity_RefOf(foe);
     self->engaged = (foe >= 0);
@@ -78,11 +134,16 @@ static void UpdateHero(int index) {
         return;
     }
 
-    // No one worth fighting - drift back toward the player, but keep a
-    // respectful follow distance instead of standing on top of them:
-    // start regrouping only when well behind, and stop approaching at
-    // ~arm's length like a GW1 henchman trailing the party leader.
-    if (player && player->alive) {
+    // No one worth fighting. Hold the party flag if one is planted;
+    // otherwise drift back toward the player, keeping a respectful follow
+    // distance like a GW1 henchman trailing the party leader.
+    Vector2 flag;
+    if (AI_PartyFlagActive(&flag)) {
+        if (Dist(self->pos, flag) > 16.0f) {
+            self->moveTarget = flag;
+            self->hasMoveTarget = true;
+        }
+    } else if (player && player->alive) {
         float d = Dist(self->pos, player->pos);
         if (d > 200.0f) {
             float t = (d - 110.0f) / d; // stop ~110 units short of the player

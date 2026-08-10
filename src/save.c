@@ -539,6 +539,21 @@ bool Save_LoadAndApply(void) {
         }
     }
 
+    // Every character carries the Resurrection Signet (a universal
+    // pre-Searing skill). Guarantee it on load too, so characters saved
+    // before it existed - or with it dropped from the bar - still have a
+    // rez; slot it in the first empty spot if it isn't on the bar.
+    Skillbook_Unlock(SK_RESURRECTION_SIGNET);
+    {
+        bool onBar = false;
+        for (int i = 0; i < SKILL_BAR_SIZE; i++)
+            if (p->skillBar[i] == SK_RESURRECTION_SIGNET) onBar = true;
+        if (!onBar) {
+            for (int i = 0; i < SKILL_BAR_SIZE; i++)
+                if (p->skillBar[i] < 0) { p->skillBar[i] = SK_RESURRECTION_SIGNET; break; }
+        }
+    }
+
     World_SetThomHired(thomHired);
     World_SetPetProgress(petLevel, petXp);
     World_SetVisitedMask(visitedOutposts);

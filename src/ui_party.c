@@ -67,7 +67,9 @@ void UI_DrawPartyPanel(int screenWidth, int screenHeight) {
         // handler converts the entity before targeting matters.)
         Rectangle rowRect = { (float)x + 2, (float)rowY - 2, (float)panelW - 4, (float)rowH - 4 };
         bool rowHovered = CheckCollisionPointRec(mouse, rowRect);
-        if (rowHovered && click && e->alive && player) {
+        // Dead members can be selected too - that's how you aim a
+        // Resurrection Signet at a fallen ally from the party window.
+        if (rowHovered && click && player) {
             player->targetRef = Entity_RefOf(i);
             playerTarget = i;
         }

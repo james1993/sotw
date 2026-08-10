@@ -8,6 +8,7 @@
 #include "projectile.h"
 #include "fx.h"
 #include "area.h"
+#include "ai_hero.h"
 #include "save.h"
 #include "progression.h"
 #include "ui_hints.h"
@@ -996,6 +997,7 @@ static void SpawnCynn(Vector2 pos) {
     hero->skillBar[0] = SK_FIRE_BOLT;
     hero->skillBar[1] = SK_CINDER_STORM;
     hero->skillBar[2] = SK_MIND_SEAR; // energy management
+    hero->skillBar[3] = SK_RESURRECTION_SIGNET; // henchmen rez the fallen, GW1-style
 }
 
 // Everything that makes Little Thom a fighting Warrior henchman - used
@@ -1016,6 +1018,7 @@ void World_SetupThomStats(Entity *thom) {
     thom->skillBar[0] = SK_GASH;
     thom->skillBar[1] = SK_RUSH_STRIKE;
     thom->skillBar[2] = SK_BATTLE_CRY;
+    thom->skillBar[3] = SK_RESURRECTION_SIGNET; // henchmen rez the fallen, GW1-style
 }
 
 // Little Thom, the pre-Searing Warrior henchman. As a party member he
@@ -1322,6 +1325,7 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     memset(g_drops, 0, sizeof(g_drops)); // ground loot doesn't survive rezoning, like GW1
     Projectile_ClearAll();               // and neither do shots in flight
     Area_Reset();                        // wards/wells/spirits don't either
+    AI_ClearPartyFlag();                 // a party flag doesn't cross zones
     Fx_Clear();
 
     g_entities[g_entityCount++] = saved;
@@ -1548,6 +1552,12 @@ void World_Init(void) {
     // opens the trainer, which is the pre-Searing order.
     g_skillPoints = 0;
     Skillbook_Unlock(player->skillBar[0]);
+
+    // Every character also carries a Resurrection Signet - GW1 hands it out
+    // in the first hour of pre-Searing, and without a rez the party's death
+    // system has no in-combat answer. Slotted last so it's ready to use.
+    player->skillBar[SKILL_BAR_SIZE - 1] = SK_RESURRECTION_SIGNET;
+    Skillbook_Unlock(SK_RESURRECTION_SIGNET);
 
     // A full five-piece set plus the weapon, GW1's actual starting kit.
     // One "armour" item was what made armour feel like a stat rather

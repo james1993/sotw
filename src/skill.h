@@ -96,6 +96,8 @@ typedef enum {
     SK_WELL_OF_BLOOD,
     SK_WELL_OF_SUFFERING,
     SK_WINNOWING,
+    // The common resurrection skill every profession carries in pre-Searing.
+    SK_RESURRECTION_SIGNET,
     SK_COUNT
 } SkillId;
 
@@ -114,7 +116,10 @@ typedef enum {
     TARGET_SELF,
     TARGET_SINGLE_FOE,
     TARGET_SINGLE_ALLY,
-    TARGET_AOE_FOES
+    TARGET_AOE_FOES,
+    // A FALLEN ally: the only targeting that wants a dead party member,
+    // used by resurrection. Everything else refuses a corpse.
+    TARGET_DEAD_ALLY
 } TargetKind;
 
 // The fixed vocabulary of effect primitives every skill is composed from.
@@ -168,7 +173,11 @@ typedef enum {
     // AreaKind, baseValue/perAttributeRank the magnitude, duration the
     // length, and the skill's aoeRadius the size. Well kinds consume the
     // nearest corpse and spawn on it; the rest spawn at the caster.
-    FX_CREATE_AREA
+    FX_CREATE_AREA,
+    // Raises a fallen ally (Resurrection Signet): back to full health and a
+    // quarter energy, GW1's exact numbers. The one effect that operates on
+    // a dead target.
+    FX_RESURRECT
 } EffectKind;
 
 typedef struct {
@@ -208,6 +217,9 @@ typedef struct {
     // Overcast Elementalist skills (Meteor) add Exhaustion when used,
     // temporarily lowering the caster's energy ceiling.
     bool exhausting;
+    // Recharges ONLY on a morale boost, never on its own timer - the
+    // Resurrection Signet's defining limit (one rez per boss you clear).
+    bool moraleRecharge;
     // Inherent armor penetration (0..1) this skill carries regardless of
     // Strength - Penetrating Blow and the like. Strength's penetration is
     // added on top of this in the effect VM.

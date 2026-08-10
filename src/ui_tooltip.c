@@ -52,6 +52,7 @@ static const char *SubjectFor(const Skill *s, const EffectStep *step) {
     switch (s->targeting) {
         case TARGET_SELF:        return "you";
         case TARGET_SINGLE_ALLY: return "target ally";
+        case TARGET_DEAD_ALLY:   return "a fallen ally";
         case TARGET_AOE_FOES:    return "each foe in the area";
         default:                 return "target foe";
     }

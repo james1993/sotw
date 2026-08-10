@@ -40,6 +40,9 @@ int Skillbook_UnlockedCount(void) {
 
 bool Skillbook_IsUsableBy(int skillId, Profession primary, Profession secondary) {
     if (skillId < 0 || skillId >= g_skillCount) return false;
+    // The Resurrection Signet is a common skill - no profession, usable by
+    // everyone - so it sidesteps the attribute-accessibility test.
+    if (skillId == SK_RESURRECTION_SIGNET) return true;
     return Attribute_Accessible(g_skillDB[skillId].attribute, primary, secondary);
 }
 

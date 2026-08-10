@@ -11,6 +11,7 @@
 #include "fx.h"
 #include "ground.h"
 #include "area.h"
+#include "ai_hero.h"
 #include "gwmath.h"
 #include <math.h>
 #include <stddef.h>
@@ -407,6 +408,17 @@ void Render_World(Camera2D camera) {
     // by array order, which reads as a bug the moment two sprites touch.
     // Ground auras - wards, wells, spirits - laid under everything else.
     Area_Draw();
+
+    // The party flag, where the party has been told to hold.
+    {
+        Vector2 flag;
+        if (AI_PartyFlagActive(&flag)) {
+            DrawEllipse((int)flag.x, (int)(flag.y + 2), 8.0f, 3.0f, (Color){ 0, 0, 0, 70 });
+            DrawLineEx((Vector2){ flag.x, flag.y + 2 }, (Vector2){ flag.x, flag.y - 20 },
+                       2.0f, (Color){ 235, 225, 120, 255 });
+            DrawRectangle((int)flag.x, (int)(flag.y - 20), 13, 9, (Color){ 235, 205, 60, 255 });
+        }
+    }
 
     // Exploitable corpses, drawn under the living: a slain body a Death
     // Magic Necromancer can raise a minion from. Fades as its window runs

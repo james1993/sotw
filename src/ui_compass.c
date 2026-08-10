@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "world.h"
 #include "quests.h"
+#include "ai_hero.h"
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
@@ -142,6 +143,29 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         DrawCircleV(p, 3.5f, c);
         if (i == targetIdx) {
             DrawCircleLines((int)p.x, (int)p.y, 5.5f, GOLD);
+        }
+    }
+
+    // Party flag (GW1): click anywhere on the compass to send the party to
+    // that spot and hold; click your own dot at the centre to recall them.
+    // Only in the field - in town the party stands put regardless.
+    if (World_GetMode() == MODE_EXPLORABLE) {
+        Vector2 mp = GetMousePosition();
+        Vector2 md = { mp.x - center.x, mp.y - center.y };
+        float mdist = sqrtf(md.x * md.x + md.y * md.y);
+        if (mdist <= radius && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (mdist < 10.0f) {
+                AI_ClearPartyFlag();
+            } else {
+                AI_SetPartyFlag((Vector2){ player->pos.x + md.x / k, player->pos.y + md.y / k });
+            }
+        }
+        Vector2 flag;
+        if (AI_PartyFlagActive(&flag) &&
+            WorldToCompass(flag, player->pos, center, radius, 4.0f, &p)) {
+            DrawLineEx((Vector2){ p.x, p.y + 5 }, (Vector2){ p.x, p.y - 7 }, 1.5f,
+                       (Color){ 235, 225, 120, 255 });
+            DrawRectangle((int)p.x, (int)p.y - 7, 7, 5, (Color){ 235, 205, 60, 255 });
         }
     }
 

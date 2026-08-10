@@ -68,6 +68,12 @@ bool Combat_ActivateSkill(int casterIndex, int slot, int targetIndex) {
         }
         if (Dist(caster->pos, target->pos) > skill->range) return false;
     }
+    if (skill->targeting == TARGET_DEAD_ALLY) {
+        // Resurrection wants a FALLEN party member - a live target, a foe,
+        // or nothing all fail (no self-fallback: you can't rez yourself).
+        if (!target || target->alive || target->team != caster->team) return false;
+        if (Dist(caster->pos, target->pos) > skill->range) return false;
+    }
 
     // Pet skills carry preconditions the effect VM can't express, and GW1
     // simply refuses to fire them (spending nothing) when they aren't met.
@@ -176,6 +182,10 @@ static void ResolveCast(Entity *caster) {
     if (skill->targeting == TARGET_SINGLE_ALLY) {
         targetStillValid = target && target->alive && target->team == caster->team;
     }
+    if (skill->targeting == TARGET_DEAD_ALLY) {
+        // Fizzles if someone else already raised them mid-cast.
+        targetStillValid = target && !target->alive && target->team == caster->team;
+    }
     if (targetStillValid) {
         Effect_Execute(caster, skill, target);
     }
@@ -277,6 +287,10 @@ void Combat_UpdateEntity(Entity *e, float dt) {
 
     for (int i = 0; i < SKILL_BAR_SIZE; i++) {
         if (e->skillRecharge[i] > 0.0f) {
+            // The Resurrection Signet doesn't recharge on a clock - only a
+            // morale boost brings it back (Entity_GrantPartyMoraleBoost).
+            int sid = e->skillBar[i];
+            if (sid >= 0 && sid < g_skillCount && g_skillDB[sid].moraleRecharge) continue;
             e->skillRecharge[i] -= dt;
             if (e->skillRecharge[i] < 0.0f) e->skillRecharge[i] = 0.0f;
         }

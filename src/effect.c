@@ -100,7 +100,10 @@ static void ApplyAffliction(Entity *target, EffectCategory category, int kind,
 }
 
 static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectStep *step, Entity *target) {
-    if (!target || !target->alive) return;
+    // Resurrection is the one effect that WANTS a dead target; everything
+    // else does nothing to a corpse.
+    if (!target) return;
+    if (!target->alive && step->kind != FX_RESURRECT) return;
 
     switch (step->kind) {
         case FX_DAMAGE: {
@@ -345,6 +348,21 @@ static void ApplyStepToEntity(Entity *caster, const Skill *skill, const EffectSt
             }
             Area_Spawn(ak, at, skill->aoeRadius, step->duration, mag, caster->team);
             Fx_Ring(at, skill->aoeRadius, Fx_AttrColor(skill->attribute));
+            break;
+        }
+        case FX_RESURRECT: {
+            if (target->alive) break;
+            target->alive = true;
+            target->hp = target->maxHp;              // 100% health (GW1 res signet)
+            target->energy = target->maxEnergy / 4;  // 25% energy
+            target->hasMoveTarget = false;
+            target->engaged = false;
+            target->targetRef = Entity_NoRef();
+            target->castingSlot = -1;
+            target->attackTimer = 0.0f;
+            for (int i = 0; i < MAX_ACTIVE_EFFECTS; i++) target->effects[i].active = false;
+            Fx_Heal(target->pos);
+            Fx_Ring(target->pos, target->radius + 12.0f, (Color){ 220, 220, 150, 255 });
             break;
         }
         default:
