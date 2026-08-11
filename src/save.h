@@ -32,6 +32,14 @@ typedef struct {
     int level;
     bool reforged;
     bool searingSurvived; // finished the campaign - the run is over
+
+    // Enough of the character's look to draw them in the roster exactly
+    // as they appear in the world: appearance, armour tier, dye, weapon.
+    int sex, skinTone, hairColor, hairStyle;
+    int armor;          // equipped armour rating -> robe tier
+    bool dyed;
+    int dyePacked;      // 0xRRGGBB, meaningful when dyed
+    int weaponVisual;   // WeaponVisual of the equipped weapon
 } SaveSlotInfo;
 
 // Which slot everything else reads and writes. Set before World_Init /

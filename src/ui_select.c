@@ -3,6 +3,7 @@
 #include "character.h"
 #include "raylib.h"
 #include "save.h"
+#include "sprite.h"
 #include "ui_cursor.h"
 #include "ui_font.h"
 #include "ui_nav.h"
@@ -116,6 +117,37 @@ SelectAction UI_DrawSelectScreen(int screenWidth, int screenHeight, float dt) {
                 action = SELECT_CREATE;
             }
             continue;
+        }
+
+        // The character themselves, drawn from the save exactly as the
+        // world would: their appearance, the robe colour their armour and
+        // dye give them, and the weapon they have equipped. A slot is a
+        // person, so it shows a person, not just a line of stats. Sits on
+        // the right, clear of the name on the left and the Delete button
+        // below.
+        {
+            float pr = 30 * scale;
+            // Inset far enough that the widest idle pose (extended arm plus
+            // weapon) stays on the card, and clipped to the card as a hard
+            // guarantee the figure never bleeds into a neighbouring slot.
+            Vector2 pc = { card.x + card.width - UI_SP(scale, 6) - pr * 1.9f,
+                           card.y + card.height * 0.44f };
+            BeginScissorMode((int)card.x, (int)card.y, (int)card.width, (int)card.height);
+            // A faint pedestal so the figure reads against the card.
+            DrawEllipse((int)pc.x, (int)(pc.y + pr * 0.98f), pr * 0.95f, pr * 0.34f,
+                        (Color){ 0, 0, 0, 60 });
+            SpritePortrait look = {
+                .sex = info->sex, .skinTone = info->skinTone,
+                .hairColor = info->hairColor, .hairStyle = info->hairStyle,
+                .armor = info->armor, .dyed = info->dyed,
+                .dyeColor = (Color){ (unsigned char)((info->dyePacked >> 16) & 0xFF),
+                                     (unsigned char)((info->dyePacked >> 8) & 0xFF),
+                                     (unsigned char)(info->dyePacked & 0xFF), 255 },
+                .weapon = (WeaponVisual)info->weaponVisual,
+                .profession = info->primary,
+            };
+            Sprite_DrawPortrait(pc, pr, &look);
+            EndScissorMode();
         }
 
         UI_TextShadow(info->name, tx, ty, nameFont, UI_TEXT_PRIMARY);

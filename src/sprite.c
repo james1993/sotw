@@ -175,32 +175,45 @@ static float SwingPhase(const Entity *e) {
     return 1.0f - e->attackAnimTimer / ATTACK_ANIM_DURATION;
 }
 
-static void DrawHumanoid(const Entity *e, double now) {
-    float r = e->radius;
-    Vector2 p = e->pos;
-    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f; // horizontal flip
+// The player's robe colour: it tracks the equipped armour tier, and dye
+// overrides the tier entirely. Public because the roster portrait draws
+// the same figure off a save file and must land on the same colour the
+// world would - one rule, two callers.
+Color Sprite_PlayerRobeColor(int armor, bool dyed, Color dyeColor) {
+    if (dyed) return dyeColor; // legs and trim derive from it too
+    return (armor >= 60) ? (Color){ 205, 175, 95, 255 }   // gilded raiment
+         : (armor >= 45) ? (Color){ 120, 140, 190, 255 }  // woad blue
+                         : (Color){ 190, 165, 120, 255 }; // plain cloth
+}
 
-    // Robe color: the player's tracks the equipped armor tier; everyone
-    // else keeps their identity color.
-    Color robe = e->color;
-    if (e == &g_entities[PLAYER_INDEX]) {
-        int al = e->armor;
-        robe = (al >= 60) ? (Color){ 205, 175, 95, 255 }   // gilded raiment
-             : (al >= 45) ? (Color){ 120, 140, 190, 255 }  // woad blue
-                          : (Color){ 190, 165, 120, 255 }; // plain cloth
-        // Dye overrides the tier colour; the legs and trim derive from it,
-        // so the whole outfit recolours from one choice.
-        if (e->dyed) robe = e->dyeColor;
-    }
+// A humanoid figure decoupled from the Entity: pure look plus a pose.
+// The world sprite fills one of these from a live entity, the character
+// roster fills one from a save file, and both draw through DrawFigure -
+// so a character can never look one way in the world and another on the
+// selection screen.
+typedef struct {
+    Color robe, skin, hair;
+    int sex, hairStyle;
+    WeaponVisual weapon;
+    Color weaponFocus;
+    float walk;   // -1..1 sway; 0 stands still
+    float swing;  // attack extension; 0 idle
+    bool casting;
+    bool restArms; // portrait pose: weapon lowered to the side, not extended
+    bool showGlow;
+    Color glowColor;
+    float glowProg;
+} FigurePose;
 
-    float walk = sinf(e->animTime * 6.0f) * e->moveBlend;
+static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, double now) {
+    float walk = fp->walk;
     float bob = fabsf(walk) * r * 0.12f;
 
     // Shadow
     DrawEllipse((int)p.x, (int)(p.y + r * 0.95f), r * 0.85f, r * 0.32f, (Color){ 0, 0, 0, 70 });
 
     // Legs (two short strokes scissoring while walking)
-    Color legC = Darken(robe, 0.45f);
+    Color legC = Darken(fp->robe, 0.45f);
     float legSwing = walk * r * 0.45f;
     DrawLineEx((Vector2){ p.x - r * 0.25f, p.y + r * 0.25f },
                (Vector2){ p.x - r * 0.25f + legSwing * sx, p.y + r * 0.95f }, r * 0.22f, legC);
@@ -211,89 +224,131 @@ static void DrawHumanoid(const Entity *e, double now) {
     float top = p.y - r * 0.55f - bob;
     DrawTriangle((Vector2){ p.x, top },
                  (Vector2){ p.x - r * 0.78f, p.y + r * 0.55f },
-                 (Vector2){ p.x + r * 0.78f, p.y + r * 0.55f }, robe);
+                 (Vector2){ p.x + r * 0.78f, p.y + r * 0.55f }, fp->robe);
     DrawCircleV((Vector2){ p.x, top + r * 0.18f },
-                r * (e->sex == 0 ? 0.45f : 0.5f), robe);
+                r * (fp->sex == 0 ? 0.45f : 0.5f), fp->robe);
     // Trim line - brighter on higher armor.
     DrawLineEx((Vector2){ p.x - r * 0.6f, p.y + r * 0.42f },
-               (Vector2){ p.x + r * 0.6f, p.y + r * 0.42f }, r * 0.12f, Lighten(robe, 0.35f));
-
-    // Casting state feeds the arms and the glow.
-    bool casting = Entity_IsCasting(e);
-    float phase = SwingPhase(e);
-    // Same anticipation curve the beasts use, so a party member's blow
-    // and a Charr's read with the same weight.
-    float swing = (phase >= 0.0f) ? AttackSwing(phase) * 1.55f : 0.0f;
+               (Vector2){ p.x + r * 0.6f, p.y + r * 0.42f }, r * 0.12f, Lighten(fp->robe, 0.35f));
 
     // Weapon arm
     Vector2 shoulder = { p.x + sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
     float armAngle;
-    if (casting) {
+    if (fp->casting) {
         armAngle = -1.9f + sinf((float)now * 8.0f) * 0.15f; // raised, trembling with power
+    } else if (fp->restArms) {
+        armAngle = sx > 0 ? 1.15f : 1.99f; // weapon lowered, held at the side
     } else {
-        armAngle = (sx > 0 ? -0.5f : 3.64f) + (sx > 0 ? swing : -swing);
+        armAngle = (sx > 0 ? -0.5f : 3.64f) + (sx > 0 ? fp->swing : -fp->swing);
         armAngle += walk * 0.15f;
     }
     Vector2 hand = { shoulder.x + cosf(armAngle) * r * 0.75f,
                      shoulder.y + sinf(armAngle) * r * 0.75f };
-    // Appearance from character creation. Everyone who isn't the player
-    // keeps index 0 defaults, which is why NPCs and heroes still look
-    // the way they always did.
-    Color skin = g_skinTones[(e->skinTone >= 0 && e->skinTone < SKIN_TONE_COUNT)
-                             ? e->skinTone : 1];
-    DrawLineEx(shoulder, hand, r * 0.2f, Darken(robe, 0.7f));
-    DrawCircleV(hand, r * 0.16f, skin);
-    DrawWeapon(WeaponFor(e), hand, casting ? -1.57f : armAngle, r,
-               FocusColor(e->primaryProfession));
+    DrawLineEx(shoulder, hand, r * 0.2f, Darken(fp->robe, 0.7f));
+    DrawCircleV(hand, r * 0.16f, fp->skin);
+    DrawWeapon(fp->weapon, hand, fp->casting ? -1.57f : armAngle, r, fp->weaponFocus);
 
     // Off arm
     Vector2 shoulder2 = { p.x - sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
-    float armAngle2 = casting ? -1.25f : (sx > 0 ? 3.6f : -0.45f) - walk * 0.15f;
+    float armAngle2 = fp->casting ? -1.25f : (sx > 0 ? 3.6f : -0.45f) - walk * 0.15f;
     Vector2 hand2 = { shoulder2.x + cosf(armAngle2) * r * 0.7f,
                       shoulder2.y + sinf(armAngle2) * r * 0.7f };
-    DrawLineEx(shoulder2, hand2, r * 0.2f, Darken(robe, 0.7f));
-    DrawCircleV(hand2, r * 0.16f, skin);
+    DrawLineEx(shoulder2, hand2, r * 0.2f, Darken(fp->robe, 0.7f));
+    DrawCircleV(hand2, r * 0.16f, fp->skin);
 
-    // Head + hair. Hair colour is chosen at creation; the style changes
-    // the silhouette, which is what actually makes two characters
-    // distinguishable at this size.
+    // Head + hair. The style changes the silhouette, which is what
+    // actually makes two characters distinguishable at this size.
     Vector2 headC = { p.x, top - r * 0.42f };
-    DrawCircleV(headC, r * 0.42f, skin);
-    // Gated on the DATA, not on "is this g_entities[0]". The creation
-    // preview is deliberately not the player slot, so an identity check
-    // here silently ignored every swatch you clicked. Anyone who never
-    // picked hair carries -1 and keeps their identity colour.
-    Color hair = (e->hairColor >= 0 && e->hairColor < HAIR_COLOR_COUNT)
-                 ? g_hairColors[e->hairColor] : Darken(e->color, 0.5f);
-    switch (e->hairStyle) {
+    DrawCircleV(headC, r * 0.42f, fp->skin);
+    switch (fp->hairStyle) {
         case 1: // long: a cap plus a fall down the back
-            DrawCircleSector(headC, r * 0.46f, 180.0f, 360.0f, 12, hair);
+            DrawCircleSector(headC, r * 0.46f, 180.0f, 360.0f, 12, fp->hair);
             DrawEllipse((int)(headC.x - sx * r * 0.16f), (int)(headC.y + r * 0.28f),
-                        r * 0.26f, r * 0.42f, hair);
+                        r * 0.26f, r * 0.42f, fp->hair);
             break;
         case 2: // cropped: a low band, leaving the crown bare
-            DrawCircleSector(headC, r * 0.45f, 200.0f, 340.0f, 12, hair);
+            DrawCircleSector(headC, r * 0.45f, 200.0f, 340.0f, 12, fp->hair);
             break;
         default: // the original cap
-            DrawCircleSector(headC, r * 0.44f, 180.0f, 360.0f, 12, hair);
+            DrawCircleSector(headC, r * 0.44f, 180.0f, 360.0f, 12, fp->hair);
             break;
     }
     // Eyes face the walk direction
     DrawCircleV((Vector2){ headC.x + sx * r * 0.15f, headC.y + r * 0.05f }, r * 0.05f, BLACK);
 
     // Cast glow: school-colored halo swelling with cast progress.
-    if (casting) {
-        int skillIdx = e->skillBar[e->castingSlot];
-        Color glow = (skillIdx >= 0 && skillIdx < g_skillCount)
-                     ? AttrColor(g_skillDB[skillIdx].attribute)
-                     : (Color){ 200, 200, 210, 255 };
-        float prog = (e->castTimeTotal > 0.0f)
-                     ? 1.0f - e->castTimeRemaining / e->castTimeTotal : 0.5f;
-        float gr = r * (0.35f + 0.45f * prog) + sinf((float)now * 10.0f) * r * 0.06f;
+    if (fp->showGlow) {
+        Color glow = fp->glowColor;
+        float gr = r * (0.35f + 0.45f * fp->glowProg) + sinf((float)now * 10.0f) * r * 0.06f;
         glow.a = 170;
         DrawCircleV((Vector2){ p.x, top - r * 1.15f }, gr, Fade(glow, 0.35f));
         DrawCircleLines((int)p.x, (int)(top - r * 1.15f), gr, glow);
     }
+}
+
+static void DrawHumanoid(const Entity *e, double now) {
+    float r = e->radius;
+    Vector2 p = e->pos;
+    float sx = (e->facing.x < -0.05f) ? -1.0f : 1.0f; // horizontal flip
+
+    // Robe color: the player's tracks the equipped armor tier; everyone
+    // else keeps their identity color.
+    Color robe = e->color;
+    if (e == &g_entities[PLAYER_INDEX]) {
+        robe = Sprite_PlayerRobeColor(e->armor, e->dyed, e->dyeColor);
+    }
+
+    // Appearance from character creation. Everyone who isn't the player
+    // keeps index 0 defaults, which is why NPCs and heroes still look
+    // the way they always did. Hair is gated on the DATA, not on "is
+    // this g_entities[0]": the creation preview is deliberately not the
+    // player slot, and anyone who never picked hair carries -1 and keeps
+    // their identity colour.
+    Color skin = g_skinTones[(e->skinTone >= 0 && e->skinTone < SKIN_TONE_COUNT)
+                             ? e->skinTone : 1];
+    Color hair = (e->hairColor >= 0 && e->hairColor < HAIR_COLOR_COUNT)
+                 ? g_hairColors[e->hairColor] : Darken(e->color, 0.5f);
+
+    // Casting state feeds the arms and the glow; the swing uses the same
+    // anticipation curve the beasts do, so a party member's blow and a
+    // Charr's read with the same weight.
+    bool casting = Entity_IsCasting(e);
+    float phase = SwingPhase(e);
+    float swing = (phase >= 0.0f) ? AttackSwing(phase) * 1.55f : 0.0f;
+
+    FigurePose pose = {
+        .robe = robe, .skin = skin, .hair = hair,
+        .sex = e->sex, .hairStyle = e->hairStyle,
+        .weapon = WeaponFor(e), .weaponFocus = FocusColor(e->primaryProfession),
+        .walk = sinf(e->animTime * 6.0f) * e->moveBlend,
+        .swing = swing, .casting = casting, .showGlow = casting,
+    };
+    if (casting) {
+        int skillIdx = e->skillBar[e->castingSlot];
+        pose.glowColor = (skillIdx >= 0 && skillIdx < g_skillCount)
+                         ? AttrColor(g_skillDB[skillIdx].attribute)
+                         : (Color){ 200, 200, 210, 255 };
+        pose.glowProg = (e->castTimeTotal > 0.0f)
+                        ? 1.0f - e->castTimeRemaining / e->castTimeTotal : 0.5f;
+    }
+    DrawFigure(p, r, sx, &pose, now);
+}
+
+void Sprite_DrawPortrait(Vector2 center, float radius, const SpritePortrait *look) {
+    Color robe = Sprite_PlayerRobeColor(look->armor, look->dyed, look->dyeColor);
+    Color skin = g_skinTones[(look->skinTone >= 0 && look->skinTone < SKIN_TONE_COUNT)
+                             ? look->skinTone : 1];
+    Color hair = (look->hairColor >= 0 && look->hairColor < HAIR_COLOR_COUNT)
+                 ? g_hairColors[look->hairColor] : Darken(robe, 0.5f);
+    FigurePose pose = {
+        .robe = robe, .skin = skin, .hair = hair,
+        .sex = look->sex, .hairStyle = look->hairStyle,
+        .weapon = look->weapon,
+        .weaponFocus = FocusColor((Profession)look->profession),
+        .walk = 0.0f, .swing = 0.0f, .casting = false,
+        .restArms = true, .showGlow = false,
+    };
+    DrawFigure(center, radius, 1.0f, &pose, 0.0);
 }
 
 // ----- Charr: hunched horned beast with a mane and tail -----

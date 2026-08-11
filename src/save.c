@@ -1,6 +1,7 @@
 #include "save.h"
 #include "entity.h"
 #include "items.h"
+#include "sprite.h"
 #include "quests.h"
 #include "titles.h"
 #include "builds.h"
@@ -120,6 +121,7 @@ bool Save_ReadSlotInfo(int slot, SaveSlotInfo *out) {
     if (!f) return false;
 
     out->level = 1;
+    bool sawPortrait = false;
     char line[512];
     while (fgets(line, sizeof(line), f)) {
         char *nl = strpbrk(line, "\r\n");
@@ -134,10 +136,36 @@ bool Save_ReadSlotInfo(int slot, SaveSlotInfo *out) {
         else if (strcmp(key, "level") == 0)      out->level = atoi(val);
         else if (strcmp(key, "reforged") == 0)   out->reforged = atoi(val) != 0;
         else if (strcmp(key, "searing") == 0)    out->searingSurvived = atoi(val) != 0;
+        else if (strcmp(key, "look") == 0) {
+            sscanf(val, "%d,%d,%d,%d", &out->sex, &out->skinTone,
+                   &out->hairColor, &out->hairStyle);
+        } else if (strcmp(key, "dye") == 0) {
+            int flag = 0, packed = 0;
+            sscanf(val, "%d,%d", &flag, &packed);
+            out->dyed = flag != 0;
+            out->dyePacked = packed;
+        } else if (strcmp(key, "portrait") == 0) {
+            sscanf(val, "%d,%d", &out->armor, &out->weaponVisual);
+            sawPortrait = true;
+        }
     }
     fclose(f);
     out->used = true;
     if (!out->name[0]) snprintf(out->name, sizeof(out->name), "Ascalonian");
+    // Saves from before portraits existed carry no armour rating or
+    // weapon shape; fall back to the same profession-appropriate weapon
+    // the world would draw for a figure without an inventory, so an old
+    // character still reads as their profession rather than unarmed.
+    if (!sawPortrait) {
+        switch (out->primary) {
+            case PROF_RANGER:       out->weaponVisual = WPNVIS_BOW;   break;
+            case PROF_ELEMENTALIST:
+            case PROF_NECROMANCER:  out->weaponVisual = WPNVIS_STAFF; break;
+            case PROF_MONK:
+            case PROF_MESMER:       out->weaponVisual = WPNVIS_ROD;   break;
+            default:                out->weaponVisual = WPNVIS_SWORD; break;
+        }
+    }
     return true;
 }
 
@@ -209,6 +237,16 @@ bool Save_Write(void) {
     // from "dyed black".
     fprintf(f, "dye=%d,%d\n", p->dyed ? 1 : 0,
             ((int)p->dyeColor.r << 16) | ((int)p->dyeColor.g << 8) | (int)p->dyeColor.b);
+    // Portrait extras the roster can't derive cheaply from the rest of
+    // the file: the armour rating that sets the robe tier, and the shape
+    // of the equipped weapon. Appearance and dye it reads from look= and
+    // dye= above.
+    {
+        int wep = g_equipped[EQUIP_WEAPON];
+        int weaponVis = (wep >= 0 && wep < g_inventoryCount)
+                        ? (int)Sprite_WeaponVisualOf(&g_inventory[wep]) : (int)WPNVIS_NONE;
+        fprintf(f, "portrait=%d,%d\n", p->armor, weaponVis);
+    }
     for (int i = 0; i < ATTR_COUNT; i++) {
         fprintf(f, "attr%d=%d\n", i, p->attributeRank[i]);
     }
