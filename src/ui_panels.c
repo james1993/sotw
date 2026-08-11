@@ -1484,6 +1484,25 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
     }
 }
 
+// One reply in the dialog: a label, whether it can be taken, and what
+// taking it does. Modelling the replies as a list is what lets a giver
+// offer several quests at once - GW1 shows each as its own line.
+typedef enum {
+    DOPT_NONE = 0,   // a disabled line that names a requirement
+    DOPT_ACCEPT, DOPT_TURNIN,
+    DOPT_SHOP, DOPT_CRAFT, DOPT_COLLECTOR, DOPT_TRAINER, DOPT_PROFESSION,
+    DOPT_HIRE_THOM
+} DlgOptKind;
+
+typedef struct {
+    char label[224];
+    bool enabled;
+    DlgOptKind kind;
+    int param;       // quest index for ACCEPT / TURNIN
+} DlgOpt;
+
+#define MAX_DLG_OPTS 12
+
 static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     Entity *npc = Entity_Get(g_dialogNpc);
     if (!npc || npc->kind != ENT_NPC) { g_dialogNpc = -1; g_shopOpen = false; return; }
@@ -1500,151 +1519,182 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     int pad = (int)(12 * scale);
     int btnH = (int)(30 * scale);
     int w = (int)(360 * scale);
-    int h = pad * 3 + font * 2 + btnH + 8;
 
-    g_dialogRect = (Rectangle){ (float)(screenWidth - w) / 2.0f,
-                                (float)screenHeight - (float)(220 * scale), (float)w, (float)h };
-    UIHit_Claim(g_dialogRect);
-    UI_ThemePanel(g_dialogRect, scale, pad + font + 6);
-
-    int x = (int)g_dialogRect.x + pad;
-    int y = (int)g_dialogRect.y + pad;
-    UIText(npc->name, x, y, font, (Color){ 130, 220, 130, 255 });
-    y += font + 6;
-
-    Rectangle btn = { (float)x, (float)y + font + 6, g_dialogRect.width - 2 * pad, (float)btnH };
+    // --- Decide what the NPC says and which replies to offer --------
+    const char *body = "";
+    DlgOpt opts[MAX_DLG_OPTS];
+    int nopt = 0;
 
     switch (npc->npcRole) {
         case NPC_QUEST_GIVER: {
-            // Each giver only deals in their own quest book - Osric's
-            // work stays in Ashford, Grast's on the Piken frontier.
-            int ready = Quests_ReadyToTurnInIndexFor(npc->name);
-            int offer = Quests_OfferableIndexFor(npc->name);
-            if (ready >= 0) {
-                Quest *q = &g_quests[ready];
+            // Each giver only deals in their own quest book, and GW1 lists
+            // every one of that book's ready and available quests as its
+            // own reply rather than a single next-quest button.
+            int ready[QUEST_COUNT], offer[QUEST_COUNT];
+            int nready = Quests_ReadyToTurnInListFor(npc->name, ready, QUEST_COUNT);
+            int noffer = Quests_OfferableListFor(npc->name, offer, QUEST_COUNT);
+            for (int i = 0; i < nready && nopt < MAX_DLG_OPTS; i++) {
+                Quest *q = &g_quests[ready[i]];
                 bool bagFull = q->rewardItem && g_inventoryCount >= MAX_INVENTORY;
-                UIText(bagFull ? "Your bags are full - make room for your reward."
-                               : "You've done it! Ascalon thanks you.", x, y, font, LIGHTGRAY);
                 char rewards[96];
                 QuestRewardSummary(q, player, rewards, sizeof(rewards));
-                char label[224];
-                snprintf(label, sizeof(label), "Turn in: %.63s (%.95s)", q->name, rewards);
-                if (DialogButton(btn, label, font, !bagFull)) {
-                    Quests_TurnIn(player, ready);
-                }
-            } else if (offer >= 0) {
-                Quest *q = &g_quests[offer];
-                UIText(q->offerText, x, y, font, LIGHTGRAY);
+                snprintf(opts[nopt].label, sizeof(opts[nopt].label),
+                         "Turn in: %.48s (%.60s)", q->name, rewards);
+                opts[nopt].enabled = !bagFull;
+                opts[nopt].kind = DOPT_TURNIN;
+                opts[nopt].param = ready[i];
+                nopt++;
+            }
+            for (int i = 0; i < noffer && nopt < MAX_DLG_OPTS; i++) {
+                Quest *q = &g_quests[offer[i]];
                 char rewards[96];
                 QuestRewardSummary(q, player, rewards, sizeof(rewards));
-                char label[224];
-                snprintf(label, sizeof(label), "Accept: %.63s (%.95s)", q->name, rewards);
-                if (DialogButton(btn, label, font, true)) {
-                    Quests_Accept(offer);
-                }
+                snprintf(opts[nopt].label, sizeof(opts[nopt].label),
+                         "Accept: %.48s (%.60s)", q->name, rewards);
+                opts[nopt].enabled = true;
+                opts[nopt].kind = DOPT_ACCEPT;
+                opts[nopt].param = offer[i];
+                nopt++;
+            }
+            if (nready == 1 && noffer == 0) {
+                bool bagFull = g_quests[ready[0]].rewardItem && g_inventoryCount >= MAX_INVENTORY;
+                body = bagFull ? "Your bags are full - make room for your reward."
+                               : "You've done it! Ascalon thanks you.";
+            } else if (noffer == 1 && nready == 0) {
+                body = g_quests[offer[0]].offerText; // keep the single-quest flavour
+            } else if (nready + noffer > 0) {
+                body = "I've work that needs doing. Which will you take?";
             } else {
                 bool anyActive = false;
                 for (int i = 0; i < QUEST_COUNT; i++) {
                     if (g_quests[i].state == QUEST_ACTIVE &&
                         strcmp(g_quests[i].giverName, npc->name) == 0) anyActive = true;
                 }
-                UIText(anyActive ? "Your task awaits. Good hunting."
-                                 : "Nothing more for now, friend.", x, y, font, LIGHTGRAY);
+                body = anyActive ? "Your task awaits. Good hunting."
+                                 : "Nothing more for now, friend.";
             }
             break;
         }
-        case NPC_MERCHANT: {
-            UIText("Weapons - fair prices, no haggling. Armor? See Dunda.", x, y, font, LIGHTGRAY);
-            if (DialogButton(btn, g_shopOpen ? "Close shop" : "Browse wares", font, true)) {
-                g_shopOpen = !g_shopOpen;
-                UIFocus_Clear();
-            }
+        case NPC_MERCHANT:
+            body = "Weapons - fair prices, no haggling. Armor? See Dunda.";
+            snprintf(opts[0].label, sizeof(opts[0].label), "%s",
+                     g_shopOpen ? "Close shop" : "Browse wares");
+            opts[0].enabled = true; opts[0].kind = DOPT_SHOP; nopt = 1;
             break;
-        }
-        case NPC_CRAFTER: {
-            UIText("Bring me Charr hides and coin - I'll fit you properly.", x, y, font, LIGHTGRAY);
-            if (DialogButton(btn, g_craftOpen ? "Close crafting" : "Craft armor", font, true)) {
-                g_craftOpen = !g_craftOpen;
-                UIFocus_Clear();
-            }
+        case NPC_CRAFTER:
+            body = "Bring me Charr hides and coin - I'll fit you properly.";
+            snprintf(opts[0].label, sizeof(opts[0].label), "%s",
+                     g_craftOpen ? "Close crafting" : "Craft armor");
+            opts[0].enabled = true; opts[0].kind = DOPT_CRAFT; nopt = 1;
             break;
-        }
         case NPC_COLLECTOR: {
             const CollectorOffer *offer = Collectors_OfferFor(npc->name);
-            if (!offer) {
-                UIText("I've nothing to trade just now.", x, y, font, LIGHTGRAY);
-                break;
-            }
-            UIText(offer->flavour, x, y, font, LIGHTGRAY);
-            if (DialogButton(btn, g_collectorOpen ? "Step away" : "Look at the trade",
-                             font, true)) {
-                g_collectorOpen = !g_collectorOpen;
-                UIFocus_Clear();
-            }
+            if (!offer) { body = "I've nothing to trade just now."; break; }
+            body = offer->flavour;
+            snprintf(opts[0].label, sizeof(opts[0].label), "%s",
+                     g_collectorOpen ? "Step away" : "Look at the trade");
+            opts[0].enabled = true; opts[0].kind = DOPT_COLLECTOR; nopt = 1;
             break;
         }
-        case NPC_SKILL_TRAINER: {
-            UIText("Skills are earned, not given. Points and coin, and I'll teach.",
-                   x, y, font, LIGHTGRAY);
-            if (DialogButton(btn, g_trainerOpen ? "Close training" : "Learn skills", font, true)) {
-                g_trainerOpen = !g_trainerOpen;
-                UIFocus_Clear();
-            }
+        case NPC_SKILL_TRAINER:
+            body = "Skills are earned, not given. Points and coin, and I'll teach.";
+            snprintf(opts[0].label, sizeof(opts[0].label), "%s",
+                     g_trainerOpen ? "Close training" : "Learn skills");
+            opts[0].enabled = true; opts[0].kind = DOPT_TRAINER; nopt = 1;
             break;
-        }
         case NPC_PROFESSION_CHANGER: {
             bool hasSecondary = (g_character.secondary != PROF_NONE);
-            // Two different gates depending on which half of the pacing
-            // this NPC is. Whichever one you don't meet is said out
-            // loud, with the requirement named - an NPC that just
-            // refuses teaches the player nothing.
+            // Whichever gate you don't meet is said out loud, with the
+            // requirement named - an NPC that just refuses teaches nothing.
             if (!hasSecondary) {
                 if (SecondaryGrantAllowed()) {
-                    UIText("You've bled for Ascalon. Choose a second calling.",
-                           x, y, font, LIGHTGRAY);
-                    if (DialogButton(btn, "Choose a second profession", font, true)) {
-                        g_professionOpen = !g_professionOpen;
-                        UIFocus_Clear();
-                    }
+                    body = "You've bled for Ascalon. Choose a second calling.";
+                    snprintf(opts[0].label, sizeof(opts[0].label), "Choose a second profession");
+                    opts[0].enabled = true; opts[0].kind = DOPT_PROFESSION;
                 } else {
-                    UIText("Prove yourself first. Osric has work - finish it.",
-                           x, y, font, LIGHTGRAY);
-                    DialogButton(btn, "Requires: " SECONDARY_QUEST, font, false);
+                    body = "Prove yourself first. Osric has work - finish it.";
+                    snprintf(opts[0].label, sizeof(opts[0].label), "Requires: %s", SECONDARY_QUEST);
+                    opts[0].enabled = false; opts[0].kind = DOPT_NONE;
                 }
             } else if (SecondaryChangeAllowed(player)) {
-                UIText("Second thoughts? I can unmake the choice.", x, y, font, LIGHTGRAY);
-                if (DialogButton(btn, g_professionOpen ? "Never mind" : "Change my second profession",
-                                 font, true)) {
-                    g_professionOpen = !g_professionOpen;
-                    UIFocus_Clear();
-                }
+                body = "Second thoughts? I can unmake the choice.";
+                snprintf(opts[0].label, sizeof(opts[0].label), "%s",
+                         g_professionOpen ? "Never mind" : "Change my second profession");
+                opts[0].enabled = true; opts[0].kind = DOPT_PROFESSION;
             } else {
-                char why[96];
-                snprintf(why, sizeof(why), "Requires: level %d (you are %d)",
-                         SECONDARY_CHANGE_LEVEL, player->level);
-                UIText("A calling isn't a coat. Live with it a while longer.",
-                       x, y, font, LIGHTGRAY);
-                DialogButton(btn, why, font, false);
+                body = "A calling isn't a coat. Live with it a while longer.";
+                snprintf(opts[0].label, sizeof(opts[0].label),
+                         "Requires: level %d (you are %d)", SECONDARY_CHANGE_LEVEL, player->level);
+                opts[0].enabled = false; opts[0].kind = DOPT_NONE;
             }
+            nopt = 1;
             break;
         }
-        case NPC_HENCHMAN: {
-            UIText("Need another axe... er, sword? I work for loot shares.", x, y, font, LIGHTGRAY);
-            if (DialogButton(btn, "Hire Little Thom (free)", font, true)) {
+        case NPC_HENCHMAN:
+            body = "Need another axe... er, sword? I work for loot shares.";
+            snprintf(opts[0].label, sizeof(opts[0].label), "Hire Little Thom (free)");
+            opts[0].enabled = true; opts[0].kind = DOPT_HIRE_THOM; nopt = 1;
+            break;
+        default:
+            break;
+    }
+
+    // --- Size the panel to the wrapped text and the reply list ------
+    int maxw = w - 2 * pad;
+    int lineGap = (int)(3 * scale);
+    int nameAdv = font + (int)(8 * scale);
+    int bodyLines = UITextWrapped(body, 0, 0, font, maxw, lineGap, LIGHTGRAY, false);
+    int bodyH = bodyLines * (font + lineGap);
+    int optGap = (int)(6 * scale);
+    int optsH = nopt > 0 ? nopt * btnH + (nopt - 1) * optGap : 0;
+    int gapBodyOpts = nopt > 0 ? (int)(8 * scale) : 0;
+    int h = pad + nameAdv + bodyH + gapBodyOpts + optsH + pad;
+
+    // Anchored by its bottom edge so it grows upward as replies pile up,
+    // never off the bottom of the screen and never over the skill bar.
+    float bottomY = (float)screenHeight - 96.0f * scale;
+    float top = bottomY - (float)h;
+    if (top < 10.0f * scale) top = 10.0f * scale;
+    g_dialogRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, top, (float)w, (float)h };
+    UIHit_Claim(g_dialogRect);
+    UI_ThemePanel(g_dialogRect, scale, pad + font + 6);
+
+    int x = (int)g_dialogRect.x + pad;
+    int y = (int)g_dialogRect.y + pad;
+    UIText(npc->name, x, y, font, (Color){ 130, 220, 130, 255 });
+    y += nameAdv;
+    UITextWrapped(body, x, y, font, maxw, lineGap, LIGHTGRAY, true);
+    y += bodyH + gapBodyOpts;
+
+    // Draw every reply (so focus registration stays stable), remember
+    // which was taken, and act on it after the list is laid out.
+    int chosen = -1;
+    for (int i = 0; i < nopt; i++) {
+        Rectangle b = { (float)x, (float)y, (float)maxw, (float)btnH };
+        if (DialogButton(b, opts[i].label, font, opts[i].enabled)) chosen = i;
+        y += btnH + optGap;
+    }
+    if (chosen >= 0) {
+        switch (opts[chosen].kind) {
+            case DOPT_ACCEPT:  Quests_Accept(opts[chosen].param); break;
+            case DOPT_TURNIN:  Quests_TurnIn(player, opts[chosen].param); break;
+            case DOPT_SHOP:    g_shopOpen = !g_shopOpen; UIFocus_Clear(); break;
+            case DOPT_CRAFT:   g_craftOpen = !g_craftOpen; UIFocus_Clear(); break;
+            case DOPT_COLLECTOR: g_collectorOpen = !g_collectorOpen; UIFocus_Clear(); break;
+            case DOPT_TRAINER: g_trainerOpen = !g_trainerOpen; UIFocus_Clear(); break;
+            case DOPT_PROFESSION: g_professionOpen = !g_professionOpen; UIFocus_Clear(); break;
+            case DOPT_HIRE_THOM:
                 World_SetThomHired(true);
                 // Convert the standing NPC into a fighting party member on
-                // the spot; zone loads keep him from then on. Stats come
-                // from the same setup zone loads use, so the two copies
-                // of his stat block can't drift.
+                // the spot; zone loads keep him from then on, from the same
+                // stat setup so the two copies can't drift.
                 npc->kind = ENT_HERO;
                 npc->npcRole = NPC_NONE;
                 World_SetupThomStats(npc);
                 g_dialogNpc = -1;
-            }
-            break;
+                break;
+            case DOPT_NONE: break;
         }
-        default:
-            break;
     }
 }
 

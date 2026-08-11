@@ -386,6 +386,24 @@ int Quests_ReadyToTurnInIndexFor(const char *giverName) {
     return -1;
 }
 
+int Quests_OfferableListFor(const char *giverName, int *out, int max) {
+    int n = 0;
+    for (int i = 0; i < QUEST_COUNT && n < max; i++) {
+        if (g_quests[i].state == QUEST_AVAILABLE && PrereqMet(i) &&
+            ProfessionAllows(i) && GiverMatches(i, giverName)) out[n++] = i;
+    }
+    return n;
+}
+
+int Quests_ReadyToTurnInListFor(const char *giverName, int *out, int max) {
+    int n = 0;
+    for (int i = 0; i < QUEST_COUNT && n < max; i++) {
+        if (g_quests[i].state == QUEST_READY_TO_TURN_IN &&
+            GiverMatches(i, giverName)) out[n++] = i;
+    }
+    return n;
+}
+
 int Quests_ResolveRewardSkill(const Quest *q, const Entity *player) {
     if (!q || q->rewardSkill == -1) return -1;
     if (q->rewardSkill == QUEST_REWARD_ANY_SKILL) {

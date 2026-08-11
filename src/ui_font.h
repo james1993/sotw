@@ -13,6 +13,13 @@ void UIFont_Init(void);
 void UIText(const char *text, int x, int y, int size, Color color);
 int UITextWidth(const char *text, int size);
 
+// Word-wraps `text` to `maxWidth` pixels and draws it from (x, y) down,
+// each line advanced by size + lineGap. Returns the number of lines it
+// occupies, so a panel can measure first (draw = false) and size to the
+// text before painting it. Honours explicit '\n' as hard breaks.
+int UITextWrapped(const char *text, int x, int y, int size, int maxWidth,
+                  int lineGap, Color color, bool draw);
+
 // The DISPLAY face - a Roman capital serif, for titles, window headers
 // and zone names only. Deliberately not available to body text: the
 // thing that makes it good at 40px is what makes it bad at 11px.

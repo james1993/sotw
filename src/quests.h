@@ -78,6 +78,12 @@ extern Quest g_quests[QUEST_COUNT];
 int Quests_OfferableIndexFor(const char *giverName);
 int Quests_ReadyToTurnInIndexFor(const char *giverName);
 
+// All offerable / turn-in-ready quests for a giver, written into `out`
+// (up to `max`), returning the count. GW1 lists every quest a giver has
+// as its own reply, so the player picks which to take or hand in.
+int Quests_OfferableListFor(const char *giverName, int *out, int max);
+int Quests_ReadyToTurnInListFor(const char *giverName, int *out, int max);
+
 // Which skill this quest will actually teach THIS character, or -1 if
 // none (or nothing suitable is left). Used both by the reward summary
 // and by the turn-in, so the promise and the payout can't differ.

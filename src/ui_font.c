@@ -1,6 +1,7 @@
 #include "ui_font.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 static Font g_font;          // body: dense, small, has to stay legible
 static Font g_display;       // display: titles, headers, zone names
@@ -114,6 +115,45 @@ int UITextWidth(const char *text, int size) {
         return (int)MeasureTextEx(g_font, text, (float)size, size * 0.04f).x;
     }
     return MeasureText(text, size);
+}
+
+int UITextWrapped(const char *text, int x, int y, int size, int maxWidth,
+                  int lineGap, Color color, bool draw) {
+    if (!text || !text[0] || maxWidth <= 0) return 0;
+    int adv = size + lineGap;
+    int lines = 0;
+    char line[512] = "";   // the line being assembled
+    const char *p = text;
+    while (*p) {
+        if (*p == '\n') {  // hard break: emit the line and reset
+            if (draw) UIText(line, x, y + lines * adv, size, color);
+            lines++; line[0] = '\0'; p++;
+            continue;
+        }
+        while (*p == ' ') p++;               // collapse runs of spaces
+        char word[256];
+        int wl = 0;
+        while (*p && *p != ' ' && *p != '\n' && wl < (int)sizeof(word) - 1) word[wl++] = *p++;
+        word[wl] = '\0';
+        if (wl == 0) continue;
+        char cand[512];
+        if (line[0] == '\0') snprintf(cand, sizeof(cand), "%s", word);
+        else snprintf(cand, sizeof(cand), "%s %s", line, word);
+        // Keep the word if it fits, or if the line is empty (a single word
+        // wider than the box has nowhere else to go).
+        if (line[0] == '\0' || UITextWidth(cand, size) <= maxWidth) {
+            snprintf(line, sizeof(line), "%s", cand);
+        } else {
+            if (draw) UIText(line, x, y + lines * adv, size, color);
+            lines++;
+            snprintf(line, sizeof(line), "%s", word);
+        }
+    }
+    if (line[0] != '\0') {
+        if (draw) UIText(line, x, y + lines * adv, size, color);
+        lines++;
+    }
+    return lines;
 }
 
 float UI_Scale(int screenHeight) {
