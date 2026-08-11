@@ -6,6 +6,7 @@
 #include "items.h"
 #include "world.h"
 #include "ui_party.h"
+#include "ui_effects.h"
 #include "ui_compass.h"
 #include "ui_hit.h"
 #include "ui_font.h"
@@ -526,7 +527,11 @@ void Quests_DrawTracker(int screenWidth, int screenHeight) {
     // The right side belongs to the compass and the party window.
     (void)screenWidth;
     int x = (int)(14 * scale);
+    // Tuck under the effects monitor when it's showing, so the two
+    // top-left panels never overlap; otherwise sit at the usual top.
     int y = (int)(28 * scale);
+    float fxBottom = UI_EffectsMonitorBottom();
+    if (fxBottom + 8.0f * scale > (float)y) y = (int)(fxBottom + 8.0f * scale);
 
     for (int i = 0; i < QUEST_COUNT; i++) {
         Quest *q = &g_quests[i];

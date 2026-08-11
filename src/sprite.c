@@ -286,6 +286,32 @@ static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, doubl
     }
 }
 
+// An interactive NPC wears gilded shoulder armour and a collar gem so
+// the people worth walking up to read as special at a glance, not just
+// from the nameplate. Quest-givers carry a green gem to match their "!"
+// badge; other service NPCs a ruby one. Drawn over the finished figure,
+// so it sits on the shoulders like real pauldrons.
+static void DrawNpcAdornment(Vector2 p, float r, float top, NpcRole role) {
+    Color gold   = { 214, 182, 96, 255 };
+    Color goldHi = { 245, 225, 150, 255 };
+    Color goldDk = { 150, 120, 48, 255 };
+    float sy = top + r * 0.26f;
+    float sx = r * 0.5f;
+    // Collar bar across the chest, then a pauldron on each shoulder.
+    DrawLineEx((Vector2){ p.x - sx, sy }, (Vector2){ p.x + sx, sy }, r * 0.12f, goldDk);
+    DrawLineEx((Vector2){ p.x - sx * 0.8f, sy - r * 0.02f },
+               (Vector2){ p.x + sx * 0.8f, sy - r * 0.02f }, r * 0.05f, gold);
+    DrawCircleV((Vector2){ p.x - sx, sy }, r * 0.22f, gold);
+    DrawCircleV((Vector2){ p.x + sx, sy }, r * 0.22f, gold);
+    DrawCircleV((Vector2){ p.x - sx, sy }, r * 0.10f, goldHi);
+    DrawCircleV((Vector2){ p.x + sx, sy }, r * 0.10f, goldHi);
+    // Collar gem, coloured by whether this NPC has quests to give.
+    Color gem = (role == NPC_QUEST_GIVER) ? (Color){ 90, 200, 110, 255 }
+                                          : (Color){ 200, 90, 90, 255 };
+    DrawCircleV((Vector2){ p.x, sy + r * 0.03f }, r * 0.09f, gem);
+    DrawCircleV((Vector2){ p.x, sy + r * 0.03f }, r * 0.045f, goldHi);
+}
+
 static void DrawHumanoid(const Entity *e, double now) {
     float r = e->radius;
     Vector2 p = e->pos;
@@ -315,12 +341,13 @@ static void DrawHumanoid(const Entity *e, double now) {
     bool casting = Entity_IsCasting(e);
     float phase = SwingPhase(e);
     float swing = (phase >= 0.0f) ? AttackSwing(phase) * 1.55f : 0.0f;
+    float walk = sinf(e->animTime * 6.0f) * e->moveBlend;
 
     FigurePose pose = {
         .robe = robe, .skin = skin, .hair = hair,
         .sex = e->sex, .hairStyle = e->hairStyle,
         .weapon = WeaponFor(e), .weaponFocus = FocusColor(e->primaryProfession),
-        .walk = sinf(e->animTime * 6.0f) * e->moveBlend,
+        .walk = walk,
         .swing = swing, .casting = casting, .showGlow = casting,
     };
     if (casting) {
@@ -332,6 +359,12 @@ static void DrawHumanoid(const Entity *e, double now) {
                         ? 1.0f - e->castTimeRemaining / e->castTimeTotal : 0.5f;
     }
     DrawFigure(p, r, sx, &pose, now);
+
+    // Interactive NPCs wear special armour so they stand out in a crowd.
+    if (e->kind == ENT_NPC && e->npcRole != NPC_NONE) {
+        float bob = fabsf(walk) * r * 0.12f;
+        DrawNpcAdornment(p, r, p.y - r * 0.55f - bob, e->npcRole);
+    }
 }
 
 void Sprite_DrawPortrait(Vector2 center, float radius, const SpritePortrait *look) {

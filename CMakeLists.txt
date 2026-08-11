@@ -64,6 +64,7 @@ add_executable(sotw_demake
     src/ui_skillbar.c
     src/ui_target.c
     src/ui_party.c
+    src/ui_effects.c
     src/ui_compass.c
     src/ui_hit.c
     src/ui_panels.c

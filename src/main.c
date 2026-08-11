@@ -14,6 +14,7 @@
 #include "ui_skillbar.h"
 #include "ui_target.h"
 #include "ui_party.h"
+#include "ui_effects.h"
 #include "ui_compass.h"
 #include "ui_panels.h"
 #include "ui_hit.h"
@@ -292,6 +293,7 @@ int main(void) {
         UI_DrawCompass(screenWidth, screenHeight);
         UI_DrawPartyPanel(screenWidth, screenHeight);
         UI_DrawTargetPanel(screenWidth, screenHeight, 50);
+        UI_DrawEffectsMonitor(screenWidth, screenHeight);
         Quests_DrawTracker(screenWidth, screenHeight);
         if (!paused) {
             // Interactive UI is skipped under the pause overlay so its
