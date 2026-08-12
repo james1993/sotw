@@ -4,6 +4,7 @@
 #include "quests.h"
 #include "ai_hero.h"
 #include "mapdraw.h"
+#include "ui_mapmarks.h"
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
@@ -100,6 +101,22 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         }
     }
 
+    // Terrain, faint: houses, water and camps under the blips so the
+    // compass carries the lay of the land, not just an empty disc. Grass
+    // is skipped - too many specks would crowd a disc this small.
+    {
+        int propCount = 0;
+        const EnvProp *props = World_GetProps(&propCount);
+        for (int i = 0; i < propCount; i++) {
+            if (props[i].type == PROP_GRASS) continue;
+            if (!WorldToCompass(props[i].pos, player->pos, center, radius, 3.0f, &p)) continue;
+            float unit = k * 5.0f * props[i].scale;
+            if (unit < 1.6f) unit = 1.6f;
+            if (unit > 8.0f) unit = 8.0f;
+            UIMap_DrawProp(p, props[i].type, unit, 170);
+        }
+    }
+
     // Freehand drawings you scribble on the compass. The breadcrumb trail
     // of where you've walked is deliberately NOT drawn here - like GW1, it
     // lives only on the full map (U). Both are world-space, so
@@ -152,8 +169,9 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         }
     }
 
-    // Entities: allies green, NPCs pale green, monsters red (brighter
-    // when awake and hunting). The player's current target gets a gold
+    // Entities: allies green dots, NPCs cyan dots, monsters a red diamond
+    // (bigger, ringed and brighter when awake) so foes separate from
+    // friends by shape as well as colour. The current target gets a gold
     // ring so it reads on the compass too.
     int targetIdx = Entity_RefIndex(player->targetRef);
     for (int i = 0; i < g_entityCount; i++) {
@@ -161,18 +179,8 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         if (!e->alive || i == PLAYER_INDEX) continue;
         if (!WorldToCompass(e->pos, player->pos, center, radius, 4.0f, &p)) continue;
 
-        Color c;
-        if (e->kind == ENT_MONSTER) {
-            c = e->aggroed ? (Color){ 255, 70, 60, 255 } : (Color){ 190, 60, 55, 255 };
-        } else if (e->kind == ENT_NPC) {
-            c = (Color){ 150, 220, 150, 255 };
-        } else {
-            c = (Color){ 80, 210, 90, 255 };
-        }
-        DrawCircleV(p, 3.5f, c);
-        if (i == targetIdx) {
-            DrawCircleLines((int)p.x, (int)p.y, 5.5f, GOLD);
-        }
+        int kind = (e->kind == ENT_MONSTER) ? 2 : (e->kind == ENT_NPC) ? 1 : 0;
+        UIMap_DrawBlip(p, kind, e->aggroed, i == targetIdx, 3.0f);
     }
 
     // Party flag (GW1): click anywhere on the compass to send the party to

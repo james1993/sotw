@@ -3,6 +3,7 @@
 #include "world.h"
 #include "quests.h"
 #include "mapdraw.h"
+#include "ui_mapmarks.h"
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
@@ -100,21 +101,20 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
     DrawRectangleLinesEx((Rectangle){ m.panel.x - 5, m.panel.y - 5,
                                       m.panel.width + 10, m.panel.height + 10 }, 1, UI_GOLD_DIM);
 
-    // Terrain props, faint - enough to recognize the lay of the land.
+    // Terrain, as cartography: houses as footprints, water blue, trees and
+    // rocks and camps each their own mark - enough to read the lay of the
+    // land, not just green speckle. Clipped to the panel like the ridge.
+    BeginScissorMode((int)m.panel.x, (int)m.panel.y, (int)m.panel.width, (int)m.panel.height);
     int propCount = 0;
     const EnvProp *props = World_GetProps(&propCount);
     for (int i = 0; i < propCount; i++) {
         Vector2 p = W2M(&m, props[i].pos);
-        Color c;
-        switch (props[i].type) {
-            case PROP_TREE: c = (Color){ 60, 110, 65, 255 }; break;
-            case PROP_ROCK: c = (Color){ 105, 105, 110, 255 }; break;
-            case PROP_TENT: c = (Color){ 150, 120, 80, 255 }; break;
-            case PROP_FIRE: c = (Color){ 230, 130, 40, 255 }; break;
-            default: c = (Color){ 70, 120, 70, 200 }; break; // grass
-        }
-        DrawCircleV(p, (props[i].type == PROP_TREE) ? 4.0f : 2.5f, c);
+        float unit = m.k * 5.0f * props[i].scale;
+        if (unit < 2.0f) unit = 2.0f;
+        if (unit > 16.0f) unit = 16.0f;
+        UIMap_DrawProp(p, props[i].type, unit, 255);
     }
+    EndScissorMode();
 
     // Portals + labels, shrine, active reach-quest markers.
     for (int i = 0; i < World_GetPortalCount(); i++) {
@@ -145,18 +145,8 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
         Entity *e = &g_entities[i];
         if (!e->alive || i == PLAYER_INDEX) continue;
         Vector2 p = W2M(&m, e->pos);
-        Color c;
-        if (e->kind == ENT_MONSTER) {
-            c = e->aggroed ? (Color){ 255, 70, 60, 255 } : (Color){ 190, 60, 55, 255 };
-        } else if (e->kind == ENT_NPC) {
-            c = (Color){ 150, 220, 150, 255 };
-        } else {
-            c = (Color){ 80, 210, 90, 255 };
-        }
-        DrawCircleV(p, 4.0f, c);
-        if (i == targetIdx) {
-            DrawCircleLines((int)p.x, (int)p.y, 6.5f, GOLD);
-        }
+        int kind = (e->kind == ENT_MONSTER) ? 2 : (e->kind == ENT_NPC) ? 1 : 0;
+        UIMap_DrawBlip(p, kind, e->aggroed, i == targetIdx, 3.6f * scale);
     }
     if (player && player->alive) {
         Vector2 p = W2M(&m, player->pos);
