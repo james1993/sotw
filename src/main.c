@@ -10,6 +10,7 @@
 #include "fx.h"
 #include "world.h"
 #include "mapdraw.h"
+#include "ui_intro.h"
 #include "quests.h"
 #include "save.h"
 #include "ui_skillbar.h"
@@ -43,6 +44,7 @@ typedef enum {
     APP_MENU,
     APP_SELECT,   // the character roster - six slots, GW1's login screen
     APP_CREATE,   // character creation, reached from an empty slot
+    APP_INTRO,    // "The Last Day Dawns" - the opening cinematic for a new hero
     APP_PLAYING,
     APP_SEARING   // the ending - pre-Searing stops here, so the game does
 } AppState;
@@ -221,11 +223,24 @@ int main(void) {
             EndDrawing();
             if (ca == CREATE_CONFIRM) {
                 StartGame(false, &camera);
-                app = APP_PLAYING;
+                // A newly made hero watches the kingdom's last dawn before
+                // they wake in Ascalon City. Loading an existing character
+                // (from the roster) skips straight to play.
+                UI_IntroReset();
+                app = APP_INTRO;
             } else if (ca == CREATE_CANCEL) {
                 UI_SelectReset(); // back to the roster, not past it
                 app = APP_SELECT;
             }
+            continue;
+        }
+
+        // --- Opening cinematic (new characters only) ---
+        if (app == APP_INTRO) {
+            BeginDrawing();
+            bool done = UI_DrawIntro(screenWidth, screenHeight, dt);
+            EndDrawing();
+            if (done) app = APP_PLAYING;
             continue;
         }
 
