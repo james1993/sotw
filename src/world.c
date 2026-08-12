@@ -74,6 +74,11 @@ typedef struct {
     GameMode mode;
     Color clearColor; // window background
     Color gridColor;  // ground grid
+    // Outposts pave their ground with laid stone by default. Pre-Searing
+    // Ascalon City is the exception: inside its walls it is mostly lawn,
+    // so it opts into the grassy (broken-earth + green tint) surface the
+    // countryside uses.
+    bool grassyGround;
     ZonePortal portals[MAX_ZONE_PORTALS];
     int portalCount;
     Rectangle bounds; // playable area; movement clamps to this
@@ -765,8 +770,12 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
     [ZONE_ASCALON_CITY] = {
         .name = "Ascalon City",
         .mode = MODE_OUTPOST,
-        .clearColor = { 26, 23, 17, 255 },  // warm stone, banners, torchlight
-        .gridColor = { 92, 80, 58, 255 },
+        // Inside the walls pre-Searing Ascalon is a green city - lawns and
+        // gardens, not flagstones - so it takes the countryside's grass
+        // palette rather than the warm stone the other outposts use.
+        .clearColor = { 18, 27, 17, 255 },  // city lawns under a clear sky
+        .gridColor = { 64, 96, 58, 255 },   // tended green
+        .grassyGround = true,
         .portals = {
             // Lakeside County lies directly south of the capital, so its gate
             // sits on the city's south edge, below the plaza.
@@ -979,6 +988,11 @@ const char *World_GetZoneName(void) { return g_zone->name; }
 ZoneId World_GetZoneId(void) { return g_zoneId; }
 Color World_GetClearColor(void) { return g_zone->clearColor; }
 Color World_GetGridColor(void) { return g_zone->gridColor; }
+// Laid stone underfoot only where the zone is a paved outpost. Explorable
+// wilds - and grassy Ascalon City - take the broken-earth surface instead.
+bool World_GroundIsStone(void) {
+    return g_zone->mode == MODE_OUTPOST && !g_zone->grassyGround;
+}
 static bool g_searingHappened = false;
 
 bool World_SearingHappened(void) {

@@ -470,12 +470,12 @@ void Render_World(Camera2D camera) {
     // out in the plains. Per-zone data (world.c).
     Color gridColor = World_GetGridColor();
 
-    // The surface itself: laid stone inside a settlement, broken ground
-    // outside it, tinted with the zone's own colour (ground.c). Drawn
-    // first, so everything below sits on top of it.
+    // The surface itself: laid stone inside a paved settlement, broken
+    // ground (grass, when green-tinted) elsewhere, tinted with the zone's
+    // own colour (ground.c). Drawn first, so everything below sits on top.
     Ground_Draw((Rectangle){ (float)startX, (float)startY,
                              (float)(endX - startX), (float)(endY - startY) },
-                gridColor, World_GetMode() == MODE_OUTPOST);
+                gridColor, World_GroundIsStone());
 
     // The grid is deliberately faint and every fourth line is a touch
     // stronger. It survived the ground texture because it still does a

@@ -105,6 +105,11 @@ ZoneId World_GetZoneId(void);
 Color World_GetClearColor(void);
 Color World_GetGridColor(void);
 
+// True where the ground should be drawn as laid stone (paved outposts)
+// rather than the broken-earth/grass surface. Ascalon City is a grassy
+// outpost, so it reads false despite being an outpost.
+bool World_GroundIsStone(void);
+
 // Creates the player + loads the starting outpost. Call once at startup.
 void World_Init(void);
 
