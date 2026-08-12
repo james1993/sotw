@@ -1091,6 +1091,22 @@ static float BarrierHash01(unsigned a, unsigned b) {
 }
 
 // Would a mass here block something the player has to reach?
+// Roughly how much room a decorative prop needs kept clear of the ridge so
+// it never ends up half-buried in a mountain. Houses have the biggest
+// footprint; trees, grass and the like are small.
+static float PropClearance(const EnvProp *p) {
+    switch (p->type) {
+        case PROP_HOUSE:                       return 74.0f * p->scale;
+        case PROP_STATUE: case PROP_FOUNTAIN:
+        case PROP_STALL:  case PROP_TENT:      return 52.0f * p->scale;
+        default:                               return 34.0f * p->scale;
+    }
+}
+
+// True when a barrier mass at `pos`/`radius` would bury something that must
+// stay reachable and visible: a portal, the shrine, a placed prop or a
+// spawned NPC/monster. The ridge is nudged around these instead of over
+// them - the same carve-out that keeps the only way out of a zone clear.
 static bool BarrierWouldBlockExit(const ZoneDef *zone, Vector2 pos, float radius) {
     for (int i = 0; i < zone->portalCount; i++) {
         float dx = zone->portals[i].pos.x - pos.x;
@@ -1100,6 +1116,14 @@ static bool BarrierWouldBlockExit(const ZoneDef *zone, Vector2 pos, float radius
     if (zone->hasShrine) {
         float dx = zone->shrinePos.x - pos.x, dy = zone->shrinePos.y - pos.y;
         if (sqrtf(dx * dx + dy * dy) < radius + BARRIER_CLEARANCE) return true;
+    }
+    for (int i = 0; i < zone->propCount; i++) {
+        float dx = zone->props[i].pos.x - pos.x, dy = zone->props[i].pos.y - pos.y;
+        if (sqrtf(dx * dx + dy * dy) < radius + PropClearance(&zone->props[i])) return true;
+    }
+    for (int i = 0; i < zone->spawnCount; i++) {
+        float dx = zone->spawns[i].pos.x - pos.x, dy = zone->spawns[i].pos.y - pos.y;
+        if (sqrtf(dx * dx + dy * dy) < radius + 44.0f) return true;
     }
     return false;
 }
