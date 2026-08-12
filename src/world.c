@@ -155,14 +155,17 @@ static const EnvProp g_lakesideProps[] = {
 static const SpawnDef g_lakesideSpawns[] = {
     // River Skale in the water margin - the first thing most Prophecies
     // characters ever killed.
+    // Tighter aggro on the opening skale so a solo character can pull one
+    // at a time instead of the whole margin at once - the pre-Searing
+    // teaching fight, not an ambush.
     { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 300, 60 },
-      .level = 1, .hp = 80, .armor = 20, .aggro = 110.0f, .strengthRank = 3,
+      .level = 1, .hp = 80, .armor = 20, .aggro = 88.0f, .strengthRank = 3,
       .species = SPECIES_SKALE, .group = 1 },
     { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 380, 140 },
-      .level = 1, .hp = 80, .armor = 20, .aggro = 110.0f, .strengthRank = 3,
+      .level = 1, .hp = 80, .armor = 20, .aggro = 88.0f, .strengthRank = 3,
       .species = SPECIES_SKALE, .group = 1 },
     { .kind = SPAWN_MONSTER, .name = "River Skale Fin", .pos = { 250, 160 },
-      .level = 2, .hp = 110, .armor = 25, .aggro = 115.0f, .strengthRank = 4,
+      .level = 2, .hp = 110, .armor = 25, .aggro = 92.0f, .strengthRank = 4,
       .species = SPECIES_SKALE, .group = 1 },
 
     // A collector, out in the field where GW1 puts them: not in the
@@ -190,10 +193,10 @@ static const SpawnDef g_lakesideSpawns[] = {
       .strengthRank = 3, .species = SPECIES_MOA },
 
     { .kind = SPAWN_MONSTER, .name = "River Skale", .pos = { 820, -60 },
-      .level = 2, .hp = 100, .armor = 25, .aggro = 115.0f, .strengthRank = 4,
+      .level = 2, .hp = 100, .armor = 25, .aggro = 90.0f, .strengthRank = 4,
       .species = SPECIES_SKALE, .group = 2 },
     { .kind = SPAWN_MONSTER, .name = "River Skale Fin", .pos = { 900, -140 },
-      .level = 3, .hp = 130, .armor = 30, .aggro = 120.0f, .strengthRank = 5,
+      .level = 3, .hp = 130, .armor = 30, .aggro = 95.0f, .strengthRank = 5,
       .species = SPECIES_SKALE, .group = 2 },
 };
 
@@ -1452,8 +1455,12 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     // character who started at level 5 - against a level-1 Ascalonian in
     // starter cloth, that made a River Skale hit as hard as a Charr and
     // killed you on the walk out of the abbey.
-    m->attackDamageMin = 2 + def->level;
-    m->attackDamageMax = 4 + def->level * 2;
+    // Damage scales gently and LINEARLY with level now. The old
+    // 4 + level*2 curve spiked hard - a pack of level-3 skale could drop
+    // a fresh caster in a couple of seconds, which pre-Searing never
+    // does. A level-1 foe should chip, not delete.
+    m->attackDamageMin = 1 + def->level;
+    m->attackDamageMax = 3 + def->level;
     m->attributeRank[ATTR_MONSTROUS] = def->strengthRank;
     // Aloes are rooted: they fight what comes to them and never chase.
     if (def->species == SPECIES_ALOE) m->moveSpeed = 0.0f;
@@ -1465,8 +1472,8 @@ static Entity *SpawnMonster(const SpawnDef *def) {
         // Bosses read as bigger on the field and hit harder, so a
         // capture run is a real fight rather than a detour.
         m->radius *= 1.35f;
-        m->attackDamageMin = (int)(m->attackDamageMin * 1.4f);
-        m->attackDamageMax = (int)(m->attackDamageMax * 1.4f);
+        m->attackDamageMin = (int)(m->attackDamageMin * 1.3f);
+        m->attackDamageMax = (int)(m->attackDamageMax * 1.3f);
     }
     if (def->caster) {
         // Shaman loadout: hangs back and casts Fire Magic - the ranged
