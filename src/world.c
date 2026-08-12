@@ -1522,6 +1522,16 @@ static void SpawnNpc(const SpawnDef *def) {
     if (npc) {
         npc->npcRole = def->npcRole;
         npc->teachesProfession = def->teaches;
+        // Give every NPC their own face from a hash of their name, so a
+        // town reads as a crowd of different people instead of one
+        // person copied five times. Deterministic, so an NPC looks the
+        // same on every visit.
+        unsigned h = 2166136261u;
+        for (const char *c = def->name; *c; c++) h = (h ^ (unsigned char)*c) * 16777619u;
+        npc->sex       = (int)(h & 1u);
+        npc->skinTone  = (int)((h >> 1) % SKIN_TONE_COUNT);
+        npc->hairColor = (int)((h >> 4) % HAIR_COLOR_COUNT);
+        npc->hairStyle = (int)((h >> 8) % HAIR_STYLE_COUNT);
     }
 }
 

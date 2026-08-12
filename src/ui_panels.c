@@ -55,13 +55,6 @@ static Rectangle g_invRect, g_dialogRect, g_shopRect,
 #define SECONDARY_QUEST "A Second Profession"
 #define SECONDARY_CHANGE_LEVEL 10
 
-// Pre-Searing's skill trainer (Halbrik, in Ascalon City) only teaches
-// characters at level 10 or above, and only skills the quests also
-// grant. That is the whole reason pre-Searing skills come from quests:
-// the trainer is a late backstop, not the source. Gating him here is
-// what makes the quest chain the actual route to a build.
-#define TRAINER_MIN_LEVEL 10
-
 static bool SecondaryGrantAllowed(void) {
     return Quests_IsDoneByName(SECONDARY_QUEST);
 }
@@ -107,43 +100,71 @@ static const ShopEntry g_shopStock[] = {
 // The Armorer's recipes: gold + Charr Carvings in, armor out - GW1's
 // craft-only armor economy. No armor ever drops or sits in a shop.
 typedef struct { Item item; int gold; int hides; } CraftEntry;
-#define CRAFT_LIST_COUNT 10  // two tiers x five pieces
+#define CRAFT_LIST_COUNT 5   // one pre-Searing set, five pieces
 #define CRAFT_MATERIAL "Charr Carving"
 
-// GW1 armor is per-profession, and the ceiling differs: a Warrior tops
-// out at AL 80, a Ranger at 70, every caster at 60. The armorer stocks
-// two tiers above whatever that profession started in, so the gap
-// between a front-liner and a caster stays the gap GW1 designed.
-static int ArmorBaseFor(Profession p) {
+// The pre-Searing "Ascalon armor" set each profession crafts. These are
+// GW1's actual pre-Searing set names; the post-Searing sets (and their
+// far higher armour) come later.
+static const char *ArmorSetName(Profession p) {
     switch (p) {
-        case PROF_WARRIOR: return 40;
-        case PROF_RANGER:  return 35;
-        default:           return 30;
+        case PROF_WARRIOR:      return "Ringmail";
+        case PROF_RANGER:       return "Rawhide";
+        case PROF_MONK:         return "Roughspun";
+        case PROF_NECROMANCER:  return "Initiate's";
+        case PROF_MESMER:       return "Dilettante's";
+        case PROF_ELEMENTALIST: return "Apprentice's";
+        default:                return "Ascalon";
     }
 }
 
-// Two tiers, five pieces each. GW1's armourer sells a SET a piece at a
-// time, which is the whole reason armour is a collection: you upgrade
-// the chest first because it protects the most, and finish the set when
-// you can afford to.
+// Pre-Searing armour is deliberately low. A warrior's Ringmail sits
+// around AL 40, a ranger's Rawhide near 30, and every caster's cloth
+// lower still - nothing close to the AL 60/70/80 ceilings that only open
+// up after the Searing.
+static int ArmorRatingFor(Profession p) {
+    switch (p) {
+        case PROF_WARRIOR: return 40;
+        case PROF_RANGER:  return 30;
+        default:           return 24; // every caster
+    }
+}
+
+// GW1's core armour-piece nouns, split martial vs cloth so a warrior gets
+// a Hauberk and Gauntlets while a caster gets a Robe and Gloves.
+static const char *ArmorPieceNoun(Profession p, EquipSlot slot) {
+    bool warrior = (p == PROF_WARRIOR);
+    bool ranger  = (p == PROF_RANGER);
+    switch (slot) {
+        case EQUIP_HEAD:  return warrior ? "Helm"      : ranger ? "Mask"  : "Cowl";
+        case EQUIP_CHEST: return warrior ? "Hauberk"   : ranger ? "Vest"  : "Robe";
+        case EQUIP_ARMS:  return warrior ? "Gauntlets" : "Gloves";
+        case EQUIP_LEGS:  return "Leggings";
+        case EQUIP_FEET:  return ranger || warrior ? "Boots" : "Shoes";
+        default:          return "Piece";
+    }
+}
+
+// One set, five pieces. GW1's armourer sells a SET a piece at a time,
+// which is the whole reason armour is a collection: you buy the chest
+// first because it protects the most, and finish the set when you can.
 static void BuildCraftList(Profession p, CraftEntry out[CRAFT_LIST_COUNT]) {
-    static const int tierGold[2]  = { 30, 70 };
-    static const int tierHides[2] = { 1, 2 };
-    int base = ArmorBaseFor(p);
+    // The chest costs more and armours the most; the extremities are cheap.
+    static const int pieceGold[5]  = { 25, 45, 20, 30, 20 };
+    static const int pieceHides[5] = { 1, 2, 1, 1, 1 };
+    int al = ArmorRatingFor(p);
+    const char *set = ArmorSetName(p);
     int n = 0;
-    for (int tier = 0; tier < 2; tier++) {
-        int al = base + 15 * (tier + 1);
-        for (int piece = EQUIP_HEAD; piece <= EQUIP_FEET && n < CRAFT_LIST_COUNT; piece++, n++) {
-            memset(&out[n], 0, sizeof(out[n]));
-            out[n].item.kind = ITEM_ARMOR;
-            out[n].item.armor = al;
-            out[n].item.count = 1;
-            out[n].item.slot = (EquipSlot)piece;
-            snprintf(out[n].item.name, sizeof(out[n].item.name), "%.14s %s (AL %d)",
-                     Character_ProfessionName(p), Items_SlotName((EquipSlot)piece), al);
-            out[n].gold = tierGold[tier];
-            out[n].hides = tierHides[tier];
-        }
+    for (int piece = EQUIP_HEAD; piece <= EQUIP_FEET && n < CRAFT_LIST_COUNT; piece++, n++) {
+        memset(&out[n], 0, sizeof(out[n]));
+        out[n].item.kind = ITEM_ARMOR;
+        out[n].item.armor = al;
+        out[n].item.count = 1;
+        out[n].item.slot = (EquipSlot)piece;
+        snprintf(out[n].item.name, sizeof(out[n].item.name), "%.12s %s (AL %d)",
+                 set, ArmorPieceNoun(p, (EquipSlot)piece), al);
+        out[n].gold = pieceGold[n];
+        out[n].hides = pieceHides[n];
     }
 }
 
@@ -159,6 +180,15 @@ void UI_OpenNpcDialog(int entityIndex) {
     g_dialogNpc = entityIndex;
     g_shopOpen = false;
     g_craftOpen = false;
+    // GW1 opens a merchant's trade window and an armourer's craft window
+    // the moment you talk to them - the wares are the conversation, so
+    // there's no "Browse wares" step in between. Closing the window drops
+    // back to the one-line dialogue behind it.
+    const Entity *npc = Entity_Get(entityIndex);
+    if (npc && npc->kind == ENT_NPC) {
+        if (npc->npcRole == NPC_MERCHANT) g_shopOpen = true;
+        else if (npc->npcRole == NPC_CRAFTER) g_craftOpen = true;
+    }
 }
 
 bool UI_IsNpcDialogOpen(void) {
@@ -833,16 +863,12 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     int rowH = (int)(30 * scale);
     int w = (int)(440 * scale);
 
-    bool tooEarly = player->level < TRAINER_MIN_LEVEL;
-
     int forSale = 0;
-    if (!tooEarly) {
-        for (int i = 0; i < g_skillCount; i++) {
-            if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite || !g_skillDB[i].preSearing) continue;
-            if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
-        }
+    for (int i = 0; i < g_skillCount; i++) {
+        if (Skillbook_IsUnlocked(i) || g_skillDB[i].isElite || !g_skillDB[i].preSearing) continue;
+        if (Skillbook_IsUsableBy(i, player->primaryProfession, player->secondaryProfession)) forSale++;
     }
-    int rows = tooEarly ? 2 : (forSale > 0 ? forSale : 1);
+    int rows = forSale > 0 ? forSale : 1;
     int h = pad * 3 + font + small + (int)(6 * scale) + rows * rowH + pad;
 
     g_trainerRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(90 * scale),
@@ -862,26 +888,13 @@ static void DrawTrainer(Entity *player, int screenWidth, int screenHeight) {
     int y = (int)g_trainerRect.y + pad + font + pad;
 
     char sub[128];
-    if (tooEarly) {
-        snprintf(sub, sizeof(sub), "Requires: level %d (you are %d)",
-                 TRAINER_MIN_LEVEL, player->level);
-    } else {
-        snprintf(sub, sizeof(sub), "Each skill costs 1 skill point and %d gold. Elites must be captured.",
-                 Skillbook_TrainerGoldCost());
-    }
-    UIText(sub, x, y, small,
-           tooEarly ? (Color){ 200, 150, 120, 255 } : (Color){ 150, 146, 134, 255 });
+    snprintf(sub, sizeof(sub), "Each skill costs 1 skill point and %d gold. Elites must be captured.",
+             Skillbook_TrainerGoldCost());
+    UIText(sub, x, y, small, (Color){ 150, 146, 134, 255 });
     y += small + (int)(6 * scale);
 
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
-
-    if (tooEarly) {
-        UIText("Learn your trade in the field first - the quest givers", x, y, font, GRAY);
-        y += font + (int)(4 * scale);
-        UIText("of Ascalon have skills for you. Come back at 10.", x, y, font, GRAY);
-        return;
-    }
 
     if (forSale == 0) {
         UIText("You've learned everything I can teach.", x, y, font, GRAY);
@@ -1367,10 +1380,6 @@ static void DrawCraft(Entity *player, int screenWidth, int screenHeight) {
         }
         y += rowH;
     }
-
-    y += 4;
-    UIText("Hides come from slain Charr - armor is never looted, only crafted.",
-           x, y, (int)(10 * scale), GRAY);
 }
 
 // Picking a second profession. Every profession but your primary is

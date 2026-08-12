@@ -67,7 +67,7 @@ void UI_DrawEffectsMonitor(int screenWidth, int screenHeight) {
     if (p->morale != 0) {
         Color c = p->morale > 0 ? (Color){ 74, 150, 78, 255 } : (Color){ 168, 62, 58, 255 };
         char pct[8];
-        snprintf(pct, sizeof(pct), "%+d", p->morale);
+        snprintf(pct, sizeof(pct), "%+d%%", p->morale);
         int pw = UITextWidth(pct, tiny);
         int cw = icon + (pw > icon - 4 ? pw - (icon - 4) : 0); // widen if the number needs it
         DrawRectangle(x, y, cw, icon, c);

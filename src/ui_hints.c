@@ -19,15 +19,11 @@ typedef struct {
 // A NULL pad label means "no controller binding" - the entry is simply
 // dropped from the pad legend. On a controller every screen is reached
 // through Start, so the panel hotkeys only appear for the keyboard.
+// Just the way into the menu. Everything else the player learns by
+// playing; a permanent legend of every key is clutter, and GW1 doesn't
+// carry one either. The menu, which opens every other screen, is the one
+// binding worth pinning to the HUD.
 static const HintEntry g_hints[] = {
-    { "Space", "A",      "Attack" },
-    { "Tab",   "R1",     "Next foe" },
-    { "F",     "X",      "Talk" },
-    { "L",     NULL,     "Build" },
-    { "I",     NULL,     "Bags" },
-    { "E",     NULL,     "Gear" },
-    { "T",     NULL,     "Titles" },
-    { "M",     "Select", "Map" },
     { "P",     "Start",  "Menu" },
 };
 #define HINT_COUNT (int)(sizeof(g_hints) / sizeof(g_hints[0]))

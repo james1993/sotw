@@ -22,7 +22,10 @@ static const Color COLOR_SELF  = { 246, 240, 220, 255 };
 
 static const char *NpcRoleLabel(NpcRole role) {
     switch (role) {
-        case NPC_QUEST_GIVER: return "Quests";
+        // Giving a quest isn't a profession - Rurik is a prince who has
+        // work, not a "Quests" NPC. The green "!" already says he has
+        // something, so his plate carries only his name.
+        case NPC_QUEST_GIVER: return NULL;
         case NPC_MERCHANT:    return "Merchant";
         case NPC_HENCHMAN:    return "Henchman";
         case NPC_CRAFTER:     return "Armorer";
