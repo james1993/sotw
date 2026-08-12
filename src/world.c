@@ -572,6 +572,16 @@ static const EnvProp g_northProps[] = {
     { {  920,   80 }, PROP_ROCK,  1.0f },
     { {  640,  200 }, PROP_TREE,  0.8f },
     { {  -40,  -60 }, PROP_FIRE,  1.0f },
+    // Filling the taller frontier: crags across the far north and along the
+    // southern approach so the enlarged expanse doesn't read as empty.
+    { { -240, -400 }, PROP_ROCK,  1.3f },
+    { {  100, -420 }, PROP_ROCK,  1.1f },
+    { {  520, -380 }, PROP_ROCK,  1.2f },
+    { {  860, -340 }, PROP_ROCK,  1.0f },
+    { { -300,  380 }, PROP_ROCK,  1.1f },
+    { {  180,  420 }, PROP_ROCK,  1.0f },
+    { {  560,  380 }, PROP_TREE,  0.8f },
+    { {  980, -220 }, PROP_ROCK,  1.1f },
 };
 
 static const SpawnDef g_northSpawns[] = {
@@ -875,7 +885,10 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
             { { 320, -300 }, "To Piken Square", ZONE_PIKEN_SQUARE, { 0, 190 } },
         },
         .portalCount = 2,
-        .bounds = { -520, -340, 1740, 700 },
+        // The frontier north of the Wall: made taller so it reads as open
+        // country rather than a corridor. Wide already for the long fight
+        // out to Piken Square.
+        .bounds = { -560, -520, 1820, 1040 },
         .hasShrine = true,
         .shrinePos = { -380, -200 },
         .props = g_northProps, .propCount = COUNT(g_northProps),
