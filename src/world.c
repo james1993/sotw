@@ -7,6 +7,7 @@
 #include "skillbook.h"
 #include "projectile.h"
 #include "fx.h"
+#include "mapdraw.h"
 #include "area.h"
 #include "ai_hero.h"
 #include "save.h"
@@ -1552,6 +1553,7 @@ static void LoadZone(ZoneId zoneId, Vector2 playerEntry) {
     Projectile_ClearAll();               // and neither do shots in flight
     Area_Reset();                        // wards/wells/spirits don't either
     AI_ClearPartyFlag();                 // a party flag doesn't cross zones
+    MapDraw_Reset();                     // trail + map scribbles are per-instance
     Fx_Clear();
 
     g_entities[g_entityCount++] = saved;

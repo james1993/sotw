@@ -9,6 +9,7 @@
 #include "area.h"
 #include "fx.h"
 #include "world.h"
+#include "mapdraw.h"
 #include "quests.h"
 #include "save.h"
 #include "ui_skillbar.h"
@@ -251,6 +252,13 @@ int main(void) {
             playerNow = Entity_Get(PLAYER_INDEX); // zone loads rebuild the array
             Items_UpdatePickup(playerNow);
             Quests_Update(playerNow);
+
+            // Map annotations: age the player's freehand drawings, and drop
+            // a breadcrumb of where they've walked - but only in the field,
+            // where retracing your steps actually matters.
+            MapDraw_Update(dt);
+            if (playerNow && World_GetMode() == MODE_EXPLORABLE)
+                MapDraw_RecordStep(playerNow->pos);
 
             // Turning in Sir Tydus' Academy trial sets this, and the
             // county stops existing the moment it does. Checked here in

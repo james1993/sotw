@@ -2,10 +2,12 @@
 #include "entity.h"
 #include "world.h"
 #include "quests.h"
+#include "mapdraw.h"
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
 #include "raylib.h"
+#include <math.h>
 
 #define PLAYER_INDEX 0
 #define GAMEPAD_ID 0
@@ -35,6 +37,14 @@ static Vector2 W2M(const MapXform *m, Vector2 world) {
     return (Vector2){
         m->panel.x + (world.x - m->bounds.x) * m->k,
         m->panel.y + (world.y - m->bounds.y) * m->k
+    };
+}
+
+// Map panel -> world, for turning a pointer drag into a drawing.
+static Vector2 M2W(const MapXform *m, Vector2 screen) {
+    return (Vector2){
+        m->bounds.x + (screen.x - m->panel.x) / m->k,
+        m->bounds.y + (screen.y - m->panel.y) / m->k
     };
 }
 
@@ -152,6 +162,35 @@ void UI_MapUpdateAndDraw(int screenWidth, int screenHeight) {
         Vector2 p = W2M(&m, player->pos);
         DrawCircleV(p, 5.0f, RAYWHITE);
         DrawCircleLines((int)p.x, (int)p.y, 5.0f, BLACK);
+    }
+
+    // Breadcrumb trail and freehand drawings, clipped to the panel. The
+    // trail shows where you've been; the drawings are yours to add.
+    BeginScissorMode((int)m.panel.x, (int)m.panel.y, (int)m.panel.width, (int)m.panel.height);
+    for (int i = 1; i < MapDraw_TrailCount(); i++) {
+        DrawLineEx(W2M(&m, MapDraw_TrailAt(i - 1)), W2M(&m, MapDraw_TrailAt(i)), 2.0f,
+                   (Color){ 120, 150, 210, 130 });
+    }
+    {
+        float ttl = MapDraw_StrokeTTL();
+        for (int i = 1; i < MapDraw_StrokeCount(); i++) {
+            const MapStrokePt *s0 = MapDraw_StrokeAt(i - 1), *s1 = MapDraw_StrokeAt(i);
+            if (s0->stroke != s1->stroke) continue;
+            float f = 1.0f - s0->age / ttl; if (f < 0.0f) f = 0.0f;
+            DrawLineEx(W2M(&m, s0->pos), W2M(&m, s1->pos), 3.0f,
+                       (Color){ 240, 210, 90, (unsigned char)(230 * f) });
+        }
+    }
+    EndScissorMode();
+
+    // Left-drag inside the map draws a stroke, the way GW1 lets you mark
+    // up the map. The travel buttons sit in the margin, clear of the panel.
+    {
+        Vector2 mp = GetMousePosition();
+        if (CheckCollisionPointRec(mp, m.panel)) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) MapDraw_BeginStroke();
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) MapDraw_AddPoint(M2W(&m, mp));
+        }
     }
 
     // Map travel: a column of visited outposts you can jump to, GW1-style.

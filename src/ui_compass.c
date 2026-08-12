@@ -3,6 +3,7 @@
 #include "world.h"
 #include "quests.h"
 #include "ai_hero.h"
+#include "mapdraw.h"
 #include "ui_font.h"
 #include "ui_hit.h"
 #include "ui_theme.h"
@@ -99,6 +100,29 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         }
     }
 
+    // Your breadcrumb trail this instance, then any freehand drawings on
+    // top. Both are world-space, so WorldToCompass clips them to the disc
+    // for free.
+    {
+        Vector2 a, b;
+        for (int i = 1; i < MapDraw_TrailCount(); i++) {
+            if (WorldToCompass(MapDraw_TrailAt(i - 1), player->pos, center, radius, 2.0f, &a) &&
+                WorldToCompass(MapDraw_TrailAt(i), player->pos, center, radius, 2.0f, &b)) {
+                DrawLineEx(a, b, 1.5f, (Color){ 120, 150, 210, 110 });
+            }
+        }
+        float ttl = MapDraw_StrokeTTL();
+        for (int i = 1; i < MapDraw_StrokeCount(); i++) {
+            const MapStrokePt *s0 = MapDraw_StrokeAt(i - 1), *s1 = MapDraw_StrokeAt(i);
+            if (s0->stroke != s1->stroke) continue;
+            if (WorldToCompass(s0->pos, player->pos, center, radius, 2.0f, &a) &&
+                WorldToCompass(s1->pos, player->pos, center, radius, 2.0f, &b)) {
+                float f = 1.0f - s0->age / ttl; if (f < 0.0f) f = 0.0f;
+                DrawLineEx(a, b, 2.0f, (Color){ 240, 210, 90, (unsigned char)(220 * f) });
+            }
+        }
+    }
+
     // Portal and shrine landmarks.
     for (int i = 0; i < World_GetPortalCount(); i++) {
         const ZonePortal *portal = World_GetPortal(i);
@@ -112,7 +136,9 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         DrawRectangle((int)p.x - 3, (int)p.y - 3, 6, 6, (Color){ 200, 210, 235, 255 });
     }
 
-    // Active reach-quest marker.
+    // Active reach-quest marker. In range it sits on the target; out of
+    // range it becomes an arrow at the rim pointing the way, so the
+    // compass always answers "which way is my next step?".
     for (int i = 0; i < QUEST_COUNT; i++) {
         const Quest *q = &g_quests[i];
         if (q->type != QTYPE_REACH || q->state != QUEST_ACTIVE) continue;
@@ -120,6 +146,14 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         if (WorldToCompass(q->targetPos, player->pos, center, radius, 5.0f, &p)) {
             DrawTriangle((Vector2){ p.x, p.y - 5 }, (Vector2){ p.x - 4, p.y + 3 },
                          (Vector2){ p.x + 4, p.y + 3 }, (Color){ 90, 220, 90, 255 });
+        } else {
+            float a = atan2f(q->targetPos.y - player->pos.y, q->targetPos.x - player->pos.x);
+            Vector2 tip = { center.x + cosf(a) * (radius - 3.0f), center.y + sinf(a) * (radius - 3.0f) };
+            Vector2 bl  = { center.x + cosf(a + 2.5f) * (radius - 11.0f),
+                            center.y + sinf(a + 2.5f) * (radius - 11.0f) };
+            Vector2 br  = { center.x + cosf(a - 2.5f) * (radius - 11.0f),
+                            center.y + sinf(a - 2.5f) * (radius - 11.0f) };
+            DrawTriangle(tip, bl, br, (Color){ 90, 220, 90, 255 });
         }
     }
 
@@ -166,6 +200,18 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
             DrawLineEx((Vector2){ p.x, p.y + 5 }, (Vector2){ p.x, p.y - 7 }, 1.5f,
                        (Color){ 235, 225, 120, 255 });
             DrawRectangle((int)p.x, (int)p.y - 7, 7, 5, (Color){ 235, 205, 60, 255 });
+        }
+    }
+
+    // Draw on the compass with the RIGHT button (left is the party flag):
+    // hold and drag to scribble a route or a warning, GW1's map drawing.
+    {
+        Vector2 mp = GetMousePosition();
+        Vector2 md = { mp.x - center.x, mp.y - center.y };
+        if (sqrtf(md.x * md.x + md.y * md.y) <= radius) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) MapDraw_BeginStroke();
+            if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT))
+                MapDraw_AddPoint((Vector2){ player->pos.x + md.x / k, player->pos.y + md.y / k });
         }
     }
 
