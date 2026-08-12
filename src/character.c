@@ -97,7 +97,11 @@ void Character_FormatTitle(const CharacterDef *def, char *out, int outSize) {
 }
 
 bool Character_IsReforged(void) {
-    return g_character.reforged;
+    // Reforged Mode is always on in this demake - there is no toggle. Every
+    // character gets the Reforged content (Piken Square, the extra Northlands
+    // Charr, reduced enemy health/armor, the +5% XP and gold). The stored
+    // `reforged` flag is kept only for save-file compatibility.
+    return true;
 }
 
 CharacterDef Character_Default(void) {
@@ -110,8 +114,8 @@ CharacterDef Character_Default(void) {
     d.skinTone = 1;
     d.hairColor = 1;
     d.hairStyle = 0;
-    // Off by default, like the real thing: Reforged is a deliberate
-    // choice you make about the run, not the way the game arrives.
-    d.reforged = false;
+    // Reforged Mode is always on (see Character_IsReforged); the flag is set
+    // for tidiness and save compatibility, not as a choice.
+    d.reforged = true;
     return d;
 }

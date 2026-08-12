@@ -158,10 +158,8 @@ SelectAction UI_DrawSelectScreen(int screenWidth, int screenHeight, float dt) {
         UI_TextShadow(sub, tx, ty, small, UI_TEXT_SECOND);
         ty += small + UI_SP(scale, 2);
 
-        if (info->reforged) {
-            UI_TextShadow("Reforged Mode", tx, ty, tiny, (Color){ 208, 168, 96, 255 });
-            ty += tiny + UI_SP(scale, 1);
-        }
+        // No "Reforged Mode" badge: Reforged is always on now, so every
+        // character has it and the label would just be noise on every card.
         if (info->searingSurvived) {
             // A finished character. GW1 moves them on to post-Searing;
             // this prototype stops at the Searing, so the run is over

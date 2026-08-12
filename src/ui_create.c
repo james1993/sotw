@@ -350,29 +350,9 @@ CreateAction UI_DrawCreateScreen(int screenWidth, int screenHeight, float dt) {
         if (picked >= 0) g_draft.hairColor = picked;
         y += sw + UI_SP(scale, 6);
 
-        // Reforged Mode. Taken here and never again - that's how the
-        // real thing works, and it's why it belongs on the creation
-        // screen next to the other permanent decisions rather than in a
-        // settings menu you could revisit.
-        DrawRectangle(x, y, innerW, 1, UI_GOLD_DIM);
-        y += UI_SP(scale, 3);
-        UI_TextShadow("Reforged Mode", x, y, small, UI_GOLD);
-        y += small + UI_SP(scale, 2);
-        Rectangle toggle = { (float)x, (float)y, (float)innerW, (float)(30 * scale) };
-        if (NavButton(toggle, g_draft.reforged ? "Reforged:  ON" : "Reforged:  off",
-                      small, true, g_draft.reforged)) {
-            g_draft.reforged = !g_draft.reforged;
-        }
-        y += (int)(30 * scale) + UI_SP(scale, 2);
-        UI_TextShadow(g_draft.reforged
-                          ? "Piken Square opens. More Charr in the north."
-                          : "The county as it was. No Piken Square.",
-                      x, y, tiny, UI_TEXT_SECOND);
-        y += tiny + UI_SP(scale, 1);
-        UI_TextShadow(g_draft.reforged
-                          ? "Foes hit softer; +5% XP and gold."
-                          : "",
-                      x, y, tiny, UI_TEXT_MUTED);
+        // Reforged Mode is always on in this demake, so there is no toggle
+        // here - it is simply how the world arrives: Piken Square unlockable,
+        // extra Charr in the north, and the Reforged XP/gold bonus.
     }
 
     // ---------------- Bottom: name + actions ----------------
