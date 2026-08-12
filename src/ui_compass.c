@@ -100,17 +100,12 @@ void UI_DrawCompass(int screenWidth, int screenHeight) {
         }
     }
 
-    // Your breadcrumb trail this instance, then any freehand drawings on
-    // top. Both are world-space, so WorldToCompass clips them to the disc
-    // for free.
+    // Freehand drawings you scribble on the compass. The breadcrumb trail
+    // of where you've walked is deliberately NOT drawn here - like GW1, it
+    // lives only on the full map (U). Both are world-space, so
+    // WorldToCompass clips them to the disc for free.
     {
         Vector2 a, b;
-        for (int i = 1; i < MapDraw_TrailCount(); i++) {
-            if (WorldToCompass(MapDraw_TrailAt(i - 1), player->pos, center, radius, 2.0f, &a) &&
-                WorldToCompass(MapDraw_TrailAt(i), player->pos, center, radius, 2.0f, &b)) {
-                DrawLineEx(a, b, 1.5f, (Color){ 120, 150, 210, 110 });
-            }
-        }
         float ttl = MapDraw_StrokeTTL();
         for (int i = 1; i < MapDraw_StrokeCount(); i++) {
             const MapStrokePt *s0 = MapDraw_StrokeAt(i - 1), *s1 = MapDraw_StrokeAt(i);
