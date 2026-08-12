@@ -11,7 +11,7 @@ Icons from [game-icons.net](https://game-icons.net), used under the
 licence. CC BY credits the individual artist, so:
 
 - Icons made by **delapouite**, available on https://game-icons.net (6 used)
-- Icons made by **lorc**, available on https://game-icons.net (25 used)
+- Icons made by **lorc**, available on https://game-icons.net (57 used)
 
 The same credit is shown in-game on the title screen, which is how
 CC BY asks a video game to carry it. The exact icon used for each
