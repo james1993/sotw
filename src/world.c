@@ -725,8 +725,11 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 22, 24, 18, 255 },  // cool cloister stone and grass
         .gridColor = { 74, 80, 60, 255 },
         .portals = {
-            { {  380, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { -420, 0 } },
-            { { -380, 0 }, "To The Catacombs",   ZONE_CATACOMBS,       {  320, 0 } },
+            // Ashford is south-west of Ascalon City; from the abbey the road
+            // back into the county runs north-east, and the Catacombs open
+            // just south, below the statue of Dwayna.
+            { {  300, -180 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { -360, 240 } },
+            { {    0,  230 }, "To The Catacombs",   ZONE_CATACOMBS,       {    0, -180 } },
         },
         .portalCount = 2,
         .bounds = { -450, -300, 900, 600 },
@@ -740,13 +743,17 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 16, 26, 18, 255 },  // green, wet, and safe
         .gridColor = { 58, 92, 58, 255 },
         .portals = {
-            { { -460, 0 },   "To Ashford Abbey",     ZONE_ASHFORD_ABBEY,  {  320, 0 } },
-            { { 1020, 0 },   "To Ascalon City",      ZONE_ASCALON_CITY,   { -360, 0 } },
-            { { 280, -420 }, "To Green Hills County", ZONE_GREEN_HILLS,   {    0, 300 } },
-            { { 280,  420 }, "To Regent Valley",     ZONE_REGENT_VALLEY,  {    0, -280 } },
+            // Laid out by real pre-Searing compass bearings: Ascalon City due
+            // north, the Northlands gate through the Wall to its north-east,
+            // Green Hills west, Ashford south-west, and Regent Valley away
+            // east past the lake that gives the county its name.
+            { {    0, -430 }, "To Ascalon City",      ZONE_ASCALON_CITY,   {    0,  200 } },
+            { { -430,  300 }, "To Ashford Abbey",     ZONE_ASHFORD_ABBEY,  {  260, -150 } },
+            { { -490,  -80 }, "To Green Hills County", ZONE_GREEN_HILLS,   {  480,    0 } },
+            { { 1000,  160 }, "To Regent Valley",     ZONE_REGENT_VALLEY,  { -460, -140 } },
             // The gate in the wall - the only way north into the Charr
             // frontier. GW1 puts this passage in Lakeside, not the city.
-            { { 720, -440 }, "To The Northlands",    ZONE_NORTHLANDS,     { -420, 0 } },
+            { {  300, -440 }, "To The Northlands",    ZONE_NORTHLANDS,     {    0,  280 } },
         },
         .portalCount = 5,
         .bounds = { -520, -480, 1600, 960 },
@@ -761,7 +768,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 26, 23, 17, 255 },  // warm stone, banners, torchlight
         .gridColor = { 92, 80, 58, 255 },
         .portals = {
-            { { -420, 0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, {  960, 0 } },
+            // Lakeside County lies directly south of the capital, so its gate
+            // sits on the city's south edge, below the plaza.
+            { { 0, 255 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { 0, -380 } },
         },
         .portalCount = 1,
         .bounds = { -480, -300, 960, 600 },
@@ -775,8 +784,10 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 17, 25, 15, 255 },
         .gridColor = { 62, 94, 54, 255 },
         .portals = {
-            { { 0, 340 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { 280, -360 } },
-            { { 520, 0 }, "To The Barradin Estate", ZONE_BARRADIN_ESTATE, { -380, 0 } },
+            // Green Hills sits west of Lakeside, so the county is back east;
+            // the Barradin Estate lies further west still.
+            { {  520,  0 }, "To Lakeside County",     ZONE_LAKESIDE_COUNTY, { -440, -60 } },
+            { { -530, 40 }, "To The Barradin Estate", ZONE_BARRADIN_ESTATE, {  440,   0 } },
         },
         .portalCount = 2,
         .bounds = { -560, -340, 1120, 720 },
@@ -791,10 +802,13 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 18, 23, 15, 255 },  // deeper woodland
         .gridColor = { 66, 86, 50, 255 },
         .portals = {
-            { {    0, -320 }, "To Lakeside County",  ZONE_LAKESIDE_COUNTY, { 280,  360 } },
-            { { -480,    0 }, "To Wizard's Folly",   ZONE_WIZARDS_FOLLY,   { 380,    0 } },
+            // Regent Valley is off east of Lakeside: the county lies back to
+            // the north-west, Wizard's Folly to the south-west, and Fort
+            // Ranik further east.
+            { { -510, -160 }, "To Lakeside County",  ZONE_LAKESIDE_COUNTY, { 1000, 140 } },
+            { { -510,  180 }, "To Wizard's Folly",   ZONE_WIZARDS_FOLLY,   {  380,   0 } },
             // Reforged only - World_ZoneUnlocked hides the door otherwise.
-            { {  980,    0 }, "To Fort Ranik",       ZONE_FORT_RANIK,      { -300,   0 } },
+            { {  940,    0 }, "To Fort Ranik",       ZONE_FORT_RANIK,      { -300,   0 } },
         },
         .portalCount = 3,
         .bounds = { -540, -340, 1500, 700 },
@@ -809,10 +823,11 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 15, 21, 24, 255 },  // sodden, blue-grey
         .gridColor = { 54, 74, 88, 255 },
         .portals = {
-            { { 420, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -440, 0 } },
-            // Foible's Fair sits up in the snowy heights of the Folly - the
+            // Regent Valley lies east (you cross into the Folly from the east);
+            // Foible's Fair sits up in the snowy heights to the north - the
             // fair is reached through here, not off Ashford Abbey.
-            { { 300, -260 }, "To Foible's Fair", ZONE_FOIBLES_FAIR, { 0, 180 } },
+            { { 430,   0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -470, 150 } },
+            { {   0, -270 }, "To Foible's Fair", ZONE_FOIBLES_FAIR, {    0, 190 } },
         },
         .portalCount = 2,
         .bounds = { -460, -300, 920, 600 },
@@ -827,7 +842,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 14, 13, 16, 255 },  // near-black; the one grim place
         .gridColor = { 62, 58, 70, 255 },
         .portals = {
-            { { 380, 0 }, "To Ashford Abbey", ZONE_ASHFORD_ABBEY, { -320, 0 } },
+            // The Catacombs run below Ashford Abbey; the way up is north.
+            { { 0, -230 }, "To Ashford Abbey", ZONE_ASHFORD_ABBEY, { 0, 180 } },
         },
         .portalCount = 1,
         .bounds = { -420, -300, 840, 600 },
@@ -842,10 +858,12 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 20, 21, 24, 255 },  // cold, grey, no green left
         .gridColor = { 78, 82, 90, 255 },
         .portals = {
-            { { -460,  0 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, {  720, -380 } },
+            // North of the Great Northern Wall: Lakeside lies back south
+            // through the gate, and Piken Square is deeper north.
+            { {   0,  300 }, "To Lakeside County", ZONE_LAKESIDE_COUNTY, { 300, -380 } },
             // Reforged only. World_ZoneUnlocked hides it otherwise, so a
             // character who can't go there is never shown a door.
-            { { 1120, 60 }, "To Piken Square", ZONE_PIKEN_SQUARE, { -300, 0 } },
+            { { 320, -300 }, "To Piken Square", ZONE_PIKEN_SQUARE, { 0, 190 } },
         },
         .portalCount = 2,
         .bounds = { -520, -340, 1740, 700 },
@@ -860,7 +878,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 26, 22, 20, 255 },  // stone and torchlight
         .gridColor = { 88, 76, 66, 255 },
         .portals = {
-            { { -340, 0 }, "To The Northlands", ZONE_NORTHLANDS, { 1040, 60 } },
+            // Piken looks back south to the Northlands and the Wall beyond.
+            { { 0, 240 }, "To The Northlands", ZONE_NORTHLANDS, { 320, -240 } },
         },
         .portalCount = 1,
         .bounds = { -400, -280, 800, 560 },
@@ -874,7 +893,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 24, 22, 16, 255 },  // festival torchlight
         .gridColor = { 92, 82, 58, 255 },
         .portals = {
-            { { -360, 0 }, "To Wizard's Folly", ZONE_WIZARDS_FOLLY, { 300, -200 } },
+            // The fair looks back down south into the Folly's heights.
+            { { 0, 220 }, "To Wizard's Folly", ZONE_WIZARDS_FOLLY, { 0, -210 } },
         },
         .portalCount = 1,
         .bounds = { -420, -280, 840, 560 },
@@ -888,7 +908,8 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 19, 24, 16, 255 },  // vineyard green, going to seed
         .gridColor = { 68, 88, 54, 255 },
         .portals = {
-            { { -460, 0 }, "To Green Hills County", ZONE_GREEN_HILLS, { 480, 0 } },
+            // The estate lies west of Green Hills, so the county is back east.
+            { { 480, 0 }, "To Green Hills County", ZONE_GREEN_HILLS, { -490, 40 } },
         },
         .portalCount = 1,
         .bounds = { -520, -320, 1040, 640 },
@@ -903,7 +924,9 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .clearColor = { 25, 22, 19, 255 },
         .gridColor = { 88, 78, 66, 255 },
         .portals = {
-            { { -340, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { -440, 0 } },
+            // The fort guards the eastern end of Regent Valley; the valley
+            // itself is back to the west.
+            { { -340, 0 }, "To Regent Valley", ZONE_REGENT_VALLEY, { 900, 0 } },
         },
         .portalCount = 1,
         .bounds = { -400, -280, 800, 560 },
