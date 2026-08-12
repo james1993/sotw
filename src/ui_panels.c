@@ -1034,21 +1034,30 @@ static void DrawCollector(Entity *player, int screenWidth, int screenHeight) {
     (void)player;
 }
 
+// GW1's Hero window is one panel with tabs, not a screen per thing.
+// Titles is one tab; Reputation is the Factions/allegiance tab, which a
+// pre-Searing character simply hasn't opened yet.
+static int g_heroTab = 0; // 0 = Titles, 1 = Reputation
+
 static void DrawTitles(Entity *player, int screenWidth, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int font = (int)(12 * scale);
     int small = (int)(10 * scale);
     int pad = (int)(10 * scale);
     int rowH = (int)(64 * scale);
-    int w = (int)(440 * scale);
-    int h = pad * 3 + font + TITLE_COUNT * rowH + pad;
+    int tabH = (int)(26 * scale);
+    int w = (int)(460 * scale);
+
+    int contentH = (g_heroTab == 0) ? TITLE_COUNT * rowH
+                                     : font + small * 3 + (int)(20 * scale);
+    int h = pad * 2 + font + tabH + pad + contentH + pad;
 
     g_titlesRect = (Rectangle){ (float)(screenWidth - w) / 2.0f, (float)(120 * scale),
                                 (float)w, (float)h };
     UIHit_Claim(g_titlesRect);
     UI_ThemePanel(g_titlesRect, scale, pad + font + pad / 2);
 
-    if (PanelHeader(g_titlesRect, "Titles", "T", NULL, font, pad, scale)) {
+    if (PanelHeader(g_titlesRect, "Hero", "T", NULL, font, pad, scale)) {
         g_titlesOpen = false;
         return;
     }
@@ -1058,6 +1067,39 @@ static void DrawTitles(Entity *player, int screenWidth, int screenHeight) {
 
     bool click = UI_PointerClicked();
     Vector2 mouse = UI_PointerPos();
+
+    // Tab strip.
+    {
+        static const char *labels[2] = { "Titles", "Reputation" };
+        int tx = x;
+        for (int t = 0; t < 2; t++) {
+            int tw = UITextWidth(labels[t], font) + pad * 2;
+            Rectangle tab = { (float)tx, (float)y, (float)tw, (float)tabH };
+            bool active = (g_heroTab == t);
+            bool th = CheckCollisionPointRec(mouse, tab);
+            DrawRectangleRec(tab, active ? UI_SURFACE_RAISE
+                                 : th ? UI_SURFACE_HOVER : (Color){ 26, 28, 34, 220 });
+            DrawRectangleLinesEx(tab, 1.0f, active ? UI_GOLD : (Color){ 60, 58, 54, 255 });
+            UIText(labels[t], tx + pad, y + (tabH - font) / 2, font,
+                   active ? UI_GOLD : UI_TEXT_SECOND);
+            if (th && click) { g_heroTab = t; Audio_Play(SFX_UI_CLICK); }
+            tx += tw + (int)(4 * scale);
+        }
+        y += tabH + pad;
+    }
+
+    // Reputation tab: no allegiances in pre-Searing (Prophecies has no
+    // Luxon/Kurzick, and pre-Searing has no faction to earn either).
+    if (g_heroTab == 1) {
+        UIText("Reputation", x, y, font, UI_TEXT_PRIMARY);
+        y += font + (int)(6 * scale);
+        UIText("You hold no allegiances yet. The rivalries and factions",
+               x, y, small, UI_TEXT_SECOND);
+        y += small + (int)(3 * scale);
+        UIText("of the wider world lie beyond the Wall, and beyond Ascalon.",
+               x, y, small, UI_TEXT_SECOND);
+        return;
+    }
 
     for (int i = 0; i < TITLE_COUNT; i++) {
         TitleId id = (TitleId)i;
