@@ -305,6 +305,226 @@ static bool PanelHeader(Rectangle rect, const char *title, const char *hotkey,
 // piece at a time. Splitting "equipment" and "inventory" into two
 // windows made that invisible - you could never see the hole in a set
 // next to the piece in your bag that would fill it.
+// --- Procedural item icons -------------------------------------------
+// Every item draws its own little icon in the same flat, lit-from-the-
+// upper-left style the world art uses, instead of a letter on a tile.
+// Everything is derived from the item (kind, armour slot, weapon name,
+// dye colour), so no art files are needed.
+
+typedef enum { WT_SWORD, WT_AXE, WT_HAMMER, WT_BOW, WT_STAFF, WT_WAND,
+               WT_DAGGER, WT_SPEAR, WT_SCYTHE } WeaponType;
+
+static WeaponType ClassifyWeapon(const Item *it) {
+    const char *n = it->name;
+    if (strstr(n, "Bow"))                      return WT_BOW;
+    if (strstr(n, "Hammer") || strstr(n, "Maul")) return WT_HAMMER;
+    if (strstr(n, "Axe"))                      return WT_AXE;
+    if (strstr(n, "Staff"))                    return WT_STAFF;
+    if (strstr(n, "Wand") || strstr(n, "Rod")) return WT_WAND;
+    if (strstr(n, "Dagger"))                   return WT_DAGGER;
+    if (strstr(n, "Scythe"))                   return WT_SCYTHE;
+    if (strstr(n, "Spear"))                    return WT_SPEAR;
+    if (strstr(n, "Sword") || strstr(n, "Blade") ||
+        strstr(n, "Sabre") || strstr(n, "Saber")) return WT_SWORD;
+    if (it->range > 90.0f) return WT_BOW;   // ranged weapon, unnamed
+    if (it->twoHanded)     return WT_STAFF;
+    return WT_SWORD;
+}
+
+// Shared palette so the icons read as one set.
+#define IC_STEEL   (Color){ 196, 202, 212, 255 }
+#define IC_STEEL_D (Color){ 128, 134, 148, 255 }
+#define IC_STEEL_L (Color){ 226, 232, 240, 255 }
+#define IC_WOOD    (Color){ 140, 100, 58, 255 }
+#define IC_WOOD_D  (Color){ 98, 68, 38, 255 }
+#define IC_GOLD2   (Color){ 214, 176, 84, 255 }
+#define IC_LEATHER (Color){ 150, 110, 70, 255 }
+#define IC_LEATHER_D (Color){ 108, 76, 46, 255 }
+
+static void IconWeapon(float cx, float cy, float s, WeaponType t) {
+    switch (t) {
+        case WT_SWORD: case WT_DAGGER: {
+            float len = (t == WT_DAGGER) ? 0.28f : 0.42f;
+            // Blade pointing up, tapering to a tip.
+            DrawRectangle((int)(cx - 0.055f*s), (int)(cy - len*s), (int)(0.11f*s), (int)((len+0.06f)*s), IC_STEEL);
+            DrawRectangle((int)(cx - 0.055f*s), (int)(cy - len*s), (int)(0.045f*s), (int)((len+0.06f)*s), IC_STEEL_L);
+            DrawTriangle((Vector2){cx - 0.055f*s, cy - len*s}, (Vector2){cx, cy - (len+0.12f)*s},
+                         (Vector2){cx + 0.055f*s, cy - len*s}, IC_STEEL);
+            // Crossguard, grip, pommel.
+            DrawRectangle((int)(cx - 0.17f*s), (int)(cy + 0.05f*s), (int)(0.34f*s), (int)(0.055f*s), IC_GOLD2);
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy + 0.10f*s), (int)(0.06f*s), (int)(0.16f*s), IC_WOOD);
+            DrawCircle((int)cx, (int)(cy + 0.28f*s), 0.05f*s, IC_GOLD2);
+        } break;
+        case WT_AXE: {
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.34f*s), (int)(0.06f*s), (int)(0.66f*s), IC_WOOD);
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.34f*s), (int)(0.025f*s), (int)(0.66f*s), IC_WOOD_D);
+            // Axe head: a crescent blade off the top-right of the haft.
+            DrawTriangle((Vector2){cx + 0.02f*s, cy - 0.30f*s}, (Vector2){cx + 0.34f*s, cy - 0.20f*s},
+                         (Vector2){cx + 0.02f*s, cy - 0.02f*s}, IC_STEEL);
+            DrawTriangle((Vector2){cx + 0.02f*s, cy - 0.30f*s}, (Vector2){cx + 0.02f*s, cy - 0.02f*s},
+                         (Vector2){cx - 0.02f*s, cy - 0.16f*s}, IC_STEEL_D);
+            DrawTriangle((Vector2){cx + 0.02f*s, cy - 0.30f*s}, (Vector2){cx + 0.34f*s, cy - 0.20f*s},
+                         (Vector2){cx + 0.18f*s, cy - 0.26f*s}, IC_STEEL_L);
+        } break;
+        case WT_HAMMER: {
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.20f*s), (int)(0.06f*s), (int)(0.52f*s), IC_WOOD);
+            DrawRectangle((int)(cx - 0.20f*s), (int)(cy - 0.36f*s), (int)(0.40f*s), (int)(0.20f*s), IC_STEEL);
+            DrawRectangle((int)(cx - 0.20f*s), (int)(cy - 0.36f*s), (int)(0.40f*s), (int)(0.06f*s), IC_STEEL_L);
+            DrawRectangle((int)(cx - 0.20f*s), (int)(cy - 0.20f*s), (int)(0.40f*s), (int)(0.04f*s), IC_STEEL_D);
+        } break;
+        case WT_BOW: case WT_SPEAR: {
+            if (t == WT_SPEAR) {
+                DrawRectangle((int)(cx - 0.02f*s), (int)(cy - 0.20f*s), (int)(0.04f*s), (int)(0.52f*s), IC_WOOD);
+                DrawTriangle((Vector2){cx - 0.09f*s, cy - 0.18f*s}, (Vector2){cx, cy - 0.40f*s},
+                             (Vector2){cx + 0.09f*s, cy - 0.18f*s}, IC_STEEL);
+            } else {
+                // A recurve limb (two arcs) with the string and a nocked arrow.
+                for (int i = 0; i < 14; i++) {
+                    float a0 = -0.7f + i * (1.4f / 14.0f), a1 = -0.7f + (i+1) * (1.4f / 14.0f);
+                    Vector2 p0 = { cx - 0.10f*s + cosf(a0)*0.02f*s, cy + sinf(a0)*0.36f*s };
+                    Vector2 p1 = { cx - 0.10f*s + cosf(a1)*0.02f*s, cy + sinf(a1)*0.36f*s };
+                    DrawLineEx((Vector2){cx - 0.10f*s + cosf(a0)*0.30f*s, cy + sinf(a0)*0.36f*s},
+                               (Vector2){cx - 0.10f*s + cosf(a1)*0.30f*s, cy + sinf(a1)*0.36f*s}, 0.05f*s, IC_WOOD);
+                    (void)p0; (void)p1;
+                }
+                DrawLineEx((Vector2){cx + 0.13f*s, cy - 0.34f*s}, (Vector2){cx + 0.13f*s, cy + 0.34f*s}, 0.02f*s, IC_STEEL_L);
+                DrawLineEx((Vector2){cx - 0.16f*s, cy}, (Vector2){cx + 0.20f*s, cy}, 0.03f*s, IC_STEEL);
+            }
+        } break;
+        case WT_STAFF: case WT_SCYTHE: {
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.30f*s), (int)(0.06f*s), (int)(0.62f*s), IC_WOOD);
+            if (t == WT_SCYTHE) {
+                DrawTriangle((Vector2){cx, cy - 0.30f*s}, (Vector2){cx + 0.30f*s, cy - 0.34f*s},
+                             (Vector2){cx + 0.06f*s, cy - 0.14f*s}, IC_STEEL);
+            } else {
+                DrawCircle((int)cx, (int)(cy - 0.34f*s), 0.11f*s, (Color){ 120, 170, 210, 255 });
+                DrawCircle((int)(cx - 0.03f*s), (int)(cy - 0.37f*s), 0.05f*s, (Color){ 190, 220, 240, 255 });
+            }
+        } break;
+        case WT_WAND: {
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.10f*s), (int)(0.06f*s), (int)(0.40f*s), IC_WOOD);
+            DrawPoly((Vector2){ cx, cy - 0.22f*s }, 4, 0.11f*s, 45.0f, (Color){ 150, 120, 210, 255 });
+            DrawPoly((Vector2){ cx - 0.02f*s, cy - 0.24f*s }, 4, 0.05f*s, 45.0f, (Color){ 205, 190, 240, 255 });
+        } break;
+    }
+}
+
+static void IconArmor(float cx, float cy, float s, EquipSlot slot, Color cloth) {
+    Color dark = { (unsigned char)(cloth.r*0.7f), (unsigned char)(cloth.g*0.7f), (unsigned char)(cloth.b*0.7f), 255 };
+    Color lite = { (unsigned char)fminf(255, cloth.r*1.2f), (unsigned char)fminf(255, cloth.g*1.2f), (unsigned char)fminf(255, cloth.b*1.2f), 255 };
+    switch (slot) {
+        case EQUIP_HEAD: {
+            // Domed helm with a brim and a nasal bar.
+            DrawCircleSector((Vector2){cx, cy + 0.02f*s}, 0.30f*s, 180, 360, 24, cloth);
+            DrawCircleSector((Vector2){cx, cy + 0.02f*s}, 0.30f*s, 200, 280, 16, lite);
+            DrawRectangle((int)(cx - 0.32f*s), (int)(cy + 0.02f*s), (int)(0.64f*s), (int)(0.06f*s), dark);
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.16f*s), (int)(0.06f*s), (int)(0.22f*s), dark);
+        } break;
+        case EQUIP_CHEST: {
+            // Cuirass: shoulders down to a waist.
+            DrawTriangle((Vector2){cx - 0.30f*s, cy - 0.22f*s}, (Vector2){cx - 0.22f*s, cy + 0.30f*s},
+                         (Vector2){cx + 0.22f*s, cy + 0.30f*s}, cloth);
+            DrawTriangle((Vector2){cx - 0.30f*s, cy - 0.22f*s}, (Vector2){cx + 0.22f*s, cy + 0.30f*s},
+                         (Vector2){cx + 0.30f*s, cy - 0.22f*s}, cloth);
+            DrawTriangle((Vector2){cx - 0.30f*s, cy - 0.22f*s}, (Vector2){cx - 0.22f*s, cy + 0.30f*s},
+                         (Vector2){cx, cy + 0.10f*s}, lite);
+            DrawRectangle((int)(cx - 0.05f*s), (int)(cy - 0.24f*s), (int)(0.10f*s), (int)(0.5f*s), dark); // laced seam
+        } break;
+        case EQUIP_ARMS: {
+            // A gauntlet/glove.
+            DrawRectangle((int)(cx - 0.16f*s), (int)(cy - 0.10f*s), (int)(0.30f*s), (int)(0.34f*s), cloth);
+            DrawRectangle((int)(cx - 0.16f*s), (int)(cy - 0.10f*s), (int)(0.10f*s), (int)(0.34f*s), lite);
+            DrawRectangle((int)(cx - 0.10f*s), (int)(cy - 0.26f*s), (int)(0.08f*s), (int)(0.18f*s), cloth); // thumb
+            DrawRectangle((int)(cx - 0.16f*s), (int)(cy + 0.20f*s), (int)(0.30f*s), (int)(0.07f*s), dark);  // cuff
+        } break;
+        case EQUIP_LEGS: {
+            // Two legs of a pair of leggings.
+            DrawRectangle((int)(cx - 0.20f*s), (int)(cy - 0.28f*s), (int)(0.40f*s), (int)(0.14f*s), cloth); // waist
+            DrawRectangle((int)(cx - 0.19f*s), (int)(cy - 0.16f*s), (int)(0.16f*s), (int)(0.44f*s), cloth);
+            DrawRectangle((int)(cx + 0.03f*s), (int)(cy - 0.16f*s), (int)(0.16f*s), (int)(0.44f*s), cloth);
+            DrawRectangle((int)(cx - 0.19f*s), (int)(cy - 0.16f*s), (int)(0.05f*s), (int)(0.44f*s), lite);
+        } break;
+        case EQUIP_FEET: default: {
+            // A boot.
+            DrawRectangle((int)(cx - 0.12f*s), (int)(cy - 0.28f*s), (int)(0.20f*s), (int)(0.42f*s), cloth); // shaft
+            DrawRectangle((int)(cx - 0.12f*s), (int)(cy + 0.06f*s), (int)(0.40f*s), (int)(0.16f*s), cloth); // foot
+            DrawRectangle((int)(cx - 0.12f*s), (int)(cy + 0.20f*s), (int)(0.40f*s), (int)(0.05f*s), dark);  // sole
+            DrawRectangle((int)(cx - 0.12f*s), (int)(cy - 0.28f*s), (int)(0.06f*s), (int)(0.50f*s), lite);
+        } break;
+    }
+}
+
+static void DrawItemIcon(Rectangle box, const Item *it) {
+    float s = fminf(box.width, box.height);
+    float cx = box.x + box.width * 0.5f, cy = box.y + box.height * 0.5f;
+    switch (it->kind) {
+        case ITEM_WEAPON:
+            IconWeapon(cx, cy, s, ClassifyWeapon(it));
+            break;
+        case ITEM_ARMOR:
+            IconArmor(cx, cy, s, it->slot, (Color){ 150, 158, 172, 255 });
+            break;
+        case ITEM_OFFHAND: {
+            if (strstr(it->name, "Focus") || strstr(it->name, "Idol") ||
+                strstr(it->name, "Orb") || strstr(it->name, "Scroll")) {
+                DrawCircle((int)cx, (int)cy, 0.26f*s, (Color){ 120, 150, 205, 255 });
+                DrawCircle((int)(cx - 0.07f*s), (int)(cy - 0.07f*s), 0.10f*s, (Color){ 200, 214, 240, 255 });
+            } else {
+                // A heater shield.
+                DrawTriangle((Vector2){cx - 0.26f*s, cy - 0.28f*s}, (Vector2){cx - 0.26f*s, cy + 0.06f*s},
+                             (Vector2){cx, cy + 0.32f*s}, IC_STEEL);
+                DrawTriangle((Vector2){cx - 0.26f*s, cy - 0.28f*s}, (Vector2){cx, cy + 0.32f*s},
+                             (Vector2){cx + 0.26f*s, cy - 0.28f*s}, IC_STEEL);
+                DrawTriangle((Vector2){cx + 0.26f*s, cy - 0.28f*s}, (Vector2){cx, cy + 0.32f*s},
+                             (Vector2){cx + 0.26f*s, cy + 0.06f*s}, IC_STEEL_D);
+                DrawTriangle((Vector2){cx - 0.26f*s, cy - 0.28f*s}, (Vector2){cx - 0.26f*s, cy + 0.06f*s},
+                             (Vector2){cx, cy + 0.10f*s}, IC_STEEL_L);
+                DrawCircle((int)cx, (int)(cy - 0.02f*s), 0.05f*s, IC_GOLD2);
+            }
+        } break;
+        case ITEM_BAG: {
+            DrawRectangleRounded((Rectangle){ cx - 0.24f*s, cy - 0.14f*s, 0.48f*s, 0.42f*s }, 0.4f, 6, IC_LEATHER);
+            DrawRectangleRounded((Rectangle){ cx - 0.24f*s, cy - 0.22f*s, 0.48f*s, 0.16f*s }, 0.5f, 6, IC_LEATHER_D); // flap
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.24f*s), (int)(0.06f*s), (int)(0.10f*s), (Color){ 80, 56, 34, 255 }); // strap
+        } break;
+        case ITEM_MATERIAL: {
+            Color c = strstr(it->name, "Hide") ? (Color){ 150, 108, 66, 255 }
+                    : strstr(it->name, "Fin")  ? (Color){ 110, 150, 160, 255 }
+                    : strstr(it->name, "Bone") ? (Color){ 224, 220, 200, 255 }
+                    : strstr(it->name, "Necklace") ? (Color){ 210, 196, 150, 255 }
+                                                   : (Color){ 168, 150, 110, 255 };
+            DrawPoly((Vector2){ cx, cy }, 6, 0.28f*s, 12.0f, c);
+            DrawPoly((Vector2){ cx - 0.05f*s, cy - 0.05f*s }, 6, 0.14f*s, 12.0f,
+                     (Color){ (unsigned char)fminf(255,c.r*1.25f), (unsigned char)fminf(255,c.g*1.25f), (unsigned char)fminf(255,c.b*1.25f), 255 });
+        } break;
+        case ITEM_KIT_ID: {
+            // Magnifying glass.
+            DrawCircle((int)(cx - 0.05f*s), (int)(cy - 0.05f*s), 0.20f*s, (Color){ 120, 150, 205, 255 });
+            DrawCircle((int)(cx - 0.05f*s), (int)(cy - 0.05f*s), 0.13f*s, (Color){ 40, 44, 60, 255 });
+            DrawLineEx((Vector2){cx + 0.06f*s, cy + 0.06f*s}, (Vector2){cx + 0.24f*s, cy + 0.24f*s}, 0.07f*s, IC_WOOD);
+        } break;
+        case ITEM_KIT_SALVAGE: {
+            // Pick.
+            DrawRectangle((int)(cx - 0.03f*s), (int)(cy - 0.22f*s), (int)(0.06f*s), (int)(0.5f*s), IC_WOOD);
+            DrawLineEx((Vector2){cx - 0.26f*s, cy - 0.10f*s}, (Vector2){cx + 0.26f*s, cy - 0.24f*s}, 0.06f*s, IC_STEEL);
+            DrawLineEx((Vector2){cx + 0.26f*s, cy - 0.10f*s}, (Vector2){cx - 0.26f*s, cy - 0.24f*s}, 0.06f*s, IC_STEEL_D);
+        } break;
+        case ITEM_RUNE: case ITEM_INSIGNIA: {
+            DrawPoly((Vector2){ cx, cy }, 4, 0.26f*s, 0.0f, (Color){ 150, 120, 210, 255 });
+            DrawPoly((Vector2){ cx - 0.04f*s, cy - 0.04f*s }, 4, 0.12f*s, 0.0f, (Color){ 210, 196, 240, 255 });
+        } break;
+        case ITEM_DYE: {
+            // A dye vial filled with the item's colour.
+            DrawRectangleRounded((Rectangle){ cx - 0.12f*s, cy - 0.24f*s, 0.24f*s, 0.10f*s }, 0.4f, 4, (Color){ 90, 90, 96, 255 }); // stopper
+            DrawRectangleRounded((Rectangle){ cx - 0.15f*s, cy - 0.14f*s, 0.30f*s, 0.40f*s }, 0.5f, 6, (Color){ 220, 226, 232, 90 }); // glass
+            DrawRectangleRounded((Rectangle){ cx - 0.12f*s, cy - 0.02f*s, 0.24f*s, 0.26f*s }, 0.5f, 6, it->dyeColor);              // dye
+        } break;
+        default:
+            DrawCircle((int)cx, (int)cy, 0.10f*s, GRAY);
+            break;
+    }
+}
+
 static void DrawInventory(Entity *player, int screenHeight) {
     float scale = UI_Scale(screenHeight);
     int screenWidth = GetScreenWidth();
@@ -361,7 +581,16 @@ static void DrawInventory(Entity *player, int screenHeight) {
         DrawRectangleRec(row, hovered ? UI_SURFACE_HOVER : UI_SURFACE_RAISE);
         DrawRectangleLinesEx(row, 1.0f, filled ? UI_GOLD_DIM : (Color){ 54, 52, 48, 255 });
 
-        UIText(Items_SlotName((EquipSlot)slot), (int)row.x + (int)(6 * scale),
+        // An icon swatch at the left of the row when something is worn.
+        int iconSz = slotH - 9;
+        Rectangle iconBox = { row.x + 3, row.y + (row.height - iconSz) / 2.0f, (float)iconSz, (float)iconSz };
+        int nameX = (int)row.x + (int)(6 * scale);
+        if (filled) {
+            DrawRectangleRec(iconBox, (Color){ 26, 28, 36, 255 });
+            DrawItemIcon(iconBox, &g_inventory[idx]);
+            nameX = (int)(iconBox.x + iconBox.width) + (int)(6 * scale);
+        }
+        UIText(Items_SlotName((EquipSlot)slot), nameX,
                (int)row.y + (slotH - 3 - small) / 2, small, UI_TEXT_MUTED);
 
         char label[64];
@@ -417,23 +646,20 @@ static void DrawInventory(Entity *player, int screenHeight) {
         bool worn = Items_IsEquipped(i);
         bool armed = (g_armedKit == i);
 
-        // A letter tile rather than an icon: the item art doesn't exist,
-        // and a consistent glyph per kind still scans at a glance.
-        const char *glyph = it->kind == ITEM_WEAPON ? "W"
-                          : it->kind == ITEM_ARMOR ? "A"
-                          : it->kind == ITEM_OFFHAND ? "O"
-                          : it->kind == ITEM_BAG ? "B"
-                          : it->kind == ITEM_MATERIAL ? "M" : "K";
-        Color tile = it->kind == ITEM_WEAPON ? (Color){ 120, 92, 60, 255 }
-                   : it->kind == ITEM_ARMOR ? (Color){ 78, 96, 120, 255 }
-                   : it->kind == ITEM_OFFHAND ? (Color){ 96, 84, 124, 255 }
-                   : it->kind == ITEM_BAG ? (Color){ 104, 86, 56, 255 }
-                   : it->kind == ITEM_MATERIAL ? (Color){ 88, 106, 76, 255 }
-                                               : (Color){ 100, 100, 108, 255 };
-        if (it->unidentified) tile = (Color){ 82, 70, 96, 255 };
-        DrawRectangleRec((Rectangle){ r.x + 3, r.y + 3, r.width - 6, r.height - 6 }, tile);
-        UI_TextShadowCentered(glyph, (int)(r.x + r.width / 2), (int)(r.y + (cell - font) / 2 - 3),
-                              font, RAYWHITE);
+        // A drawn icon per item, on a neutral inset tile. An unidentified
+        // weapon is masked: its type is unknown, so it shows a wrapped
+        // bundle with a "?" rather than giving the base type away.
+        Rectangle inner = { r.x + 3, r.y + 3, r.width - 6, r.height - 6 };
+        DrawRectangleRec(inner, (Color){ 26, 28, 36, 255 });
+        if (it->unidentified) {
+            DrawRectangleRounded((Rectangle){ inner.x + inner.width*0.16f, inner.y + inner.height*0.12f,
+                                              inner.width*0.68f, inner.height*0.76f }, 0.3f, 6,
+                                 (Color){ 120, 104, 78, 255 });
+            UI_TextShadowCentered("?", (int)(r.x + r.width / 2), (int)(r.y + (cell - font) / 2 - 3),
+                                  font, (Color){ 240, 228, 200, 255 });
+        } else {
+            DrawItemIcon(inner, it);
+        }
 
         if (it->count > 1) {
             char cnt[16];
@@ -1313,7 +1539,11 @@ static void DrawShop(int screenWidth, int screenHeight) {
             } else {
                 snprintf(label, sizeof(label), "%s  (%dg)", entry->item.name, entry->price);
             }
-            UIText(label, x, y, font, canAfford ? RAYWHITE : GRAY);
+            int isz = rowH - 8;
+            Rectangle ibox = { row.x + 3, (float)y - 2 + (rowH - isz) / 2.0f, (float)isz, (float)isz };
+            DrawRectangleRec(ibox, (Color){ 26, 28, 36, 255 });
+            DrawItemIcon(ibox, &entry->item);
+            UIText(label, (int)(ibox.x + ibox.width) + (int)(6 * scale), y, font, canAfford ? RAYWHITE : GRAY);
 
             if (((hovered && click) || (focused && UIFocus_Confirm())) && canAfford) {
                 g_gold -= entry->price;
@@ -1347,7 +1577,16 @@ static void DrawShop(int screenWidth, int screenHeight) {
                 snprintf(label, sizeof(label), "%s  (+%dg)%s", Items_DisplayName(it),
                          Items_SellValue(it), equipped ? "  [equipped]" : "");
             }
-            UIText(label, x, y, font, equipped ? GRAY : RAYWHITE);
+            int isz = rowH - 8;
+            Rectangle ibox = { row.x + 3, (float)y - 2 + (rowH - isz) / 2.0f, (float)isz, (float)isz };
+            DrawRectangleRec(ibox, (Color){ 26, 28, 36, 255 });
+            if (it->unidentified) {
+                UI_TextShadowCentered("?", (int)(ibox.x + ibox.width/2), (int)(ibox.y + (isz - font)/2),
+                                      font, (Color){ 240, 228, 200, 255 });
+            } else {
+                DrawItemIcon(ibox, it);
+            }
+            UIText(label, (int)(ibox.x + ibox.width) + (int)(6 * scale), y, font, equipped ? GRAY : RAYWHITE);
 
             if ((hovered && click) || (focused && !equipped && UIFocus_Confirm())) {
                 Audio_Play(SFX_UI_CONFIRM);
