@@ -29,18 +29,6 @@ static const Item g_weaponTable[] = {
 };
 #define WEAPON_TABLE_COUNT (int)(sizeof(g_weaponTable) / sizeof(g_weaponTable[0]))
 
-// Armour upgrades that drop in the field and are slotted into a worn
-// piece. Vigor/Vitae add health, an attribute rune boosts a line, and an
-// insignia adds armour - GW1's three upgrade shapes in miniature.
-static const Item g_runeTable[] = {
-    { .kind = ITEM_RUNE, .name = "Rune of Vigor", .count = 1, .runeAttr = -1, .runeHealth = 30 },
-    { .kind = ITEM_RUNE, .name = "Rune of Vitae", .count = 1, .runeAttr = -1, .runeHealth = 10 },
-    { .kind = ITEM_RUNE, .name = "Rune of Minor Tactics", .count = 1,
-      .runeAttr = ATTR_TACTICS, .runeAttrBonus = 1, .runeHealth = 0 },
-    { .kind = ITEM_INSIGNIA, .name = "Reinforced Insignia", .count = 1, .insigniaArmor = 10 },
-};
-#define RUNE_TABLE_COUNT (int)(sizeof(g_runeTable) / sizeof(g_runeTable[0]))
-
 // Dyes recolour the whole outfit from one choice (GW1 dyes armour; the
 // demake keeps it to a single character colour).
 static const Item g_dyeTable[] = {
@@ -507,17 +495,11 @@ void Items_SpawnMonsterDrops(Vector2 pos, int monsterLevel, int species) {
         }
     }
 
-    // A rarer prize: an armour upgrade (rune or insignia) to slot into a
-    // worn piece. Its own roll so it can co-drop with the above.
-    if (GetRandomValue(1, 100) <= 8 && DropIsMine(party)) {
-        d = FindFreeDrop();
-        if (d) {
-            memset(d, 0, sizeof(GroundDrop));
-            d->active = true;
-            d->pos = (Vector2){ pos.x - 14, pos.y - 8 };
-            d->item = g_runeTable[GetRandomValue(0, RUNE_TABLE_COUNT - 1)];
-        }
-    }
+    // No rune/insignia drops: in GW1 runes and insignias are never direct
+    // monster drops - they are salvaged out of armour and salvage items (or
+    // bought from a rune trader, which pre-Searing has none of). So foes
+    // here drop gold, crafting materials, weapons and the occasional dye,
+    // exactly as the wiki's pre-Searing drop tables list.
 
     // And, rarely, a dye - the only purely cosmetic drop.
     if (GetRandomValue(1, 100) <= 5 && DropIsMine(party)) {
