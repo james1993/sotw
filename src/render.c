@@ -139,6 +139,163 @@ static void DrawCampfire(Vector2 pos, float scale) {
                  (Color){ 255, 214, 96, 255 });
 }
 
+// ---------------------------------------------------------------------
+// City dressing. Same flat-shaded, lit-from-the-upper-left language as
+// the tents and trees, so a stone capital sits beside them without a
+// seam. Ascalon's sandstone-and-tile palette throughout.
+// ---------------------------------------------------------------------
+
+static void DrawHouse(Vector2 pos, float scale) {
+    float w = 44 * scale, wallH = 30 * scale;
+    float baseY = pos.y + 12 * scale, wallTop = baseY - wallH;
+    DrawPropShadow((Vector2){ pos.x, baseY }, w * 0.60f, 8 * scale);
+
+    // Sandstone wall: body, a shaded right third, a lit left edge.
+    DrawRectangle((int)(pos.x - w / 2), (int)wallTop, (int)w, (int)wallH, (Color){ 182, 156, 116, 255 });
+    DrawRectangle((int)(pos.x + w * 0.14f), (int)wallTop, (int)(w * 0.36f), (int)wallH,
+                  (Color){ 150, 126, 92, 255 });
+    DrawRectangle((int)(pos.x - w / 2), (int)wallTop, (int)(4 * scale), (int)wallH,
+                  (Color){ 208, 182, 138, 255 });
+
+    // Pitched tile roof, overhanging the eaves; the left slope catches light.
+    float eave = 6 * scale, ridge = 20 * scale;
+    Vector2 rl = { pos.x - w / 2 - eave, wallTop };
+    Vector2 rr = { pos.x + w / 2 + eave, wallTop };
+    Vector2 rt = { pos.x, wallTop - ridge };
+    DrawTriangle(rt, rl, rr, (Color){ 146, 70, 54, 255 });
+    DrawTriangle(rt, rl, (Vector2){ pos.x, wallTop }, (Color){ 176, 92, 70, 255 });
+    DrawTriangleLines(rt, rl, rr, (Color){ 104, 52, 42, 255 });
+
+    // Door and a small pale window.
+    DrawRectangle((int)(pos.x - 5 * scale), (int)(baseY - 15 * scale), (int)(10 * scale),
+                  (int)(15 * scale), (Color){ 70, 50, 36, 255 });
+    DrawRectangle((int)(pos.x + 8 * scale), (int)(wallTop + 8 * scale), (int)(8 * scale),
+                  (int)(8 * scale), (Color){ 120, 150, 160, 255 });
+}
+
+static void DrawFountain(Vector2 pos, float scale) {
+    DrawPropShadow(pos, 30 * scale, 9 * scale);
+    // Round basin seen from above: stone rim, then water.
+    DrawEllipse((int)pos.x, (int)pos.y, 32 * scale, 17 * scale, (Color){ 150, 146, 134, 255 });
+    DrawEllipse((int)pos.x, (int)(pos.y - 1 * scale), 26 * scale, 13 * scale, (Color){ 110, 106, 96, 255 });
+    DrawEllipse((int)pos.x, (int)(pos.y - 2 * scale), 23 * scale, 11 * scale, (Color){ 92, 150, 180, 255 });
+    DrawEllipse((int)pos.x, (int)(pos.y - 3 * scale), 15 * scale, 7 * scale, (Color){ 120, 178, 202, 255 });
+    // Ripples and a central spout.
+    float t = (float)GetTime();
+    DrawEllipseLines((int)pos.x, (int)(pos.y - 3 * scale),
+                     (10.0f + 3.0f * sinf(t * 2.0f)) * scale,
+                     (5.0f + 1.5f * sinf(t * 2.0f)) * scale, (Color){ 200, 224, 235, 120 });
+    DrawRectangle((int)(pos.x - 3 * scale), (int)(pos.y - 18 * scale), (int)(6 * scale),
+                  (int)(16 * scale), (Color){ 170, 166, 152, 255 });
+    DrawCircleV((Vector2){ pos.x, pos.y - 18 * scale }, 5 * scale, (Color){ 190, 186, 172, 255 });
+    for (int i = 0; i < 4; i++) {
+        float a = (float)i / 4.0f * 6.2832f + t;
+        DrawCircleV((Vector2){ pos.x + cosf(a) * 8 * scale, pos.y - 12 * scale + sinf(a) * 3 * scale },
+                    1.6f * scale, (Color){ 190, 224, 240, 200 });
+    }
+}
+
+static void DrawStatue(Vector2 pos, float scale) {
+    float baseY = pos.y + 10 * scale;
+    DrawPropShadow((Vector2){ pos.x, baseY }, 18 * scale, 6 * scale);
+    Color stone = { 196, 192, 180, 255 }, stoneSh = { 150, 146, 134, 255 };
+    // Stepped plinth.
+    DrawRectangle((int)(pos.x - 16 * scale), (int)(baseY - 8 * scale), (int)(32 * scale),
+                  (int)(8 * scale), stoneSh);
+    DrawRectangle((int)(pos.x - 12 * scale), (int)(baseY - 14 * scale), (int)(24 * scale),
+                  (int)(6 * scale), stone);
+    // Dwayna: a robed figure, arms spread in blessing.
+    float top = baseY - 14 * scale;
+    Vector2 apex = { pos.x, top - 42 * scale };
+    DrawTriangle(apex, (Vector2){ pos.x - 13 * scale, top }, (Vector2){ pos.x + 13 * scale, top }, stone);
+    DrawTriangle(apex, (Vector2){ pos.x, top }, (Vector2){ pos.x + 13 * scale, top }, stoneSh);
+    DrawLineEx((Vector2){ pos.x, top - 30 * scale }, (Vector2){ pos.x - 17 * scale, top - 22 * scale },
+               3.0f * scale, stone);
+    DrawLineEx((Vector2){ pos.x, top - 30 * scale }, (Vector2){ pos.x + 17 * scale, top - 22 * scale },
+               3.0f * scale, stoneSh);
+    DrawCircleV((Vector2){ pos.x, top - 46 * scale }, 6 * scale, stone);
+}
+
+static void DrawBanner(Vector2 pos, float scale) {
+    float baseY = pos.y + 8 * scale;
+    DrawPropShadow((Vector2){ pos.x, baseY }, 7 * scale, 3 * scale);
+    float poleTop = baseY - 66 * scale;
+    DrawRectangle((int)(pos.x - 2 * scale), (int)poleTop, (int)(4 * scale),
+                  (int)(baseY - poleTop), (Color){ 84, 64, 44, 255 });
+    DrawCircleV((Vector2){ pos.x, poleTop }, 4 * scale, (Color){ 214, 178, 96, 255 });
+    // A long heraldic banner hanging the length of the pole, its free edge
+    // swaying, ending in a swallowtail. Ascalon gold-on-blue.
+    float sway = sinf((float)GetTime() * 1.4f + pos.x) * 3.0f * scale;
+    Color cloth = { 58, 98, 170, 255 }, clothLit = { 78, 120, 196, 255 };
+    Color trim = { 210, 174, 96, 255 };
+    float halfW = 14 * scale;
+    float lx = pos.x - halfW, rx = pos.x + halfW + sway;
+    float top = poleTop + 3 * scale, hem = baseY - 12 * scale;
+    // Two triangles for the cloth quad, the lit half toward the pole.
+    DrawTriangle((Vector2){ lx, top }, (Vector2){ lx, hem }, (Vector2){ rx, top }, clothLit);
+    DrawTriangle((Vector2){ rx, top }, (Vector2){ lx, hem }, (Vector2){ rx, hem }, cloth);
+    // Swallowtail: notch the hem into two points.
+    DrawTriangle((Vector2){ lx, hem }, (Vector2){ pos.x + sway * 0.5f, hem },
+                 (Vector2){ lx + 3 * scale, hem + 9 * scale }, cloth);
+    DrawTriangle((Vector2){ pos.x + sway * 0.5f, hem }, (Vector2){ rx, hem },
+                 (Vector2){ rx - 3 * scale, hem + 9 * scale }, cloth);
+    // Gold top and bottom trim bands, and a lozenge charge.
+    DrawRectangle((int)lx, (int)top, (int)(rx - lx), (int)(3 * scale), trim);
+    Vector2 c = { pos.x + sway * 0.3f, (top + hem) / 2 };
+    DrawTriangle((Vector2){ c.x, c.y - 8 * scale }, (Vector2){ c.x - 7 * scale, c.y },
+                 (Vector2){ c.x + 7 * scale, c.y }, trim);
+    DrawTriangle((Vector2){ c.x, c.y + 8 * scale }, (Vector2){ c.x - 7 * scale, c.y },
+                 (Vector2){ c.x + 7 * scale, c.y }, trim);
+}
+
+static void DrawBrazier(Vector2 pos, float scale) {
+    float bowlY = pos.y - 14 * scale;
+    float flick = 0.85f + 0.15f * sinf((float)GetTime() * 7.0f + pos.x);
+    DrawCircleGradient((int)pos.x, (int)pos.y, 40 * scale * flick,
+                       (Color){ 255, 150, 60, 42 }, (Color){ 255, 120, 40, 0 });
+    DrawPropShadow(pos, 10 * scale, 4 * scale);
+    // Tripod and iron bowl.
+    DrawLineEx((Vector2){ pos.x, bowlY }, (Vector2){ pos.x - 8 * scale, pos.y + 6 * scale },
+               2.5f * scale, (Color){ 52, 50, 46, 255 });
+    DrawLineEx((Vector2){ pos.x, bowlY }, (Vector2){ pos.x + 8 * scale, pos.y + 6 * scale },
+               2.5f * scale, (Color){ 52, 50, 46, 255 });
+    DrawLineEx((Vector2){ pos.x, bowlY }, (Vector2){ pos.x, pos.y + 8 * scale },
+               2.5f * scale, (Color){ 44, 42, 38, 255 });
+    DrawEllipse((int)pos.x, (int)bowlY, 11 * scale, 5 * scale, (Color){ 70, 66, 60, 255 });
+    DrawEllipse((int)pos.x, (int)(bowlY - 1 * scale), 9 * scale, 3.5f * scale, (Color){ 40, 38, 34, 255 });
+    float h = (10.0f + 3.0f * sinf((float)GetTime() * 9.0f + pos.y)) * scale;
+    DrawTriangle((Vector2){ pos.x, bowlY - h - 4 * scale }, (Vector2){ pos.x - 6 * scale, bowlY },
+                 (Vector2){ pos.x + 6 * scale, bowlY }, (Color){ 232, 128, 42, 255 });
+    DrawTriangle((Vector2){ pos.x, bowlY - h * 0.55f - 2 * scale }, (Vector2){ pos.x - 3 * scale, bowlY - 1 * scale },
+                 (Vector2){ pos.x + 3 * scale, bowlY - 1 * scale }, (Color){ 255, 214, 96, 255 });
+}
+
+static void DrawStall(Vector2 pos, float scale) {
+    float baseY = pos.y + 8 * scale;
+    DrawPropShadow((Vector2){ pos.x, baseY }, 26 * scale, 6 * scale);
+    // Trestle table and its legs.
+    DrawRectangle((int)(pos.x - 22 * scale), (int)(baseY - 10 * scale), (int)(44 * scale),
+                  (int)(6 * scale), (Color){ 120, 92, 60, 255 });
+    DrawRectangle((int)(pos.x - 20 * scale), (int)(baseY - 4 * scale), (int)(3 * scale),
+                  (int)(6 * scale), (Color){ 96, 72, 48, 255 });
+    DrawRectangle((int)(pos.x + 17 * scale), (int)(baseY - 4 * scale), (int)(3 * scale),
+                  (int)(6 * scale), (Color){ 96, 72, 48, 255 });
+    // Wares: a crate and a couple of pots/fruit.
+    DrawRectangle((int)(pos.x - 17 * scale), (int)(baseY - 19 * scale), (int)(11 * scale),
+                  (int)(9 * scale), (Color){ 150, 120, 80, 255 });
+    DrawCircleV((Vector2){ pos.x + 2 * scale, baseY - 13 * scale }, 4 * scale, (Color){ 164, 82, 60, 255 });
+    DrawCircleV((Vector2){ pos.x + 12 * scale, baseY - 13 * scale }, 4 * scale, (Color){ 110, 140, 70, 255 });
+    // Awning posts and a striped canopy.
+    DrawRectangle((int)(pos.x - 22 * scale), (int)(baseY - 40 * scale), (int)(2.5f * scale),
+                  (int)(30 * scale), (Color){ 84, 62, 42, 255 });
+    DrawRectangle((int)(pos.x + 20 * scale), (int)(baseY - 40 * scale), (int)(2.5f * scale),
+                  (int)(30 * scale), (Color){ 84, 62, 42, 255 });
+    Vector2 bl = { pos.x - 25 * scale, baseY - 40 * scale }, br = { pos.x + 25 * scale, baseY - 40 * scale };
+    Vector2 fl = { pos.x - 27 * scale, baseY - 29 * scale }, fr = { pos.x + 27 * scale, baseY - 29 * scale };
+    DrawTriangle(bl, fl, br, (Color){ 178, 80, 70, 255 });
+    DrawTriangle(fl, fr, br, (Color){ 200, 196, 186, 255 });
+}
+
 
 // The zone edge, drawn as terrain. Three passes rather than one loop of
 // complete mountains: drawn whole, each mass would be outlined against
@@ -205,6 +362,12 @@ static void DrawProps(const EnvProp *props, int count) {
             case PROP_GRASS: DrawGrassTuft(p->pos, p->scale); break;
             case PROP_TENT: DrawTent(p->pos, p->scale); break;
             case PROP_FIRE: DrawCampfire(p->pos, p->scale); break;
+            case PROP_HOUSE:    DrawHouse(p->pos, p->scale); break;
+            case PROP_FOUNTAIN: DrawFountain(p->pos, p->scale); break;
+            case PROP_STATUE:   DrawStatue(p->pos, p->scale); break;
+            case PROP_BANNER:   DrawBanner(p->pos, p->scale); break;
+            case PROP_BRAZIER:  DrawBrazier(p->pos, p->scale); break;
+            case PROP_STALL:    DrawStall(p->pos, p->scale); break;
         }
     }
 }

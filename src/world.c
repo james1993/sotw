@@ -203,18 +203,39 @@ static const SpawnDef g_lakesideSpawns[] = {
 
 // --- Ascalon City: the capital, and the hub every road runs back to ---
 
+// Ascalon City, the capital - dressed in stone, not canvas. Ordered
+// back-to-front (low y first) so nearer buildings overlap farther ones,
+// and laid out around the plaza the NPCs stand in.
 static const EnvProp g_cityProps[] = {
-    { {    0, -170 }, PROP_FIRE,  1.1f },
-    { { -230, -160 }, PROP_TENT,  1.1f },
-    { {  230, -160 }, PROP_TENT,  1.1f },
-    { { -280,   30 }, PROP_TENT,  1.0f },
-    { {  280,   30 }, PROP_TENT,  1.0f },
-    { { -150,  190 }, PROP_TENT,  0.9f },
-    { {  160,  200 }, PROP_TENT,  0.9f },
-    { { -380, -220 }, PROP_TREE,  1.0f },
-    { {  390, -230 }, PROP_TREE,  1.0f },
-    { { -400,  180 }, PROP_ROCK,  1.0f },
-    { {  400,  190 }, PROP_ROCK,  0.9f },
+    // A skyline of sandstone houses across the back and down the sides.
+    { { -360, -262 }, PROP_HOUSE, 1.10f },
+    { { -155, -270 }, PROP_HOUSE, 1.15f },
+    { {   45, -272 }, PROP_HOUSE, 1.05f },
+    { {  250, -262 }, PROP_HOUSE, 1.15f },
+    { {  390, -252 }, PROP_HOUSE, 1.00f },
+    // Two houses pulled in to frame the square in view from the plaza.
+    { { -345,  -35 }, PROP_HOUSE, 1.05f },
+    { {  345,  -35 }, PROP_HOUSE, 1.05f },
+    { { -455,   90 }, PROP_HOUSE, 1.00f },
+    { {  455,   95 }, PROP_HOUSE, 1.00f },
+    // The plaza's heart: a statue of Dwayna, banners to either side.
+    { {    0, -165 }, PROP_STATUE, 1.15f },
+    { {  -82, -132 }, PROP_BANNER, 1.00f },
+    { {   82, -132 }, PROP_BANNER, 1.00f },
+    // A fountain and market stalls fill out the square.
+    { {  150,   35 }, PROP_FOUNTAIN, 1.00f },
+    { { -200,  150 }, PROP_STALL, 1.00f },
+    { {  190,  155 }, PROP_STALL, 1.00f },
+    // Braziers to light the capital.
+    { { -262,  -28 }, PROP_BRAZIER, 1.00f },
+    { {  262,  -28 }, PROP_BRAZIER, 1.00f },
+    { {  -78,   66 }, PROP_BRAZIER, 0.90f },
+    { {   78,   66 }, PROP_BRAZIER, 0.90f },
+    // A touch of green at the corners.
+    { { -420,  205 }, PROP_TREE, 1.00f },
+    { {  420,  210 }, PROP_TREE, 1.00f },
+    { { -110,  215 }, PROP_GRASS, 1.00f },
+    { {  120,  220 }, PROP_GRASS, 1.00f },
 };
 
 static const SpawnDef g_citySpawns[] = {

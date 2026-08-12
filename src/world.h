@@ -56,7 +56,13 @@ typedef struct {
 
 // Decorative environment props, hand-placed per zone. Drawn by render.c;
 // purely visual, no collision or LoS.
-typedef enum { PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE } PropType;
+typedef enum {
+    PROP_TREE, PROP_ROCK, PROP_GRASS, PROP_TENT, PROP_FIRE,
+    // City dressing, so a capital reads as a capital and not a campsite:
+    // Ascalon sandstone houses, a town fountain, a statue of Dwayna, a
+    // heraldic banner, a standing brazier, and a market stall.
+    PROP_HOUSE, PROP_FOUNTAIN, PROP_STATUE, PROP_BANNER, PROP_BRAZIER, PROP_STALL
+} PropType;
 typedef struct { Vector2 pos; PropType type; float scale; } EnvProp;
 
 // --- Zone edges ------------------------------------------------------
