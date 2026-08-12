@@ -218,13 +218,16 @@ static const EnvProp g_cityProps[] = {
 };
 
 static const SpawnDef g_citySpawns[] = {
+    // --- The people who have business with you, in the central plaza. ---
     // Sir Tydus sends you off to find a second profession; Prince Rurik
     // is the one who takes you to the Charr. Both are canon givers.
     { .kind = SPAWN_NPC, .name = "Sir Tydus", .pos = { -140, -70 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Prince Rurik", .pos = { 150, -70 },
       .npcRole = NPC_QUEST_GIVER, .npcColor = { 120, 190, 120, 255 } },
-    { .kind = SPAWN_NPC, .name = "Merchant Vassar", .pos = { -260, 90 },
+    // Sanura is Ascalon City's merchant; Halbrik its skill trainer - both
+    // real pre-Searing names.
+    { .kind = SPAWN_NPC, .name = "Sanura", .pos = { -260, 90 },
       .npcRole = NPC_MERCHANT, .npcColor = { 90, 170, 90, 255 } },
     { .kind = SPAWN_NPC, .name = "Armorer Gali", .pos = { 260, 100 },
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
@@ -233,6 +236,32 @@ static const SpawnDef g_citySpawns[] = {
     // skill trainer you can't see is the one NPC that most needs finding.
     { .kind = SPAWN_NPC, .name = "Halbrik", .pos = { 0, 115 },
       .npcRole = NPC_SKILL_TRAINER, .npcColor = { 90, 170, 90, 255 } },
+
+    // --- The capital's crowd: guards on the walls, nobles and townsfolk
+    // going about the last ordinary morning. Kept out toward the edges so
+    // they populate the city without stealing the talk prompt from the
+    // service NPCs in the middle. Role-less, so they carry no gilded
+    // trim and read as ordinary folk; talk to one for a word of the day.
+    { .kind = SPAWN_NPC, .name = "Ascalon Guard",    .pos = { -420, -210 },
+      .npcColor = { 150, 120, 96, 255 } },
+    { .kind = SPAWN_NPC, .name = "Ascalon Guard",    .pos = { 420, -210 },
+      .npcColor = { 150, 120, 96, 255 } },
+    { .kind = SPAWN_NPC, .name = "Ascalon Guard",    .pos = { -430, 40 },
+      .npcColor = { 150, 120, 96, 255 } },
+    { .kind = SPAWN_NPC, .name = "Ascalon Guard",    .pos = { 430, 40 },
+      .npcColor = { 150, 120, 96, 255 } },
+    { .kind = SPAWN_NPC, .name = "Ascalon Noble",    .pos = { -70, -230 },
+      .npcColor = { 176, 140, 190, 255 } },
+    { .kind = SPAWN_NPC, .name = "Ascalon Noble",    .pos = { 90, -235 },
+      .npcColor = { 150, 160, 200, 255 } },
+    { .kind = SPAWN_NPC, .name = "Priest of Dwayna", .pos = { -300, -150 },
+      .npcColor = { 210, 205, 180, 255 } },
+    { .kind = SPAWN_NPC, .name = "Townsperson",      .pos = { 300, -150 },
+      .npcColor = { 150, 150, 130, 255 } },
+    { .kind = SPAWN_NPC, .name = "Townsperson",      .pos = { -180, -200 },
+      .npcColor = { 140, 156, 120, 255 } },
+    { .kind = SPAWN_NPC, .name = "Town Crier",       .pos = { 200, -200 },
+      .npcColor = { 190, 160, 90, 255 } },
 };
 
 // --- Green Hills County: Warrior country, and the theatre where Lady
@@ -1530,12 +1559,14 @@ static void SpawnNpc(const SpawnDef *def) {
     if (npc) {
         npc->npcRole = def->npcRole;
         npc->teachesProfession = def->teaches;
-        // Give every NPC their own face from a hash of their name, so a
-        // town reads as a crowd of different people instead of one
-        // person copied five times. Deterministic, so an NPC looks the
-        // same on every visit.
+        // Give every NPC their own face from a hash of their name AND
+        // spawn point, so a town reads as a crowd of different people -
+        // and two "Ascalon Guard"s standing apart still look distinct.
+        // Deterministic, so an NPC looks the same on every visit.
         unsigned h = 2166136261u;
         for (const char *c = def->name; *c; c++) h = (h ^ (unsigned char)*c) * 16777619u;
+        h = (h ^ (unsigned)(int)def->pos.x) * 16777619u;
+        h = (h ^ (unsigned)(int)def->pos.y) * 16777619u;
         npc->sex       = (int)(h & 1u);
         npc->skinTone  = (int)((h >> 1) % SKIN_TONE_COUNT);
         npc->hairColor = (int)((h >> 4) % HAIR_COLOR_COUNT);

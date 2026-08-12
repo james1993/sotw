@@ -1717,8 +1717,26 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             snprintf(opts[0].label, sizeof(opts[0].label), "Hire Little Thom (free)");
             opts[0].enabled = true; opts[0].kind = DOPT_HIRE_THOM; nopt = 1;
             break;
-        default:
+        default: {
+            // Ambient townsfolk: a word of the day and nothing to sell.
+            // Picked by name + position, so the guard by the east gate and
+            // the guard by the west say different things.
+            static const char *chatter[] = {
+                "The Charr grow bolder every day. I pray the Wall holds.",
+                "A fine morning, isn't it? Warm off the fields.",
+                "They say the King is recruiting. Glory awaits the brave.",
+                "Dwayna keep you, traveler.",
+                "Ascalon has stood a thousand years. It will stand a thousand more.",
+                "Prince Rurik drills the Vanguard hard. Good - we'll need them.",
+                "My cousin serves on the Wall. Cold work, watching for Charr.",
+                "Mind yourself past the gate. It's wild country out there.",
+            };
+            unsigned hsh = 2166136261u;
+            for (const char *c = npc->name; *c; c++) hsh = (hsh ^ (unsigned char)*c) * 16777619u;
+            hsh = (hsh ^ (unsigned)(int)npc->pos.x) * 16777619u;
+            body = chatter[hsh % (sizeof(chatter) / sizeof(chatter[0]))];
             break;
+        }
     }
 
     // --- Size the panel to the wrapped text and the reply list ------
