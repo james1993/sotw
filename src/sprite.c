@@ -198,6 +198,10 @@ typedef struct {
     Color weaponFocus;
     float walk;   // -1..1 sway; 0 stands still
     float swing;  // attack extension; 0 idle
+    float run;    // 0..1 locomotion intensity - stride, knee lift, arm pump
+    float lean;   // signed forward lean (facing.x * run); 0 = upright
+    float swingPhase; // -1 idle, else 0..1 through the strike (lunge + trail)
+    Vector2 aim;  // facing unit vector - lean/lunge/spark direction
     bool casting;
     bool restArms; // portrait pose: weapon lowered to the side, not extended
     bool showGlow;
@@ -205,34 +209,70 @@ typedef struct {
     float glowProg;
 } FigurePose;
 
+// The forward push of an attack: nothing during the wind-up, a hard peak
+// at the impact frame, then a quick settle. Shared by the lunge and the
+// blade trail so the smear and the step land together.
+static float LungeAmount(float phase) {
+    if (phase < 0.0f) return 0.0f;
+    if (phase < 0.34f) return 0.0f;                 // winding up, no drive yet
+    if (phase < 0.5f)  return (phase - 0.34f) / 0.16f; // snap forward
+    return fmaxf(0.0f, 1.0f - (phase - 0.5f) / 0.5f);  // recover
+}
+
 static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, double now) {
     float walk = fp->walk;
-    float bob = fabsf(walk) * r * 0.12f;
+    float run = fp->run;
+    float bob = fabsf(walk) * r * (0.12f + 0.10f * run); // stride bounce grows at speed
 
-    // Shadow
+    // Idle breathing: a slow rise of the chest when standing still, so a
+    // stopped figure is alive rather than frozen.
+    float idle = 1.0f - fminf(1.0f, run + fabsf(fp->swing) + (fp->casting ? 1.0f : 0.0f));
+    float breathe = sinf((float)now * 2.1f) * r * 0.025f * idle;
+
+    // Attack lunge: the upper body drives forward through the strike, in
+    // the direction the figure is facing.
+    float lunge = LungeAmount(fp->swingPhase);
+    float lungeX = fp->aim.x * lunge * r * 0.30f;
+
+    // Forward lean while running (upper body only; the feet stay planted),
+    // plus the lunge, gives every displacement a clear x offset.
+    float ux = p.x + fp->lean * r * 0.5f + lungeX;
+
+    // Shadow (tracks the planted feet, not the leaning body)
     DrawEllipse((int)p.x, (int)(p.y + r * 0.95f), r * 0.85f, r * 0.32f, (Color){ 0, 0, 0, 70 });
 
-    // Legs (two short strokes scissoring while walking)
+    // Legs: hip -> knee -> foot, so a running stride lifts the knee and
+    // plants the heel instead of just scissoring two straight sticks.
     Color legC = Darken(fp->robe, 0.45f);
-    float legSwing = walk * r * 0.45f;
-    DrawLineEx((Vector2){ p.x - r * 0.25f, p.y + r * 0.25f },
-               (Vector2){ p.x - r * 0.25f + legSwing * sx, p.y + r * 0.95f }, r * 0.22f, legC);
-    DrawLineEx((Vector2){ p.x + r * 0.25f, p.y + r * 0.25f },
-               (Vector2){ p.x + r * 0.25f - legSwing * sx, p.y + r * 0.95f }, r * 0.22f, legC);
+    float stride = r * (0.26f + 0.34f * run);
+    float lift   = r * (0.05f + 0.28f * run);
+    for (int i = 0; i < 2; i++) {
+        float side = (i == 0) ? -1.0f : 1.0f;     // left / right leg
+        float ph = side * walk;                   // this leg's forward amount
+        Vector2 hip = { p.x + side * r * 0.22f, p.y + r * 0.28f - bob * 0.4f };
+        float footLift = fmaxf(0.0f, ph) * lift;  // raised while it swings forward
+        Vector2 foot = { hip.x + ph * stride * sx, p.y + r * 0.95f - footLift };
+        Vector2 knee = { (hip.x + foot.x) * 0.5f + sx * run * r * 0.10f,
+                         (hip.y + foot.y) * 0.5f - run * r * 0.12f - footLift * 0.3f };
+        DrawLineEx(hip, knee, r * 0.22f, legC);
+        DrawLineEx(knee, foot, r * 0.19f, legC);
+        DrawCircleV(foot, r * 0.12f, Darken(legC, 0.85f)); // heel
+    }
 
     // Robe: a tapered body (triangle skirt + chest circle)
-    float top = p.y - r * 0.55f - bob;
-    DrawTriangle((Vector2){ p.x, top },
+    float top = p.y - r * 0.55f - bob + breathe;
+    DrawTriangle((Vector2){ ux, top },
                  (Vector2){ p.x - r * 0.78f, p.y + r * 0.55f },
                  (Vector2){ p.x + r * 0.78f, p.y + r * 0.55f }, fp->robe);
-    DrawCircleV((Vector2){ p.x, top + r * 0.18f },
+    DrawCircleV((Vector2){ ux, top + r * 0.18f },
                 r * (fp->sex == 0 ? 0.45f : 0.5f), fp->robe);
     // Trim line - brighter on higher armor.
     DrawLineEx((Vector2){ p.x - r * 0.6f, p.y + r * 0.42f },
                (Vector2){ p.x + r * 0.6f, p.y + r * 0.42f }, r * 0.12f, Lighten(fp->robe, 0.35f));
 
-    // Weapon arm
-    Vector2 shoulder = { p.x + sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
+    // Weapon arm. Anchored on the leaning torso; pumps with the stride.
+    float pump = walk * (0.15f + 0.35f * run);
+    Vector2 shoulder = { ux + sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
     float armAngle;
     if (fp->casting) {
         armAngle = -1.9f + sinf((float)now * 8.0f) * 0.15f; // raised, trembling with power
@@ -240,17 +280,38 @@ static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, doubl
         armAngle = sx > 0 ? 1.15f : 1.99f; // weapon lowered, held at the side
     } else {
         armAngle = (sx > 0 ? -0.5f : 3.64f) + (sx > 0 ? fp->swing : -fp->swing);
-        armAngle += walk * 0.15f;
+        armAngle += pump;
     }
     Vector2 hand = { shoulder.x + cosf(armAngle) * r * 0.75f,
                      shoulder.y + sinf(armAngle) * r * 0.75f };
+    // Blade trail: faint smears at earlier swing angles as it snaps through.
+    if (fp->swingPhase >= 0.30f && fp->swingPhase <= 0.62f && !fp->casting) {
+        float tr = 1.0f - fabsf(fp->swingPhase - 0.46f) / 0.16f;
+        for (int g = 1; g <= 2 && tr > 0.0f; g++) {
+            float ga = armAngle - (sx > 0 ? 1.0f : -1.0f) * 0.42f * g;
+            Vector2 gh = { shoulder.x + cosf(ga) * r * 0.78f, shoulder.y + sinf(ga) * r * 0.78f };
+            DrawLineEx(shoulder, gh, r * (0.16f - 0.03f * g),
+                       Fade((Color){ 230, 236, 245, 255 }, 0.22f * tr / g));
+        }
+    }
     DrawLineEx(shoulder, hand, r * 0.2f, Darken(fp->robe, 0.7f));
     DrawCircleV(hand, r * 0.16f, fp->skin);
     DrawWeapon(fp->weapon, hand, fp->casting ? -1.57f : armAngle, r, fp->weaponFocus);
+    // Impact spark at the weapon tip on the strike frame.
+    if (fp->swingPhase >= 0.42f && fp->swingPhase <= 0.56f && !fp->casting) {
+        float sp = 1.0f - fabsf(fp->swingPhase - 0.49f) / 0.07f;
+        Vector2 tip = { hand.x + cosf(armAngle) * r * 0.55f, hand.y + sinf(armAngle) * r * 0.55f };
+        DrawCircleV(tip, r * 0.14f * sp, Fade((Color){ 255, 250, 220, 255 }, 0.8f * sp));
+        for (int k = 0; k < 4; k++) {
+            float a = armAngle - 0.9f + k * 0.6f;
+            DrawLineEx(tip, (Vector2){ tip.x + cosf(a) * r * 0.3f * sp, tip.y + sinf(a) * r * 0.3f * sp },
+                       r * 0.05f, Fade((Color){ 255, 244, 200, 255 }, 0.7f * sp));
+        }
+    }
 
     // Off arm
-    Vector2 shoulder2 = { p.x - sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
-    float armAngle2 = fp->casting ? -1.25f : (sx > 0 ? 3.6f : -0.45f) - walk * 0.15f;
+    Vector2 shoulder2 = { ux - sx * r * 0.42f, top + r * 0.30f - bob * 0.5f };
+    float armAngle2 = fp->casting ? -1.25f : (sx > 0 ? 3.6f : -0.45f) - pump;
     Vector2 hand2 = { shoulder2.x + cosf(armAngle2) * r * 0.7f,
                       shoulder2.y + sinf(armAngle2) * r * 0.7f };
     DrawLineEx(shoulder2, hand2, r * 0.2f, Darken(fp->robe, 0.7f));
@@ -258,7 +319,7 @@ static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, doubl
 
     // Head + hair. The style changes the silhouette, which is what
     // actually makes two characters distinguishable at this size.
-    Vector2 headC = { p.x, top - r * 0.42f };
+    Vector2 headC = { ux, top - r * 0.42f };
     DrawCircleV(headC, r * 0.42f, fp->skin);
     switch (fp->hairStyle) {
         case 1: // long: a cap plus a fall down the back
@@ -276,13 +337,21 @@ static void DrawFigure(Vector2 p, float r, float sx, const FigurePose *fp, doubl
     // Eyes face the walk direction
     DrawCircleV((Vector2){ headC.x + sx * r * 0.15f, headC.y + r * 0.05f }, r * 0.05f, BLACK);
 
-    // Cast glow: school-colored halo swelling with cast progress.
+    // Cast glow: school-colored halo swelling with cast progress, with
+    // motes spiralling inward - energy being gathered before release.
     if (fp->showGlow) {
+        Vector2 gc = { ux, top - r * 1.15f };
         Color glow = fp->glowColor;
         float gr = r * (0.35f + 0.45f * fp->glowProg) + sinf((float)now * 10.0f) * r * 0.06f;
         glow.a = 170;
-        DrawCircleV((Vector2){ p.x, top - r * 1.15f }, gr, Fade(glow, 0.35f));
-        DrawCircleLines((int)p.x, (int)(top - r * 1.15f), gr, glow);
+        DrawCircleV(gc, gr, Fade(glow, 0.35f));
+        DrawCircleLines((int)gc.x, (int)gc.y, gr, glow);
+        for (int m = 0; m < 5; m++) {
+            float a = (float)now * 3.2f + m * 1.2566f;       // 2pi/5 apart
+            float dist = r * (1.0f - fp->glowProg) * (0.9f + 0.3f * sinf(a * 2.0f));
+            Vector2 mote = { gc.x + cosf(a) * dist, gc.y + sinf(a) * dist };
+            DrawCircleV(mote, r * (0.06f + 0.05f * fp->glowProg), Fade(glow, 0.85f));
+        }
     }
 }
 
@@ -342,12 +411,17 @@ static void DrawHumanoid(const Entity *e, double now) {
     float phase = SwingPhase(e);
     float swing = (phase >= 0.0f) ? AttackSwing(phase) * 1.55f : 0.0f;
     float walk = sinf(e->animTime * 6.0f) * e->moveBlend;
+    // Locomotion intensity: the eased move blend, pushed toward a full run
+    // as actual pace climbs. Lean is signed by facing and fades on vertical
+    // travel (facing.x -> 0), where there's no clear forward to tip into.
+    float run = e->moveBlend * fminf(1.0f, 0.4f + e->gaitSpeed / 130.0f);
 
     FigurePose pose = {
         .robe = robe, .skin = skin, .hair = hair,
         .sex = e->sex, .hairStyle = e->hairStyle,
         .weapon = WeaponFor(e), .weaponFocus = FocusColor(e->primaryProfession),
-        .walk = walk,
+        .walk = walk, .run = run, .lean = e->facing.x * run,
+        .swingPhase = phase, .aim = e->facing,
         .swing = swing, .casting = casting, .showGlow = casting,
     };
     if (casting) {

@@ -492,6 +492,10 @@ void Combat_TickTimers(float dt) {
         float mdx = e->pos.x - e->prevPos.x;
         float mdy = e->pos.y - e->prevPos.y;
         float md = sqrtf(mdx * mdx + mdy * mdy);
+        // Smoothed speed (px/s) so the run lean and cadence can react to
+        // actual pace - a hasted runner leans harder, a crippled one plods.
+        float inst = (dt > 0.0001f) ? md / dt : 0.0f;
+        e->gaitSpeed += (inst - e->gaitSpeed) * fminf(1.0f, dt * 6.0f);
         if (md > 0.01f) {
             e->facing = (Vector2){ mdx / md, mdy / md };
             e->animTime += md * 0.055f; // stride frequency tied to speed

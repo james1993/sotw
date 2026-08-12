@@ -348,6 +348,7 @@ typedef struct Entity {
     Vector2 facing;         // unit vector of last movement direction
     float animTime;         // advances with distance walked
     float moveBlend;        // 0..1, eases the walk cycle in and out
+    float gaitSpeed;        // smoothed px/s speed; drives run lean + cadence
     float attackAnimTimer;  // > 0 during the swing animation
 
     // Patrol route: monsters with hasPatrol ping-pong between patrolA
