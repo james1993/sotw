@@ -29,6 +29,10 @@
 static bool g_invOpen = false;
 static bool g_skillsOpen = false;
 static int g_dialogNpc = -1;   // entity index, -1 = closed
+// Which offered quest the quest-giver dialogue is reading in detail, or
+// -1 for the list of quest titles. GW1 shows a quest's description on its
+// own page with Accept/Decline before you take it.
+static int g_dialogQuest = -1;
 static bool g_shopOpen = false;
 static bool g_craftOpen = false;
 static bool g_trainerOpen = false;
@@ -178,6 +182,7 @@ void UI_OpenNpcDialog(int entityIndex) {
         UIFocus_Clear(); // a new conversation starts at its first reply
     }
     g_dialogNpc = entityIndex;
+    g_dialogQuest = -1; // always open on the list of quests, not a detail
     g_shopOpen = false;
     g_craftOpen = false;
     // GW1 opens a merchant's trade window and an armourer's craft window
@@ -1499,6 +1504,8 @@ static void DrawProfessionPanel(Entity *player, int screenWidth, int screenHeigh
 typedef enum {
     DOPT_NONE = 0,   // a disabled line that names a requirement
     DOPT_ACCEPT, DOPT_TURNIN,
+    DOPT_VIEW_QUEST, // open a quest's description page
+    DOPT_BACK,       // back to the list of quest titles
     DOPT_SHOP, DOPT_CRAFT, DOPT_COLLECTOR, DOPT_TRAINER, DOPT_PROFESSION,
     DOPT_HIRE_THOM
 } DlgOptKind;
@@ -1531,6 +1538,7 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
 
     // --- Decide what the NPC says and which replies to offer --------
     const char *body = "";
+    char bodyBuf[512];
     DlgOpt opts[MAX_DLG_OPTS];
     int nopt = 0;
 
@@ -1542,6 +1550,29 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
             int ready[QUEST_COUNT], offer[QUEST_COUNT];
             int nready = Quests_ReadyToTurnInListFor(npc->name, ready, QUEST_COUNT);
             int noffer = Quests_OfferableListFor(npc->name, offer, QUEST_COUNT);
+
+            // Detail page: reading one offered quest before deciding. Only
+            // valid while that quest is still on this giver's offer list.
+            if (g_dialogQuest >= 0) {
+                bool valid = false;
+                for (int i = 0; i < noffer; i++) if (offer[i] == g_dialogQuest) valid = true;
+                if (valid) {
+                    Quest *q = &g_quests[g_dialogQuest];
+                    char rewards[96];
+                    QuestRewardSummary(q, player, rewards, sizeof(rewards));
+                    snprintf(bodyBuf, sizeof(bodyBuf), "%s\n\nObjective: %s\n\nReward: %s",
+                             q->offerText, q->objective, rewards);
+                    body = bodyBuf;
+                    snprintf(opts[0].label, sizeof(opts[0].label), "Accept: %.40s", q->name);
+                    opts[0].enabled = true; opts[0].kind = DOPT_ACCEPT; opts[0].param = g_dialogQuest;
+                    snprintf(opts[1].label, sizeof(opts[1].label), "Decline");
+                    opts[1].enabled = true; opts[1].kind = DOPT_BACK;
+                    nopt = 2;
+                    break;
+                }
+                g_dialogQuest = -1; // the quest went away - fall back to the list
+            }
+
             for (int i = 0; i < nready && nopt < MAX_DLG_OPTS; i++) {
                 Quest *q = &g_quests[ready[i]];
                 bool bagFull = q->rewardItem && g_inventoryCount >= MAX_INVENTORY;
@@ -1554,14 +1585,12 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 opts[nopt].param = ready[i];
                 nopt++;
             }
+            // Offers open a description page rather than accepting outright.
             for (int i = 0; i < noffer && nopt < MAX_DLG_OPTS; i++) {
                 Quest *q = &g_quests[offer[i]];
-                char rewards[96];
-                QuestRewardSummary(q, player, rewards, sizeof(rewards));
-                snprintf(opts[nopt].label, sizeof(opts[nopt].label),
-                         "Accept: %.48s (%.60s)", q->name, rewards);
+                snprintf(opts[nopt].label, sizeof(opts[nopt].label), "%.60s", q->name);
                 opts[nopt].enabled = true;
-                opts[nopt].kind = DOPT_ACCEPT;
+                opts[nopt].kind = DOPT_VIEW_QUEST;
                 opts[nopt].param = offer[i];
                 nopt++;
             }
@@ -1569,10 +1598,12 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
                 bool bagFull = g_quests[ready[0]].rewardItem && g_inventoryCount >= MAX_INVENTORY;
                 body = bagFull ? "Your bags are full - make room for your reward."
                                : "You've done it! Ascalon thanks you.";
-            } else if (noffer == 1 && nready == 0) {
-                body = g_quests[offer[0]].offerText; // keep the single-quest flavour
-            } else if (nready + noffer > 0) {
-                body = "I've work that needs doing. Which will you take?";
+            } else if (noffer > 0) {
+                // The titles are the replies; the description waits on the
+                // page behind each one, so the greeting just points at them.
+                body = "I've work that needs doing. Take a look.";
+            } else if (nready > 0) {
+                body = "You've done it! Ascalon thanks you.";
             } else {
                 bool anyActive = false;
                 for (int i = 0; i < QUEST_COUNT; i++) {
@@ -1685,7 +1716,10 @@ static void DrawNpcDialog(Entity *player, int screenWidth, int screenHeight) {
     }
     if (chosen >= 0) {
         switch (opts[chosen].kind) {
-            case DOPT_ACCEPT:  Quests_Accept(opts[chosen].param); break;
+            case DOPT_VIEW_QUEST: g_dialogQuest = opts[chosen].param; UIFocus_Clear(); break;
+            case DOPT_ACCEPT:  Quests_Accept(opts[chosen].param);
+                               g_dialogQuest = -1; UIFocus_Clear(); break; // back to the list
+            case DOPT_BACK:    g_dialogQuest = -1; UIFocus_Clear(); break;
             case DOPT_TURNIN:  Quests_TurnIn(player, opts[chosen].param); break;
             case DOPT_SHOP:    g_shopOpen = !g_shopOpen; UIFocus_Clear(); break;
             case DOPT_CRAFT:   g_craftOpen = !g_craftOpen; UIFocus_Clear(); break;
@@ -1748,6 +1782,10 @@ void UI_PanelsUpdateAndDraw(int screenWidth, int screenHeight) {
                 g_collectorOpen) {
                 g_shopOpen = g_craftOpen = g_trainerOpen = g_professionOpen = false;
                 g_collectorOpen = false;
+                UIFocus_Clear();
+                Audio_Play(SFX_UI_CLOSE);
+            } else if (g_dialogQuest >= 0) {
+                g_dialogQuest = -1; // a quest page backs out to the list first
                 UIFocus_Clear();
                 Audio_Play(SFX_UI_CLOSE);
             } else {
