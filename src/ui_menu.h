@@ -12,6 +12,7 @@ typedef enum {
     MENU_NONE = 0,
     MENU_CONTINUE,
     MENU_NEW_GAME,
+    MENU_TRIAL,      // straight into the wave arena, full skill bar
     MENU_QUIT
 } MenuAction;
 

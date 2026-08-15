@@ -731,6 +731,26 @@ static const SpawnDef g_ranikSpawns[] = {
       .npcRole = NPC_CRAFTER, .npcColor = { 90, 170, 90, 255 } },
 };
 
+// --- The Trial: the arena floor --------------------------------------
+// No static spawns - trial.c fills it wave by wave. A ring of braziers
+// so the floor reads as a marked-out ground rather than empty field.
+static const EnvProp g_trialProps[] = {
+    // A ring of fire around the floor: twelve braziers on a circle, so
+    // the arena reads as a marked-out place and the edge of the fighting
+    // ground is visible without a wall.
+    { {    0, -430 }, PROP_BRAZIER, 1.2f }, { {  215, -372 }, PROP_BRAZIER, 1.2f },
+    { {  372, -215 }, PROP_BRAZIER, 1.2f }, { {  430,    0 }, PROP_BRAZIER, 1.2f },
+    { {  372,  215 }, PROP_BRAZIER, 1.2f }, { {  215,  372 }, PROP_BRAZIER, 1.2f },
+    { {    0,  430 }, PROP_BRAZIER, 1.2f }, { { -215,  372 }, PROP_BRAZIER, 1.2f },
+    { { -372,  215 }, PROP_BRAZIER, 1.2f }, { { -430,    0 }, PROP_BRAZIER, 1.2f },
+    { { -372, -215 }, PROP_BRAZIER, 1.2f }, { { -215, -372 }, PROP_BRAZIER, 1.2f },
+    // Charr banners at the compass points, and two blocks to break line
+    // of sight so a caster wave isn't fought on a featureless plate.
+    { { -470, -470 }, PROP_BANNER, 1.2f }, { {  470, -470 }, PROP_BANNER, 1.2f },
+    { { -470,  470 }, PROP_BANNER, 1.2f }, { {  470,  470 }, PROP_BANNER, 1.2f },
+    { { -200, -140 }, PROP_ROCK,   1.3f }, { {  200,  140 }, PROP_ROCK,   1.3f },
+};
+
 #define COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
 
 static const ZoneDef g_zones[ZONE_COUNT] = {
@@ -955,6 +975,17 @@ static const ZoneDef g_zones[ZONE_COUNT] = {
         .hasShrine = false,
         .props = g_ranikProps, .propCount = COUNT(g_ranikProps),
         .spawns = g_ranikSpawns, .spawnCount = COUNT(g_ranikSpawns),
+    },
+    [ZONE_TRIAL] = {
+        .name = "The Trial",
+        .mode = MODE_EXPLORABLE, // a combat instance, so foes and drops behave
+        .clearColor = { 18, 15, 20, 255 },
+        .gridColor = { 74, 60, 70, 255 },
+        .portalCount = 0,        // no way out but winning or dying
+        .bounds = { -520, -460, 1040, 920 },
+        .hasShrine = false,
+        .props = g_trialProps, .propCount = COUNT(g_trialProps),
+        .spawns = NULL, .spawnCount = 0, // trial.c spawns the waves
     },
 };
 
@@ -1628,6 +1659,32 @@ static Entity *SpawnMonster(const SpawnDef *def) {
     return m;
 }
 
+// The arena's runtime spawner: trial.c composes waves in FoeSpecs and
+// this turns them into real monsters through the same path the static
+// spawn tables use, so an arena Charr fights exactly like a field one.
+struct Entity *World_SpawnFoe(const FoeSpec *spec) {
+    if (!spec) return NULL;
+    SpawnDef def = {
+        .kind = SPAWN_MONSTER,
+        .name = spec->name,
+        .pos = spec->pos,
+        .level = spec->level,
+        .hp = spec->hp,
+        .armor = spec->armor,
+        .aggro = 1400.0f, // the whole floor: nothing hides in an arena
+        .strengthRank = spec->strengthRank,
+        .withHowl = spec->withHowl,
+        .caster = spec->caster,
+        .boss = spec->boss,
+        .capSkill = -1,
+        .species = (Species)spec->species,
+        .group = spec->group,
+    };
+    Entity *m = SpawnMonster(&def);
+    if (m) m->leashRange = 4000.0f; // and nothing walks home mid-wave
+    return m;
+}
+
 // A monster that walks a route between two points instead of standing
 // still - GW1's roaming patrols, the reason pull timing matters: fight
 // a static group in a patrol's path and the patrol joins in.
@@ -1936,6 +1993,80 @@ void World_Init(void) {
     LoadZone(ZONE_ASCALON_CITY, (Vector2){ 0, 0 });
 }
 
+// --- The Trial -------------------------------------------------------
+// The eight-skill bar each profession walks into the arena holding. The
+// campaign earns these over hours; the arena is the argument that having
+// them is the game, and earning them is the part that can wait.
+//
+// Every bar carries the same five jobs, because that is what makes a GW1
+// fight a decision: pressure, a spike, an ANSWER TO A HEALING FOE (an
+// interrupt or a spike big enough to outrun the heal), self-sustain, and
+// a panic button.
+static const int g_trialBars[PROF_COUNT][SKILL_BAR_SIZE] = {
+    [PROF_WARRIOR] = { SK_GASH, SK_RUSH_STRIKE, SK_EVISCERATE, SK_CYCLONE_AXE,
+                       SK_PENETRATING_BLOW, SK_DISTRACTING_BLOW, SK_DISCIPLINED_STANCE,
+                       SK_RESURRECTION_SIGNET },
+    [PROF_RANGER]  = { SK_POWER_SHOT, SK_CONCUSSION_SHOT, SK_PIN_DOWN, SK_APPLY_POISON,
+                       SK_FEROCIOUS_STRIKE, SK_WINNOWING, SK_TROLL_UNGUENT,
+                       SK_RESURRECTION_SIGNET },
+    [PROF_MONK]    = { SK_SMITE, SK_BANISH, SK_BANE_SIGNET, SK_ORISON_OF_HEALING,
+                       SK_HEALING_BREEZE, SK_REVERSAL_OF_FORTUNE, SK_PROTECTIVE_SPIRIT,
+                       SK_RESURRECTION_SIGNET },
+    [PROF_NECROMANCER] = { SK_VAMPIRIC_GAZE, SK_DEATHLY_SWARM, SK_FAINTHEARTEDNESS,
+                           SK_ROTTING_FLESH, SK_BARBED_SIGNET, SK_WELL_OF_BLOOD,
+                           SK_ANIMATE_BONE_HORROR, SK_RESURRECTION_SIGNET },
+    [PROF_MESMER]  = { SK_ETHER_FEAST, SK_CONJURE_PHANTASM, SK_SHATTER_DELUSIONS,
+                       SK_EMPATHY, SK_DIVERSION, SK_IMAGINED_BURDEN,
+                       SK_SHATTER_ENCHANTMENT, SK_RESURRECTION_SIGNET },
+    [PROF_ELEMENTALIST] = { SK_FIRE_BOLT, SK_CINDER_STORM, SK_METEOR, SK_SHARD_STORM,
+                            SK_STONING, SK_MIND_SEAR, SK_ARMOR_OF_EARTH,
+                            SK_RESURRECTION_SIGNET },
+};
+
+#define TRIAL_LEVEL 12
+#define TRIAL_ATTR_RANK 11
+
+void World_TrialReset(void) {
+    LoadZone(ZONE_TRIAL, (Vector2){ 0, 0 });
+}
+
+void World_EnterTrial(void) {
+    // Build the ordinary starting character first, so the arena runs on
+    // exactly the same entity, kit and stat pipeline the campaign does.
+    World_Init();
+
+    Entity *player = Entity_Get(PLAYER_INDEX);
+    if (!player) return;
+
+    // Levelled, and every attribute of their own profession ranked up -
+    // read off the attribute table rather than hand-listed, so a new
+    // attribute joins a trial build the day it is added.
+    player->level = TRIAL_LEVEL;
+    for (int a = 0; a < ATTR_COUNT; a++) {
+        if (g_attributeProfession[a] == player->primaryProfession) {
+            player->attributeRank[a] = TRIAL_ATTR_RANK;
+        }
+    }
+    Entity_RecomputeAttributeStats(player);
+    player->attributePoints = 0;
+
+    // The full bar, and every skill on it known - this is the whole
+    // point of the mode.
+    int prof = (int)player->primaryProfession;
+    if (prof < 0 || prof >= PROF_COUNT) prof = PROF_ELEMENTALIST;
+    for (int s = 0; s < SKILL_BAR_SIZE; s++) {
+        int id = g_trialBars[prof][s];
+        player->skillBar[s] = id;
+        player->skillRecharge[s] = 0.0f;
+        Skillbook_Unlock(id);
+    }
+
+    player->hp = player->maxHp;
+    player->energy = player->maxEnergy;
+
+    LoadZone(ZONE_TRIAL, (Vector2){ 0, 0 });
+}
+
 void World_Update(Entity *player, float dt) {
     if (g_portalCooldown > 0.0f) {
         g_portalCooldown -= dt;
@@ -1944,7 +2075,10 @@ void World_Update(Entity *player, float dt) {
     if (!player) return;
 
     // --- Death & resurrection bookkeeping (explorable only) ---
-    if (g_zone->mode == MODE_EXPLORABLE) {
+    // The arena opts out entirely: a run ends when you fall, and a shrine
+    // respawn two seconds later would take that ending away. trial.c owns
+    // what happens next.
+    if (g_zone->mode == MODE_EXPLORABLE && g_zoneId != ZONE_TRIAL) {
         int aliveCount = 0, deadCount = 0;
         for (int i = 0; i < g_entityCount; i++) {
             Entity *e = &g_entities[i];

@@ -37,6 +37,7 @@ typedef enum {
     ZONE_FOIBLES_FAIR,        // outpost: the bazaar in Wizard's Folly
     ZONE_BARRADIN_ESTATE,     // explorable: Duke Barradin's devourer-plagued lands
     ZONE_FORT_RANIK,          // outpost, Reforged Mode only: the frontier fort
+    ZONE_TRIAL,               // the wave arena (trial.c); not part of the campaign map
     ZONE_COUNT
 } ZoneId;
 
@@ -112,6 +113,30 @@ bool World_GroundIsStone(void);
 
 // Creates the player + loads the starting outpost. Call once at startup.
 void World_Init(void);
+
+// --- The Trial arena -------------------------------------------------
+// A foe the arena spawns at runtime, rather than from a zone's static
+// spawn table. Mirrors the fields of world.c's private SpawnDef that the
+// arena actually varies, so SpawnDef itself stays internal.
+typedef struct {
+    const char *name;
+    Vector2 pos;
+    int level, hp, armor, strengthRank;
+    bool caster;    // ranged Fire Magic loadout
+    bool withHowl;  // carries Feral Howl, the interruptible self-heal
+    bool boss;
+    int species;
+    int group;
+} FoeSpec;
+
+struct Entity *World_SpawnFoe(const FoeSpec *spec);
+
+// Builds a trial-ready character - levelled, attributes spent, and a
+// FULL eight-skill bar for their profession - and loads the arena.
+void World_EnterTrial(void);
+
+// Puts the player back at the arena's centre for a fresh run.
+void World_TrialReset(void);
 
 // Portal proximity checks + zone transitions. Call every frame.
 void World_Update(struct Entity *player, float dt);

@@ -22,6 +22,7 @@
 #include "ui_hit.h"
 #include "ui_cursor.h"
 #include "ui_map.h"
+#include "trial.h"
 #include "ui_menu.h"
 #include "ui_create.h"
 #include "ui_select.h"
@@ -123,6 +124,7 @@ int main(void) {
 
     bool quitRequested = false;
     bool paused = false;
+    bool trialPending = false; // creator was opened on the way to the arena
 
     while (!WindowShouldClose() && !quitRequested) {
         float dt = GetFrameTime();
@@ -162,6 +164,12 @@ int main(void) {
                 // title screen doesn't ask it twice.
                 UI_SelectReset();
                 app = APP_SELECT;
+            } else if (action == MENU_TRIAL) {
+                // The arena still asks which profession, because the bar
+                // IS the choice - but nothing else, and no cinematic.
+                trialPending = true;
+                UI_CreateReset();
+                app = APP_CREATE;
             }
             continue;
         }
@@ -222,13 +230,24 @@ int main(void) {
             UICursor_Draw(screenHeight);
             EndDrawing();
             if (ca == CREATE_CONFIRM) {
-                StartGame(false, &camera);
-                // A newly made hero watches the kingdom's last dawn before
-                // they wake in Ascalon City. Loading an existing character
-                // (from the roster) skips straight to play.
-                UI_IntroReset();
-                app = APP_INTRO;
+                if (trialPending) {
+                    // Straight to the arena: no intro, no outpost, no
+                    // errands. Fighting starts within seconds.
+                    trialPending = false;
+                    World_EnterTrial();
+                    Trial_Start();
+                    camera.target = Entity_Get(PLAYER_INDEX)->pos;
+                    app = APP_PLAYING;
+                } else {
+                    StartGame(false, &camera);
+                    // A newly made hero watches the kingdom's last dawn before
+                    // they wake in Ascalon City. Loading an existing character
+                    // (from the roster) skips straight to play.
+                    UI_IntroReset();
+                    app = APP_INTRO;
+                }
             } else if (ca == CREATE_CANCEL) {
+                trialPending = false;
                 UI_SelectReset(); // back to the roster, not past it
                 app = APP_SELECT;
             }
@@ -253,6 +272,21 @@ int main(void) {
             paused = !paused;
         }
 
+        // Arena run over: R runs it again immediately, Esc leaves. The
+        // retry has to be one key - a slow restart is what kills a
+        // wave mode.
+        if (Trial_RunOver()) {
+            if (IsKeyPressed(KEY_R) ||
+                (IsGamepadAvailable(0) && IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN))) {
+                World_TrialReset();
+                Trial_Start();
+            } else if (IsKeyPressed(KEY_ESCAPE)) {
+                Trial_Stop();
+                app = APP_MENU;
+                continue;
+            }
+        }
+
         Entity *playerNow = Entity_Get(PLAYER_INDEX);
         if (!paused) {
             Input_Update(&camera, dt);
@@ -274,6 +308,10 @@ int main(void) {
             MapDraw_Update(dt);
             if (playerNow && World_GetMode() == MODE_EXPLORABLE)
                 MapDraw_RecordStep(playerNow->pos);
+
+            // The arena drives its own wave clock on top of the ordinary
+            // world tick - the fighting underneath is the normal game.
+            Trial_Update(dt);
 
             // Turning in Sir Tydus' Academy trial sets this, and the
             // county stops existing the moment it does. Checked here in
@@ -328,6 +366,9 @@ int main(void) {
             // trainer's list - and painted here so they land above all
             // of them rather than under the next window drawn.
             UITooltip_Flush(Entity_Get(PLAYER_INDEX), screenWidth, screenHeight);
+            // Wave counter, banner and run summary, above the HUD but
+            // below the pointer.
+            Trial_Draw(screenWidth, screenHeight);
             UICursor_Draw(screenHeight); // menu pointer, above everything it clicks
         } else {
             PauseAction pa = UI_DrawPauseMenu(screenWidth, screenHeight);
@@ -393,8 +434,11 @@ int main(void) {
             }
         }
 
-        // Death overlay: GW1 dims the world and tells you plainly.
-        if (playerNow && !playerNow->alive) {
+        // Death overlay: GW1 dims the world and tells you plainly. The
+        // arena writes its own ending (a run summary, and no shrine to
+        // return to), so it suppresses this one rather than stacking two
+        // dimmers and two contradictory messages.
+        if (playerNow && !playerNow->alive && !Trial_IsActive()) {
             DrawRectangle(0, 0, screenWidth, screenHeight, (Color){ 0, 0, 0, 110 });
             int bigFont = UI_ScaledFontSize(screenHeight, 34);
             const char *msg = "You have died.";

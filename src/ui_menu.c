@@ -88,14 +88,18 @@ MenuAction UI_DrawMainMenu(int screenWidth, int screenHeight, bool hasSave) {
     }
 
     // The entry list depends on whether a save exists.
-    const char *labels[3];
-    MenuAction actions[3];
+    const char *labels[4];
+    MenuAction actions[4];
     int count = 0;
     // One entry, not "Continue" plus "New Game": with six character
     // slots the roster is where both of those decisions are made, and
     // duplicating them here would only ask the same question twice.
     (void)hasSave;
     labels[count] = "Play";  actions[count++] = MENU_NEW_GAME;
+    // The arena, one keypress from the title: a full eight-skill bar and
+    // a fight inside ten seconds, which is the shortest path to what the
+    // campaign spends hours getting to.
+    labels[count] = "The Trial";  actions[count++] = MENU_TRIAL;
     labels[count] = "Quit";  actions[count++] = MENU_QUIT;
 
     // --- Selection movement: D-pad / left stick / arrow keys / W-S ---
